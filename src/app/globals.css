@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/*
+  Same brand palette as NEXT/admin and NEXT/website (navy/cream/blue/gold) — do not drift these
+  without updating all three. Desktop's own palette (renderer/shared/styles/globals.css) is the
+  same family under different hex values (navy sidebar, cream app background, blue accent).
+*/
+@theme {
+  --font-display: var(--font-archivo-black);
+  --font-mono: var(--font-jetbrains-mono);
+
+  --color-navy: #16204a;
+  --color-navy-deep: #0e1531;
+  --color-blue: #2f5fe0;
+  --color-blue-press: #244cc0;
+  --color-cream: #f4eee1;
+  --color-cream-dark: #eae2d0;
+  --color-gold: #c8912e;
+  --color-gold-text: #b07c1e;
+  --color-green: #00693e;
+  --color-green-lt: #4caf7d;
+  --color-red: #a6192e;
+}
+
+:root {
+  color: var(--color-navy);
+  background: var(--color-cream-dark);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* This is a phone-first, single-column app — the admin dashboard's "signature 2-col dashed-line
+     layout" is a desktop-width pattern that doesn't apply here. */
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--color-blue);
+  color: #fff;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}

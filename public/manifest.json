@@ -1,0 +1,14 @@
+{
+  "name": "Blue Ledger Owner",
+  "short_name": "BL Owner",
+  "description": "View your business performance from anywhere — sales, profit, stock, and outstanding credit.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eae2d0",
+  "theme_color": "#16204a",
+  "icons": [
+    { "src": "/BLUE_LEDGER.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/BLUE_LEDGER.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
