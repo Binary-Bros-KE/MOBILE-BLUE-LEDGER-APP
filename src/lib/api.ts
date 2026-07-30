@@ -24,6 +24,7 @@ import type {
   StockMovementRow,
   TransactionRow,
 } from "./types";
+import { timezoneOffsetMinutes } from "./period";
 
 // The only place this app knows the API's address — change NEXT_PUBLIC_API_URL in .env.local
 // (or the real deployment env) and nothing else needs to change.
@@ -92,11 +93,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+// timezoneOffsetMinutes is appended here (not required on the caller-supplied SalesReportPeriodInput
+// itself) so every call site gets it for free — SERVER resolves "today"/"this week"/etc. against
+// THIS value, never the tenant's stored business-record timezone.
 function periodQuery(period: SalesReportPeriodInput): string {
+  const tz = `timezoneOffsetMinutes=${timezoneOffsetMinutes()}`;
   if (period.mode === "custom") {
-    return `mode=custom&startDate=${encodeURIComponent(period.startDate)}&endDate=${encodeURIComponent(period.endDate)}`;
+    return `mode=custom&startDate=${encodeURIComponent(period.startDate)}&endDate=${encodeURIComponent(period.endDate)}&${tz}`;
   }
-  return `mode=${period.mode}&anchor=${encodeURIComponent(period.anchor)}`;
+  return `mode=${period.mode}&anchor=${encodeURIComponent(period.anchor)}&${tz}`;
 }
 
 export const api = {
@@ -105,7 +110,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ licenseKey, employeeCode, pin }),
     }),
-  getDashboard: (period: MobilePeriod) => request<OwnerDashboard>(`/mobile/dashboard?period=${period}`),
+  getDashboard: (period: MobilePeriod) =>
+    request<OwnerDashboard>(`/mobile/dashboard?period=${period}&timezoneOffsetMinutes=${timezoneOffsetMinutes()}`),
   getMe: () => request<MobileSessionInfo>("/mobile/me"),
   listEmployees: () => request<Employee[]>("/mobile/employees"),
   getEmployeeSalaries: (employeeId: string) => request<Salary[]>(`/mobile/employees/${employeeId}/salaries`),

@@ -1,8 +1,8 @@
 /** Ported from DESKTOP's own reports/salesReportDate.ts — same grain-based period model (Daily/
  * Weekly/Monthly/Yearly are fixed calendar periods stepped via `anchor`, Custom is a plain date
- * range). All pure date-string math, no timezone awareness needed here — the anchor is just a
- * calendar label; SERVER resolves it to a real tenant-timezone instant range
- * (mobile-sales-report-service.ts). */
+ * range). The anchor itself is a calendar label; SERVER resolves it to a real instant range using
+ * this device's own timezoneOffsetMinutes() (mobile-sales-report-service.ts) — never the tenant's
+ * stored business-record timezone, and never the server's own host timezone. */
 
 export type SalesReportMode = "daily" | "weekly" | "monthly" | "yearly" | "custom";
 
@@ -10,8 +10,20 @@ function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** This device's real local calendar date, right now — deliberately NOT toIsoDate(new Date()),
+ * which reads UTC date parts off a real "now" moment and is wrong by a day for part of the day in
+ * any timezone ahead of UTC (e.g. at 1am in Nairobi, UTC is still on yesterday's date). Every OTHER
+ * date in this module is an abstract calendar-date string being stepped/compared via UTC arithmetic
+ * purely as a DST-safe technique — that's fine and unrelated to this. */
 export function todayIso(): string {
-  return toIsoDate(new Date());
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+/** Sent with every request that resolves a period on SERVER — same convention as JS's own
+ * Date.prototype.getTimezoneOffset() (e.g. Nairobi/UTC+3 returns -180). */
+export function timezoneOffsetMinutes(): number {
+  return new Date().getTimezoneOffset();
 }
 
 function addDaysIso(dateStr: string, days: number): string {
