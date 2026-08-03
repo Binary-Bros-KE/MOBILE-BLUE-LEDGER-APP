@@ -6,6 +6,7 @@ import type {
   MobileLocation,
   MobilePeriod,
   MobileSessionInfo,
+  MobileTaxReport,
   OwnerDashboard,
   ProductListItem,
   PurchaseDetail,
@@ -139,6 +140,7 @@ export const api = {
   getSalesReportOverview: (period: SalesReportPeriodInput) => request<SalesReportOverview>(`/mobile/sales-report/overview?${periodQuery(period)}`),
   getSalesTrend: (period: SalesReportPeriodInput) => request<SalesTrendResult>(`/mobile/sales-report/trend?${periodQuery(period)}`),
   getSalesBreakdowns: (period: SalesReportPeriodInput) => request<SalesReportBreakdowns>(`/mobile/sales-report/breakdowns?${periodQuery(period)}`),
+  getSalesTaxBreakdown: (period: SalesReportPeriodInput) => request<MobileTaxReport>(`/mobile/sales-report/tax?${periodQuery(period)}`),
   createShareLink: (entity: ShareDocumentEntity, entityId: string, includePreview: boolean) =>
     request<ShareLinkResult>("/mobile/share-links", {
       method: "POST",

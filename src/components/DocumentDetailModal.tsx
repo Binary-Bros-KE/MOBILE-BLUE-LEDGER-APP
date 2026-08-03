@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Download, Loader2, Share2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { formatCents } from "@/lib/money";
+import { taxBreakdownLabel } from "@/lib/tax";
 import type { SharedDocument } from "@/lib/types";
 
 const KIND_LABEL: Record<SharedDocument["documentKind"], string> = {
@@ -201,12 +202,28 @@ export function DocumentDetailModal({
               <div className="space-y-1 text-xs">
                 <Row label="Subtotal" value={money(doc.subtotalCents)} />
                 {doc.discountAmountCents > 0 && <Row label="Discount" value={`-${money(doc.discountAmountCents)}`} />}
-                <Row label="Tax" value={money(doc.taxAmountCents)} />
                 <Row label="Total" value={money(doc.grandTotalCents)} strong />
                 {doc.balanceDueCents !== null && doc.balanceDueCents > 0 && (
                   <Row label="Balance Due" value={money(doc.balanceDueCents)} strong className="text-red" />
                 )}
               </div>
+
+              {doc.taxBreakdown.length > 0 && (
+                <>
+                  <div className="my-3 border-t border-dashed border-navy/15" />
+                  <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-navy/50">Tax Breakdown</p>
+                  <div className="space-y-1 text-xs">
+                    {doc.taxBreakdown.map((entry) => (
+                      <div key={entry.taxType} className="flex justify-between gap-2">
+                        <span className="font-bold text-navy">{taxBreakdownLabel(entry.taxType, doc.vatRatePercent)}</span>
+                        <span className="text-navy/70">
+                          Net {money(entry.netCents)} / Tax {money(entry.taxCents)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
               {(doc.paymentMethodName || doc.paymentReference) && (
                 <>

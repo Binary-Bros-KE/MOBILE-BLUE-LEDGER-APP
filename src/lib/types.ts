@@ -146,6 +146,15 @@ export type SharedPayment = {
 
 export type PricedDocumentKind = "receipt" | "invoice" | "quotation";
 
+export type TaxType = "vat" | "exempted" | "zero_rated";
+
+export type TaxBreakdownEntry = {
+  taxType: TaxType;
+  netCents: number;
+  taxCents: number;
+  grossCents: number;
+};
+
 export type SharedDocument = {
   documentKind: PricedDocumentKind;
   businessName: string;
@@ -164,6 +173,8 @@ export type SharedDocument = {
   subtotalCents: number;
   discountAmountCents: number;
   taxAmountCents: number;
+  taxBreakdown: TaxBreakdownEntry[];
+  vatRatePercent: number;
   grandTotalCents: number;
   paymentMethodName: string | null;
   paymentReference: string | null;
@@ -299,6 +310,26 @@ export type SalesByEmployeeRow = {
 
 export type SalesReportBreakdowns = { byStorefront: SalesByStorefrontRow[]; byEmployee: SalesByEmployeeRow[] };
 
+export type MobileTaxTopProductRow = {
+  productId: string;
+  productName: string;
+  sku: string;
+  taxType: TaxType;
+  quantitySold: number;
+  netCents: number;
+  taxCents: number;
+  grossCents: number;
+};
+
+export type MobileTaxReport = {
+  vatRatePercent: number;
+  byCategory: TaxBreakdownEntry[];
+  totalNetCents: number;
+  totalTaxCents: number;
+  totalGrossCents: number;
+  topTaxedProducts: MobileTaxTopProductRow[];
+};
+
 export type ProductListItem = {
   id: string;
   name: string;
@@ -339,6 +370,7 @@ export type PurchaseItemLine = {
   lineTotalCents: number;
 };
 
+
 export type PurchasePaymentLine = {
   paymentMethodName: string;
   amountCents: number;
@@ -364,6 +396,8 @@ export type PurchaseDetail = {
   subtotalCents: number;
   discountAmountCents: number;
   taxAmountCents: number;
+  taxBreakdown: TaxBreakdownEntry[];
+  vatRatePercent: number;
   grandTotalCents: number;
   amountPaidCents: number;
   payments: PurchasePaymentLine[];

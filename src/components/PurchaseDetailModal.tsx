@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
+import { taxBreakdownLabel } from "@/lib/tax";
 import type { PurchaseDetail } from "@/lib/types";
 import { Row } from "./DocumentDetailModal";
 
@@ -118,10 +119,26 @@ export function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: strin
             <div className="space-y-1 text-xs">
               <Row label="Subtotal" value={money(doc.subtotalCents)} />
               {doc.discountAmountCents > 0 && <Row label="Discount" value={`-${money(doc.discountAmountCents)}`} />}
-              <Row label="Tax" value={money(doc.taxAmountCents)} />
               <Row label="Total" value={money(doc.grandTotalCents)} strong />
               <Row label="Paid" value={money(doc.amountPaidCents)} />
             </div>
+
+            {doc.taxBreakdown.length > 0 && (
+              <>
+                <div className="my-3 border-t border-dashed border-navy/15" />
+                <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-navy/50">Tax Breakdown</p>
+                <div className="space-y-1 text-xs">
+                  {doc.taxBreakdown.map((entry) => (
+                    <div key={entry.taxType} className="flex justify-between gap-2">
+                      <span className="font-bold text-navy">{taxBreakdownLabel(entry.taxType, doc.vatRatePercent)}</span>
+                      <span className="text-navy/70">
+                        Net {money(entry.netCents)} / Tax {money(entry.taxCents)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
             {doc.payments.length > 0 && (
               <>

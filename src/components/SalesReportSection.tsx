@@ -5,7 +5,15 @@ import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { defaultAnchorForMode } from "@/lib/period";
-import type { SalesByEmployeeRow, SalesByStorefrontRow, SalesReportOverview, SalesReportPeriodInput, SalesTrendResult } from "@/lib/types";
+import { taxBreakdownLabel } from "@/lib/tax";
+import type {
+  MobileTaxReport,
+  SalesByEmployeeRow,
+  SalesByStorefrontRow,
+  SalesReportOverview,
+  SalesReportPeriodInput,
+  SalesTrendResult,
+} from "@/lib/types";
 import { HorizontalBarList } from "./charts/HorizontalBarList";
 import { TrendAreaChart } from "./charts/TrendAreaChart";
 import { SalesReportPeriodSelector } from "./SalesReportPeriodSelector";
@@ -130,18 +138,21 @@ export function SalesReportSection() {
   const [overview, setOverview] = useState<SalesReportOverview | null>(null);
   const [trend, setTrend] = useState<SalesTrendResult | null>(null);
   const [breakdowns, setBreakdowns] = useState<Breakdowns | null>(null);
+  const [taxReport, setTaxReport] = useState<MobileTaxReport | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setOverview(null);
     setTrend(null);
     setBreakdowns(null);
+    setTaxReport(null);
     setError(null);
-    Promise.all([api.getSalesReportOverview(period), api.getSalesTrend(period), api.getSalesBreakdowns(period)])
-      .then(([o, t, b]) => {
+    Promise.all([api.getSalesReportOverview(period), api.getSalesTrend(period), api.getSalesBreakdowns(period), api.getSalesTaxBreakdown(period)])
+      .then(([o, t, b, tax]) => {
         setOverview(o);
         setTrend(t);
         setBreakdowns(b);
+        setTaxReport(tax);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load the sales report."));
   }, [period]);
@@ -263,6 +274,26 @@ export function SalesReportSection() {
                     currency={overview.currency}
                   />
                 ))}
+              </div>
+            </div>
+          )}
+
+          {taxReport && taxReport.byCategory.length > 0 && (
+            <div className="rounded-lg bg-white p-4 shadow-sm">
+              <p className="mb-3 text-[11px] font-bold tracking-wide text-navy/50 uppercase">Tax Breakdown</p>
+              <div className="space-y-2">
+                {taxReport.byCategory.map((entry) => (
+                  <div key={entry.taxType} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="font-bold text-navy">{taxBreakdownLabel(entry.taxType, taxReport.vatRatePercent)}</span>
+                    <span className="text-navy/70">
+                      Net {money(entry.netCents)} / Tax {money(entry.taxCents)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between gap-2 border-t border-navy/10 pt-2 text-sm font-extrabold text-navy">
+                  <span>Total</span>
+                  <span>{money(taxReport.totalGrossCents)}</span>
+                </div>
               </div>
             </div>
           )}
