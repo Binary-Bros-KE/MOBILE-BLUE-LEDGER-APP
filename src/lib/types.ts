@@ -25,7 +25,7 @@ export type ExpensesAndProfit = {
   expensesCents: number;
   purchasesPaidCents: number;
   salariesPaidCents: number;
-  deliveryServiceCostsCents: number;
+  serviceChargeCostsCents: number;
   totalExpensesCents: number;
   netRevenueCents: number;
   netProfitCents: number;
