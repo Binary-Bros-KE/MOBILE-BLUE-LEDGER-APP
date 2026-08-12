@@ -190,7 +190,7 @@ export function SalesReportSection() {
               label="Total Expenses"
               valueCents={overview.totalExpensesCents}
               currency={overview.currency}
-              formula="Expenses + suppliers + salaries paid"
+              formula="Expenses + salaries paid — capital excluded"
               deltaPercent={overview.totalExpensesChangePercent}
             />
             <OverviewCard
@@ -200,6 +200,14 @@ export function SalesReportSection() {
               currency={overview.currency}
               formula="Net Revenue − Total Expenses"
               deltaPercent={overview.netProfitChangePercent}
+            />
+            <OverviewCard
+              tone="blue"
+              label="Total Capital Invested"
+              valueCents={overview.purchasesPaidCents}
+              currency={overview.currency}
+              formula="Purchases (goods + shipping) paid to suppliers this period — not counted in Total Expenses"
+              deltaPercent={null}
             />
           </div>
 

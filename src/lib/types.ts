@@ -284,6 +284,9 @@ export type SalesReportOverview = {
   averageDailyRevenueCents: number;
   topProducts: SalesTopProduct[];
   paymentSplit: PaymentMethodBreakdownEntry[];
+  /** Purchases (goods + shipping) actually paid to suppliers this period — "Total Capital
+   * Invested." Informational only, never folded into totalExpensesCents/netProfitCents. */
+  purchasesPaidCents: number;
 };
 
 export type SalesTrendPoint = { periodLabel: string; periodStart: string; revenueCents: number; transactionCount: number; isSelected: boolean };
