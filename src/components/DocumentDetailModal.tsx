@@ -208,7 +208,7 @@ export function DocumentDetailModal({
                 )}
               </div>
 
-              {doc.taxBreakdown.length > 0 && (
+              {doc.includeTaxBreakdown && doc.taxBreakdown.length > 0 && (
                 <>
                   <div className="my-3 border-t border-dashed border-navy/15" />
                   <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-navy/50">Tax Breakdown</p>

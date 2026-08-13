@@ -174,6 +174,10 @@ export type SharedDocument = {
   discountAmountCents: number;
   taxAmountCents: number;
   taxBreakdown: TaxBreakdownEntry[];
+  /** Whether the Tax Breakdown section should actually render on this document — see SERVER's
+   * Sale/Quotation Prisma model doc comment for the same field. taxBreakdown itself is always
+   * present regardless. */
+  includeTaxBreakdown: boolean;
   vatRatePercent: number;
   grandTotalCents: number;
   paymentMethodName: string | null;
