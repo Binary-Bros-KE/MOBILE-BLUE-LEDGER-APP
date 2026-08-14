@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CreditCard, PackageX } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
-import type { OwnerDashboard } from "@/lib/types";
+import type { MobileLocation, OwnerDashboard } from "@/lib/types";
+import { FilterChip } from "../FilterChip";
 import { SalesReportSection } from "../SalesReportSection";
+
+const ALL_FILTER = "__all__";
 
 /** Stock Alerts and Outstanding Credit are "as of right now" snapshots, not period-scoped — same
  * philosophy as DESKTOP's own Debtors/Creditors section (see DebtorsCreditorsSection.tsx: "live
@@ -14,27 +17,55 @@ import { SalesReportSection } from "../SalesReportSection";
  * period range internally, so a single fixed "today" call is fetched once here, independent of the
  * Sales Report's own period selector below. */
 export function DashboardTab() {
+  const [locations, setLocations] = useState<MobileLocation[] | null>(null);
+  const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api
-      .getDashboard("today")
-      .then(setDashboard)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Could not reach the API. Check your connection."));
+    api.listLocations().then(setLocations).catch(() => {
+      // Filter chips just fall back to "All only" — not worth failing the whole tab over.
+    });
   }, []);
 
-  return (
-    <div className="space-y-4 px-4 py-4 pb-10">
-      <SalesReportSection />
+  const locationId = locationFilter === ALL_FILTER ? undefined : locationFilter;
 
-      {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
-      {dashboard && (
-        <>
-          <StockCard dashboard={dashboard} />
-          <CreditCard_ dashboard={dashboard} currency={dashboard.currency} />
-        </>
+  useEffect(() => {
+    setDashboard(null);
+    setError(null);
+    api
+      .getDashboard("today", locationId)
+      .then(setDashboard)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Could not reach the API. Check your connection."));
+  }, [locationId]);
+
+  return (
+    <div className="pb-10">
+      {locations && locations.length > 1 && (
+        <div className="sticky top-[60px] z-10 flex gap-1.5 overflow-x-auto border-b border-navy/10 bg-cream-dark/95 px-4 py-3 backdrop-blur [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => setLocationFilter(ALL_FILTER)} />
+          {locations.map((location) => (
+            <FilterChip
+              key={location.id}
+              label={location.locationName}
+              active={locationFilter === location.id}
+              onClick={() => setLocationFilter(location.id)}
+            />
+          ))}
+        </div>
       )}
+
+      <div className="space-y-4 px-4 py-4">
+        <SalesReportSection locationId={locationId} />
+
+        {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
+        {dashboard && (
+          <>
+            <StockCard dashboard={dashboard} />
+            <CreditCard_ dashboard={dashboard} currency={dashboard.currency} />
+          </>
+        )}
+      </div>
     </div>
   );
 }

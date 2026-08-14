@@ -24,11 +24,23 @@ const TAB_LABELS: Record<TabKey, string> = Object.fromEntries(
   navGroups.flatMap((group) => group.items.map((item) => [item.key, item.label])),
 ) as Record<TabKey, string>;
 
+const ACTIVE_TAB_STORAGE_KEY = "bl_owner_active_tab";
+
+function isTabKey(value: string | null): value is TabKey {
+  return value !== null && value in TAB_LABELS;
+}
+
 export function AppShell() {
   const { logout } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<TabKey>("dashboard");
+  // Restored from localStorage so a refresh (or the PWA relaunching) lands back on whatever tab
+  // the owner was last looking at, instead of always resetting to Dashboard.
+  const [activeTab, setActiveTabState] = useState<TabKey>(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const stored = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+    return isTabKey(stored) ? stored : "dashboard";
+  });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [session, setSession] = useState<MobileSessionInfo | null>(null);
 
@@ -38,6 +50,11 @@ export function AppShell() {
       // over a display-only nicety.
     });
   }, []);
+
+  function setActiveTab(tab: TabKey) {
+    setActiveTabState(tab);
+    if (typeof window !== "undefined") localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab);
+  }
 
   function handleSignOut() {
     logout();

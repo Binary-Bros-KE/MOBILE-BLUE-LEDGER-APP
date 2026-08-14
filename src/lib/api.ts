@@ -97,12 +97,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // timezoneOffsetMinutes is appended here (not required on the caller-supplied SalesReportPeriodInput
 // itself) so every call site gets it for free — SERVER resolves "today"/"this week"/etc. against
 // THIS value, never the tenant's stored business-record timezone.
-function periodQuery(period: SalesReportPeriodInput): string {
+function periodQuery(period: SalesReportPeriodInput, locationId?: string): string {
   const tz = `timezoneOffsetMinutes=${timezoneOffsetMinutes()}`;
+  const loc = locationId ? `&locationId=${encodeURIComponent(locationId)}` : "";
   if (period.mode === "custom") {
-    return `mode=custom&startDate=${encodeURIComponent(period.startDate)}&endDate=${encodeURIComponent(period.endDate)}&${tz}`;
+    return `mode=custom&startDate=${encodeURIComponent(period.startDate)}&endDate=${encodeURIComponent(period.endDate)}&${tz}${loc}`;
   }
-  return `mode=${period.mode}&anchor=${encodeURIComponent(period.anchor)}&${tz}`;
+  return `mode=${period.mode}&anchor=${encodeURIComponent(period.anchor)}&${tz}${loc}`;
 }
 
 export const api = {
@@ -111,8 +112,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ licenseKey, employeeCode, pin }),
     }),
-  getDashboard: (period: MobilePeriod) =>
-    request<OwnerDashboard>(`/mobile/dashboard?period=${period}&timezoneOffsetMinutes=${timezoneOffsetMinutes()}`),
+  getDashboard: (period: MobilePeriod, locationId?: string) =>
+    request<OwnerDashboard>(
+      `/mobile/dashboard?period=${period}&timezoneOffsetMinutes=${timezoneOffsetMinutes()}${locationId ? `&locationId=${encodeURIComponent(locationId)}` : ""}`,
+    ),
   getMe: () => request<MobileSessionInfo>("/mobile/me"),
   listEmployees: () => request<Employee[]>("/mobile/employees"),
   getEmployeeSalaries: (employeeId: string) => request<Salary[]>(`/mobile/employees/${employeeId}/salaries`),
@@ -137,10 +140,14 @@ export const api = {
     request<ExpenseListItem[]>(`/mobile/expenses${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   listStockMovements: (locationId?: string) =>
     request<StockMovementRow[]>(`/mobile/stock-ledger${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
-  getSalesReportOverview: (period: SalesReportPeriodInput) => request<SalesReportOverview>(`/mobile/sales-report/overview?${periodQuery(period)}`),
-  getSalesTrend: (period: SalesReportPeriodInput) => request<SalesTrendResult>(`/mobile/sales-report/trend?${periodQuery(period)}`),
-  getSalesBreakdowns: (period: SalesReportPeriodInput) => request<SalesReportBreakdowns>(`/mobile/sales-report/breakdowns?${periodQuery(period)}`),
-  getSalesTaxBreakdown: (period: SalesReportPeriodInput) => request<MobileTaxReport>(`/mobile/sales-report/tax?${periodQuery(period)}`),
+  getSalesReportOverview: (period: SalesReportPeriodInput, locationId?: string) =>
+    request<SalesReportOverview>(`/mobile/sales-report/overview?${periodQuery(period, locationId)}`),
+  getSalesTrend: (period: SalesReportPeriodInput, locationId?: string) =>
+    request<SalesTrendResult>(`/mobile/sales-report/trend?${periodQuery(period, locationId)}`),
+  getSalesBreakdowns: (period: SalesReportPeriodInput, locationId?: string) =>
+    request<SalesReportBreakdowns>(`/mobile/sales-report/breakdowns?${periodQuery(period, locationId)}`),
+  getSalesTaxBreakdown: (period: SalesReportPeriodInput, locationId?: string) =>
+    request<MobileTaxReport>(`/mobile/sales-report/tax?${periodQuery(period, locationId)}`),
   createShareLink: (entity: ShareDocumentEntity, entityId: string, includePreview: boolean) =>
     request<ShareLinkResult>("/mobile/share-links", {
       method: "POST",

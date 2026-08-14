@@ -133,7 +133,7 @@ type Breakdowns = { byStorefront: SalesByStorefrontRow[]; byEmployee: SalesByEmp
  * table can't fit a phone screen). All Transactions / Voids & Returns / Cancelled Purchases /
  * Debtors & Creditors / the "how we calculate this" formula panel are deliberately deferred — see
  * [[project_sales_report_mobile]] for the phasing rationale. */
-export function SalesReportSection() {
+export function SalesReportSection({ locationId }: { locationId?: string }) {
   const [period, setPeriod] = useState<SalesReportPeriodInput>({ mode: "daily", anchor: defaultAnchorForMode("daily") });
   const [overview, setOverview] = useState<SalesReportOverview | null>(null);
   const [trend, setTrend] = useState<SalesTrendResult | null>(null);
@@ -147,7 +147,12 @@ export function SalesReportSection() {
     setBreakdowns(null);
     setTaxReport(null);
     setError(null);
-    Promise.all([api.getSalesReportOverview(period), api.getSalesTrend(period), api.getSalesBreakdowns(period), api.getSalesTaxBreakdown(period)])
+    Promise.all([
+      api.getSalesReportOverview(period, locationId),
+      api.getSalesTrend(period, locationId),
+      api.getSalesBreakdowns(period, locationId),
+      api.getSalesTaxBreakdown(period, locationId),
+    ])
       .then(([o, t, b, tax]) => {
         setOverview(o);
         setTrend(t);
@@ -155,7 +160,7 @@ export function SalesReportSection() {
         setTaxReport(tax);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load the sales report."));
-  }, [period]);
+  }, [period, locationId]);
 
   const money = (cents: number) => formatCents(cents, overview?.currency ?? "KES");
 
