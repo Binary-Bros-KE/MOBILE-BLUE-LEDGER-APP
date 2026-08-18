@@ -173,6 +173,9 @@ export type SharedDocument = {
   subtotalCents: number;
   discountAmountCents: number;
   taxAmountCents: number;
+  /** The subset of taxAmountCents actually ADDED to reach grandTotalCents (exclusive-priced lines
+   * only) — what the "Total Tax" summary row shows, computed once server-side. */
+  addedTaxCents: number;
   taxBreakdown: TaxBreakdownEntry[];
   /** Whether the Tax Breakdown section should actually render on this document — see SERVER's
    * Sale/Quotation Prisma model doc comment for the same field. taxBreakdown itself is always
