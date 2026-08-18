@@ -296,8 +296,10 @@ export function SalesReportSection({ locationId }: { locationId?: string }) {
               <p className="mb-3 text-[11px] font-bold tracking-wide text-navy/50 uppercase">Tax Breakdown</p>
               <div className="space-y-2">
                 {taxReport.byCategory.map((entry) => (
-                  <div key={entry.taxType} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="font-bold text-navy">{taxBreakdownLabel(entry.taxType, taxReport.vatRatePercent)}</span>
+                  <div key={`${entry.taxType}:${entry.pricingMode ?? ""}`} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="font-bold text-navy">
+                      {taxBreakdownLabel(entry.taxType, taxReport.vatRatePercent, entry.pricingMode)}
+                    </span>
                     <span className="text-navy/70">
                       Net {money(entry.netCents)} / Tax {money(entry.taxCents)}
                     </span>

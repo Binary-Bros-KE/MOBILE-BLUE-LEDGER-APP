@@ -148,8 +148,13 @@ export type PricedDocumentKind = "receipt" | "invoice" | "quotation";
 
 export type TaxType = "vat" | "exempted" | "zero_rated";
 
+export type TaxPricingMode = "inclusive" | "exclusive";
+
 export type TaxBreakdownEntry = {
   taxType: TaxType;
+  /** Which pricing mode this row's lines used — "vat" splits into a separate row per mode present.
+   * Always null for exempted/zero-rated. */
+  pricingMode: TaxPricingMode | null;
   netCents: number;
   taxCents: number;
   grossCents: number;
