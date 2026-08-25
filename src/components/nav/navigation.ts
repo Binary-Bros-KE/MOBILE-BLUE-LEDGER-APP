@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Bike,
+  CheckCircle2,
   CreditCard,
   FileSpreadsheet,
   FileText,
@@ -28,7 +29,8 @@ export type TabKey =
   | "stockLedger"
   | "employees"
   | "customers"
-  | "riders";
+  | "riders"
+  | "approvals";
 
 export type NavItem = {
   key: TabKey;
@@ -69,6 +71,9 @@ export const navGroups: NavGroup[] = [
       // tabs (see CheckoutTab's CustomerPickerModal/DeliveryModal).
       { key: "customers", label: "Customers", icon: UserRound, ready: true, permission: { module: "customers", action: "view" } },
       { key: "riders", label: "Riders", icon: Bike, ready: true, permission: { module: "riders", action: "view" } },
+      // Same permission DESKTOP's own Approvals inbox requires — approving a manager-level decision
+      // needs the same grant here as it does there, not a mobile-specific one.
+      { key: "approvals", label: "Approvals", icon: CheckCircle2, ready: true, permission: { module: "approvals", action: "approve" } },
     ],
   },
   {

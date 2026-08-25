@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Minus, Plus, Search, Store, Trash2 } from "lucide-react";
 import { formatCents } from "@/lib/money";
-import { computeCartLineTaxResults } from "@/lib/cart-totals";
+import { computeCartLineTaxResults, naturalUnitPriceCents } from "@/lib/cart-totals";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileSupplier, ProductListItem } from "@/lib/types";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
@@ -60,6 +60,8 @@ export function CartItemsEditor({
           taxType: product.taxType,
           pricesTaxInclusive: product.pricesTaxInclusive,
           minimumPriceCents: product.minimumPriceCents,
+          wholesalePriceCents: product.wholesalePriceCents,
+          wholesaleMinQuantity: product.wholesaleMinQuantity,
           priceOverride: "",
           isLocallySourced: false,
           localCost: "",
@@ -133,12 +135,17 @@ export function CartItemsEditor({
             {cart.map((line, index) => {
               const priceBelowMinimum =
                 line.priceOverride.trim() && line.minimumPriceCents !== null && Math.round(Number(line.priceOverride) * 100) < line.minimumPriceCents;
+              const naturalPriceCents = naturalUnitPriceCents(line);
+              const wholesaleActive = naturalPriceCents !== line.unitPriceCents;
               return (
                 <div key={line.productId} className="rounded-lg border border-navy/10 bg-white p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-navy">{line.name}</p>
-                      <p className="text-[11px] text-navy/50">@ {formatCents(line.unitPriceCents, currency)}</p>
+                      <p className="text-[11px] text-navy/50">
+                        @ {formatCents(naturalPriceCents, currency)}
+                        {wholesaleActive && <span className="ml-1 font-bold text-blue">Wholesale</span>}
+                      </p>
                     </div>
                     <button type="button" onClick={() => removeLine(line.productId)} aria-label={`Remove ${line.name}`} className="flex-none text-navy/30 hover:text-red">
                       <Trash2 className="size-4" aria-hidden="true" />
@@ -172,7 +179,7 @@ export function CartItemsEditor({
                         step="0.01"
                         value={line.priceOverride}
                         onChange={(e) => updateLine(line.productId, { priceOverride: e.target.value })}
-                        placeholder={(line.unitPriceCents / 100).toFixed(2)}
+                        placeholder={(naturalPriceCents / 100).toFixed(2)}
                         className={`w-full min-w-0 rounded-md border px-1.5 py-1 text-right text-xs font-semibold focus:outline-none ${
                           priceBelowMinimum ? "border-red text-red" : "border-navy/15 text-navy focus:border-blue"
                         }`}

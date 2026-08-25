@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, Loader2, Truck, UserRound, X } from "lucide-react";
+import { ChevronRight, Loader2, Receipt, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { buildCartFromEditableItems, computeCartTotals } from "@/lib/cart-totals";
+import { buildCartFromEditableItems, computeCartTotals, serviceChargeDraftsToInputs, serviceChargeInputsToDrafts, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, ProductListItem } from "@/lib/types";
+import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import { ServiceChargesModal } from "../ServiceChargesModal";
 import { CheckoutCustomerPickerModal } from "../tabs/CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "../tabs/CheckoutDeliveryModal";
 import { CartItemsEditor } from "./CartItemsEditor";
@@ -63,6 +64,8 @@ export function QuotationFormModal({
   const [notes, setNotes] = useState("");
   const [delivery, setDelivery] = useState<DeliveryDraft | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+  const [serviceCharges, setServiceCharges] = useState<ServiceChargeDraft[]>([]);
+  const [serviceChargesModalOpen, setServiceChargesModalOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -88,6 +91,7 @@ export function QuotationFormModal({
         setNotes(data.notes ?? "");
         setCart(buildCartFromEditableItems(data.items, products));
         setDelivery(data.delivery ? deliveryDraftFromEditable(data.delivery) : null);
+        setServiceCharges(serviceChargeInputsToDrafts(data.serviceCharges));
         setPrefilled(true);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this quotation for editing."));
@@ -96,7 +100,8 @@ export function QuotationFormModal({
   const customerLabel = customerId ? (customers.find((c) => c.id === customerId)?.name ?? "") : "Walk-in Customer";
   const totals = computeCartTotals(cart, tenantTaxConfig);
   const deliveryFeeCents = delivery?.fee.trim() ? Math.round(Number(delivery.fee) * 100) : 0;
-  const grandTotalCents = totals.itemsGrandTotalCents + deliveryFeeCents;
+  const serviceChargeFeeCents = sumServiceChargeDraftFeeCents(serviceCharges);
+  const grandTotalCents = totals.itemsGrandTotalCents + deliveryFeeCents + serviceChargeFeeCents;
 
   async function handleSubmit(): Promise<void> {
     if (!branchId) {
@@ -140,6 +145,7 @@ export function QuotationFormModal({
               costCents: delivery.cost.trim() ? Math.round(Number(delivery.cost) * 100) : 0,
             }
           : undefined,
+        serviceCharges: serviceChargeDraftsToInputs(serviceCharges),
         locationId: branchId,
       };
       const result = editId ? await api.updateQuotation(editId, body) : await api.createQuotation(body);
@@ -236,6 +242,45 @@ export function QuotationFormModal({
             </button>
           )}
 
+          {serviceCharges.length > 0 ? (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setServiceChargesModalOpen(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") setServiceChargesModalOpen(true);
+              }}
+              className="mb-2 flex w-full cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-blue/30 bg-blue/5 px-3 py-2.5 text-left"
+            >
+              <Receipt className="size-4 flex-none text-blue" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-sm font-bold text-navy">
+                {serviceCharges.length} service charge{serviceCharges.length > 1 ? "s" : ""}
+                {serviceChargeFeeCents > 0 && <span className="text-navy/50"> · {formatCents(serviceChargeFeeCents, currency)}</span>}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setServiceCharges([]);
+                }}
+                aria-label="Remove service charges"
+                className="grid size-6 flex-none place-items-center rounded-full text-navy/40 hover:bg-white hover:text-red"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setServiceChargesModalOpen(true)}
+              className="mb-2 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-navy/15 bg-white px-3 py-2.5 text-left"
+            >
+              <Receipt className="size-4 flex-none text-navy/40" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-navy/50">Add a service charge</span>
+              <ChevronRight className="size-4 flex-none text-navy/30" aria-hidden="true" />
+            </button>
+          )}
+
           <CartItemsEditor
             products={products}
             cart={cart}
@@ -275,6 +320,12 @@ export function QuotationFormModal({
                 <div className="mb-1 flex items-center justify-between text-xs font-semibold text-navy/50">
                   <span>Delivery Fee</span>
                   <span>{formatCents(deliveryFeeCents, currency)}</span>
+                </div>
+              )}
+              {serviceChargeFeeCents > 0 && (
+                <div className="mb-1 flex items-center justify-between text-xs font-semibold text-navy/50">
+                  <span>Service Charges</span>
+                  <span>{formatCents(serviceChargeFeeCents, currency)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
@@ -331,6 +382,17 @@ export function QuotationFormModal({
               : null
           }
           onClose={() => setDeliveryModalOpen(false)}
+        />
+      )}
+
+      {serviceChargesModalOpen && (
+        <ServiceChargesModal
+          initialDrafts={serviceCharges}
+          onSave={(drafts) => {
+            setServiceCharges(drafts);
+            setServiceChargesModalOpen(false);
+          }}
+          onClose={() => setServiceChargesModalOpen(false)}
         />
       )}
     </div>

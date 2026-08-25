@@ -11,6 +11,7 @@ import type {
   DocumentIdResult,
   Employee,
   ExpenseListItem,
+  InvoiceCancellationApprovalItem,
   InvoiceListItem,
   MarkPaidRequest,
   MobileCustomer,
@@ -157,6 +158,13 @@ export const api = {
   duplicateInvoice: (id: string) => request<DocumentIdResult>(`/mobile/invoices/${id}/duplicate`, { method: "POST" }),
   cancelInvoice: (id: string, reason?: string) =>
     request<DocumentIdResult>(`/mobile/invoices/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }),
+  requestInvoiceCancellation: (id: string, body: { reason: string; notes?: string }) =>
+    request<DocumentIdResult>(`/mobile/invoices/${id}/request-cancel`, { method: "POST", body: JSON.stringify(body) }),
+  listPendingInvoiceCancellations: () => request<InvoiceCancellationApprovalItem[]>("/mobile/approvals/invoice-cancellations"),
+  approveInvoiceCancellation: (id: string, notes?: string) =>
+    request<DocumentIdResult>(`/mobile/approvals/invoice-cancellations/${id}/approve`, { method: "POST", body: JSON.stringify({ notes }) }),
+  rejectInvoiceCancellation: (id: string, notes?: string) =>
+    request<DocumentIdResult>(`/mobile/approvals/invoice-cancellations/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
   listCustomers: () => request<MobileCustomer[]>("/mobile/customers"),
   createCustomer: (body: CreateCustomerInput) =>
     request<MobileCustomer>("/mobile/customers", { method: "POST", body: JSON.stringify(body) }),

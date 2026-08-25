@@ -1,22 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Loader2, Minus, Plus, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
+import { ChevronRight, Loader2, Minus, Plus, Receipt, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { effectiveUnitPriceCents, naturalUnitPriceCents, serviceChargeDraftsToInputs, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem } from "@/lib/types";
+import type { CheckoutCartLine, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
+import { ServiceChargesModal } from "../ServiceChargesModal";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 import { CheckoutCustomerPickerModal } from "./CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "./CheckoutDeliveryModal";
 
 /**
  * Real, from-scratch mobile checkout — the counterpart to DESKTOP's Checkout screen. Customer
- * selection, delivery, price override (mark-up), locally-sourced items, and order notes all match
- * DESKTOP's own Checkout feature set; deliberately still lighter in a couple of ways (no wholesale
- * price break, no service charges, no customer credit yet — see mobile-checkout-service.ts's own
- * doc comment for what's covered). Delivery is a MODAL here rather than DESKTOP's inline expanding
+ * selection, delivery, service charges, wholesale price breaks, price override (mark-up),
+ * locally-sourced items, and order notes all match DESKTOP's own Checkout feature set; deliberately
+ * still lighter in one way (no customer credit yet — see mobile-checkout-service.ts's own doc comment
+ * for what's covered). Delivery is a MODAL here rather than DESKTOP's inline expanding
  * panel (ExtraChargesSection) — a deliberate mobile-specific choice, screen space is tighter here
  * than on a desktop POS screen; the local-supplier picker is similarly a plain select+quick-create
  * rather than DESKTOP's own searchable SupplierPicker modal, for the same reason. Every figure shown
@@ -64,6 +66,8 @@ export function CheckoutTab({
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [delivery, setDelivery] = useState<DeliveryDraft | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+  const [serviceCharges, setServiceCharges] = useState<ServiceChargeDraft[]>([]);
+  const [serviceChargesModalOpen, setServiceChargesModalOpen] = useState(false);
 
   // Only ever consulted when branchId is null (see the StorefrontPicker below) — otherwise SERVER
   // always uses the employee's own assigned branch regardless of this value.
@@ -113,11 +117,11 @@ export function CheckoutTab({
   // omitted tax meant a cashier could type exactly what this screen showed and still have the sale
   // rejected as underpaid (caught live: a tax-exclusive product's real total was always higher than
   // this naive sum — 2026-08-25).
-  // effectiveUnitPriceCents (override or the product's natural price) drives every downstream figure
-  // for this line — the tax computation, the below-minimum check, and the line total shown.
-  function effectiveUnitPriceCents(line: CheckoutCartLine): number {
-    return line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : line.unitPriceCents;
-  }
+  // effectiveUnitPriceCents (override, or wholesale once quantity crosses the product's own
+  // threshold, or else the retail price) drives every downstream figure for this line — the tax
+  // computation, the below-minimum check, and the line total shown. Imported from cart-totals.ts
+  // (not duplicated locally) so this can never drift from what CartItemsEditor's Invoice/Quotation
+  // forms compute for the identical line shape.
   const lineTaxResults = cart.map((line) => {
     const taxableCents = effectiveUnitPriceCents(line) * line.quantity - line.discountAmountCents;
     const productTaxConfig = resolveProductTaxConfig({ pricesTaxInclusive: line.pricesTaxInclusive }, tenantTaxConfig);
@@ -125,11 +129,13 @@ export function CheckoutTab({
   });
   const netSubtotalCents = lineTaxResults.reduce((sum, r) => sum + r.netCents, 0);
   const taxAmountCents = lineTaxResults.reduce((sum, r) => sum + r.taxCents, 0);
-  // Delivery fee folds straight into the grand total — matching SERVER's own mobile-checkout-service
-  // (which validates amountReceivedCents against this SAME inclusive figure), so a cashier collecting
-  // a delivery fee is never shown/charged a total that's short of what checkout will actually enforce.
+  // Delivery fee + service charge fees fold straight into the grand total — matching SERVER's own
+  // mobile-checkout-service (which validates amountReceivedCents against this SAME inclusive figure),
+  // so a cashier collecting either is never shown/charged a total that's short of what checkout will
+  // actually enforce.
   const deliveryFeeCents = delivery?.fee.trim() ? Math.round(Number(delivery.fee) * 100) : 0;
-  const grandTotalCents = lineTaxResults.reduce((sum, r) => sum + r.grossCents, 0) + deliveryFeeCents;
+  const serviceChargeFeeCents = sumServiceChargeDraftFeeCents(serviceCharges);
+  const grandTotalCents = lineTaxResults.reduce((sum, r) => sum + r.grossCents, 0) + deliveryFeeCents + serviceChargeFeeCents;
   const amountReceivedCents = amountReceived.trim() ? Math.round(Number(amountReceived) * 100) : 0;
   const changeCents = amountReceivedCents - grandTotalCents;
 
@@ -141,7 +147,7 @@ export function CheckoutTab({
   // the sale would now go through. Clear it the moment any input that could have caused it changes.
   useEffect(() => {
     setSubmitError(null);
-  }, [cart, paymentMethodId, paymentReference, amountReceived, customerId, delivery]);
+  }, [cart, paymentMethodId, paymentReference, amountReceived, customerId, delivery, serviceCharges]);
 
   function addToCart(product: ProductListItem): void {
     setCart((prev) => {
@@ -161,6 +167,8 @@ export function CheckoutTab({
           taxType: product.taxType,
           pricesTaxInclusive: product.pricesTaxInclusive,
           minimumPriceCents: product.minimumPriceCents,
+          wholesalePriceCents: product.wholesalePriceCents,
+          wholesaleMinQuantity: product.wholesaleMinQuantity,
           priceOverride: "",
           isLocallySourced: false,
           localCost: "",
@@ -219,6 +227,7 @@ export function CheckoutTab({
     setAmountReceived("");
     setCustomerId(null);
     setDelivery(null);
+    setServiceCharges([]);
     setOrderNotes("");
     checkoutIdRef.current = crypto.randomUUID();
   }
@@ -265,6 +274,7 @@ export function CheckoutTab({
         customerId: customerId ?? undefined,
         amountReceivedCents,
         notes: orderNotes.trim() || undefined,
+        serviceCharges: serviceChargeDraftsToInputs(serviceCharges),
         delivery: delivery
           ? {
               riderId: delivery.riderId ?? undefined,
@@ -371,6 +381,45 @@ export function CheckoutTab({
             <ChevronRight className="size-4 flex-none text-navy/30" aria-hidden="true" />
           </button>
         )}
+
+        {serviceCharges.length > 0 ? (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setServiceChargesModalOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setServiceChargesModalOpen(true);
+            }}
+            className="mt-1.5 flex w-full cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-blue/30 bg-blue/5 px-3 py-2.5 text-left"
+          >
+            <Receipt className="size-4 flex-none text-blue" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-sm font-bold text-navy">
+              {serviceCharges.length} service charge{serviceCharges.length > 1 ? "s" : ""}
+              {serviceChargeFeeCents > 0 && <span className="text-navy/50"> · {formatCents(serviceChargeFeeCents, currency)}</span>}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setServiceCharges([]);
+              }}
+              aria-label="Remove service charges"
+              className="grid size-6 flex-none place-items-center rounded-full text-navy/40 hover:bg-white hover:text-red"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setServiceChargesModalOpen(true)}
+            className="mt-1.5 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-navy/15 bg-white px-3 py-2.5 text-left"
+          >
+            <Receipt className="size-4 flex-none text-navy/40" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-navy/50">Add a service charge</span>
+            <ChevronRight className="size-4 flex-none text-navy/30" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {loadError && <p className="mx-4 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{loadError}</p>}
@@ -421,12 +470,17 @@ export function CheckoutTab({
                 line.priceOverride.trim() &&
                 line.minimumPriceCents !== null &&
                 Math.round(Number(line.priceOverride) * 100) < line.minimumPriceCents;
+              const naturalPriceCents = naturalUnitPriceCents(line);
+              const wholesaleActive = naturalPriceCents !== line.unitPriceCents;
               return (
                 <div key={line.productId} className="rounded-lg border border-navy/10 bg-white p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-navy">{line.name}</p>
-                      <p className="text-[11px] text-navy/50">@ {formatCents(line.unitPriceCents, currency)}</p>
+                      <p className="text-[11px] text-navy/50">
+                        @ {formatCents(naturalPriceCents, currency)}
+                        {wholesaleActive && <span className="ml-1 font-bold text-blue">Wholesale</span>}
+                      </p>
                     </div>
                     <button type="button" onClick={() => removeLine(line.productId)} aria-label={`Remove ${line.name}`} className="flex-none text-navy/30 hover:text-red">
                       <Trash2 className="size-4" aria-hidden="true" />
@@ -460,7 +514,7 @@ export function CheckoutTab({
                         step="0.01"
                         value={line.priceOverride}
                         onChange={(e) => updatePriceOverride(line.productId, e.target.value)}
-                        placeholder={(line.unitPriceCents / 100).toFixed(2)}
+                        placeholder={(naturalPriceCents / 100).toFixed(2)}
                         className={`w-full min-w-0 rounded-md border px-1.5 py-1 text-right text-xs font-semibold focus:outline-none ${
                           priceBelowMinimum ? "border-red text-red" : "border-navy/15 text-navy focus:border-blue"
                         }`}
@@ -582,6 +636,12 @@ export function CheckoutTab({
               <span className="text-xs font-semibold text-navy/50">{formatCents(deliveryFeeCents, currency)}</span>
             </div>
           )}
+          {serviceChargeFeeCents > 0 && (
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold text-navy/50">Service Charges</span>
+              <span className="text-xs font-semibold text-navy/50">{formatCents(serviceChargeFeeCents, currency)}</span>
+            </div>
+          )}
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-navy/60">Total</span>
             <span className="font-display text-lg text-navy">{formatCents(grandTotalCents, currency)}</span>
@@ -669,6 +729,17 @@ export function CheckoutTab({
               : null
           }
           onClose={() => setDeliveryModalOpen(false)}
+        />
+      )}
+
+      {serviceChargesModalOpen && (
+        <ServiceChargesModal
+          initialDrafts={serviceCharges}
+          onSave={(drafts) => {
+            setServiceCharges(drafts);
+            setServiceChargesModalOpen(false);
+          }}
+          onClose={() => setServiceChargesModalOpen(false)}
         />
       )}
 

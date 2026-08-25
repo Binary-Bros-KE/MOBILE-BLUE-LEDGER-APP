@@ -7,6 +7,7 @@ import { Menu } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { MobileSessionInfo } from "@/lib/types";
+import { ApprovalsTab } from "../tabs/ApprovalsTab";
 import { CheckoutTab } from "../tabs/CheckoutTab";
 import { CustomersTab } from "../tabs/CustomersTab";
 import { DashboardTab } from "../tabs/DashboardTab";
@@ -130,6 +131,7 @@ export function AppShell() {
               branchName={session?.branchName ?? null}
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
+              canApprove={session?.permissions?.["approvals"]?.includes("approve") ?? false}
             />
           )}
           {activeTab === "quotations" && (
@@ -147,6 +149,7 @@ export function AppShell() {
           {activeTab === "purchases" && <PurchasesTab />}
           {activeTab === "expenses" && <ExpensesTab />}
           {activeTab === "stockLedger" && <StockLedgerTab />}
+          {activeTab === "approvals" && <ApprovalsTab />}
         </motion.main>
       </AnimatePresence>
     </div>

@@ -22,11 +22,15 @@ export function InvoicesTab({
   branchName,
   currency,
   tenantTaxConfig,
+  canApprove,
 }: {
   branchId: string | null;
   branchName: string | null;
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
+  /** Whether the signed-in employee has approvals.approve — passed straight through to
+   * DocumentDetailModal, which decides "Cancel Invoice" vs. "Request Cancellation" from it. */
+  canApprove: boolean;
 }) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [invoices, setInvoices] = useState<InvoiceListItem[] | null>(null);
@@ -150,6 +154,7 @@ export function InvoicesTab({
           saleId={selectedInvoiceId}
           onClose={() => setSelectedInvoiceId(null)}
           onChanged={refreshInvoices}
+          canApprove={canApprove}
           onEdit={() => {
             const id = selectedInvoiceId;
             setSelectedInvoiceId(null);

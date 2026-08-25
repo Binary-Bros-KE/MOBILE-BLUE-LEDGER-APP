@@ -383,6 +383,10 @@ export type ProductListItem = {
   /** The floor a cashier's price override/discount can never push this line below — null means no
    * floor. See CheckoutTab's price-override field. */
   minimumPriceCents: number | null;
+  /** Auto-pricing at a quantity threshold — null wholesalePriceCents or a zero/negative
+   * wholesaleMinQuantity means this product has no wholesale tier at all. */
+  wholesalePriceCents: number | null;
+  wholesaleMinQuantity: number;
   reorderLevel: number;
   mainStoreQuantity: number | null;
   storefrontQuantity: number;
@@ -410,6 +414,10 @@ export type CheckoutCartLine = {
   /** The floor this line's effective price (natural or overridden) can never drop below — copied
    * from the product at add-to-cart time. */
   minimumPriceCents: number | null;
+  /** Auto-pricing at a quantity threshold, copied from the product at add-to-cart time — see
+   * naturalUnitPriceCents in lib/cart-totals.ts for how this combines with quantity. */
+  wholesalePriceCents: number | null;
+  wholesaleMinQuantity: number;
   /** Cashier-entered mark-up/override for this line only, raw text like discountAmountCents' own UI
    * field — empty means "use the product's own listed price," same convention as DESKTOP's own
    * priceOverride. Never written back to the product. */
@@ -446,6 +454,14 @@ export type CheckoutItemInput = {
   localSupplierId?: string;
 };
 
+/** Named ad-hoc fee (e.g. "Labour", "Installation") — unlimited per document, folds into
+ * grandTotalCents alongside delivery. costCents is internal-only, never shown to the customer. */
+export type ServiceChargeInput = { name: string; feeCents: number; costCents: number };
+
+/** Client-side draft for one service-charge row being edited — raw text like priceOverride, same
+ * convention as CheckoutDeliveryModal's fee/cost fields. */
+export type ServiceChargeDraft = { name: string; fee: string; cost: string };
+
 export type CheckoutRequest = {
   id: string;
   locationId: string;
@@ -455,6 +471,7 @@ export type CheckoutRequest = {
   customerId?: string;
   amountReceivedCents: number;
   delivery?: CheckoutDeliveryInput;
+  serviceCharges?: ServiceChargeInput[];
   notes?: string;
 };
 
@@ -476,6 +493,7 @@ export type CreateInvoiceRequest = {
   items: CheckoutItemInput[];
   initialPayment?: { paymentMethodId: string; amountCents: number; reference?: string } | null;
   delivery?: CheckoutDeliveryInput;
+  serviceCharges?: ServiceChargeInput[];
   locationId: string;
 };
 
@@ -489,6 +507,7 @@ export type CreateQuotationRequest = {
   notes?: string;
   items: CheckoutItemInput[];
   delivery?: CheckoutDeliveryInput;
+  serviceCharges?: ServiceChargeInput[];
   locationId: string;
 };
 
@@ -545,6 +564,7 @@ export type MobileInvoiceEditData = {
   includeTaxBreakdown: boolean;
   items: MobileEditableItem[];
   delivery: MobileEditableDelivery | null;
+  serviceCharges: ServiceChargeInput[];
 };
 
 export type MobileQuotationEditData = {
@@ -554,6 +574,7 @@ export type MobileQuotationEditData = {
   includeTaxBreakdown: boolean;
   items: MobileEditableItem[];
   delivery: MobileEditableDelivery | null;
+  serviceCharges: ServiceChargeInput[];
 };
 
 export type PurchaseListItem = {
@@ -645,6 +666,20 @@ export type StockMovementRow = {
   valueCents: number;
   notes: string | null;
   createdAt: string;
+  currency: string;
+};
+
+/** Backs the Approvals tab — one invoice-cancellation request still awaiting a decision. */
+export type InvoiceCancellationApprovalItem = {
+  id: string;
+  saleId: string;
+  invoiceNumber: string | null;
+  saleGrandTotalCents: number;
+  locationName: string;
+  reason: string;
+  notes: string | null;
+  requestedByName: string;
+  requestedAt: string;
   currency: string;
 };
 

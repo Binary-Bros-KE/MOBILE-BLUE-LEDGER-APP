@@ -60,6 +60,7 @@ export function DocumentDetailModal({
   onClose,
   onChanged,
   onEdit,
+  canApprove = false,
 }: {
   saleId: string;
   kind?: "sale" | "quotation";
@@ -73,6 +74,11 @@ export function DocumentDetailModal({
    * back up rather than duplicating that plumbing here. Omitted entirely (no Edit button shown) for
    * a context that can't edit, e.g. read-only surfaces. */
   onEdit?: () => void;
+  /** Whether the signed-in employee has approvals.approve — the same permission DESKTOP's own
+   * cancelInvoiceDirect requires. True shows the existing self-approved "Cancel Invoice" flow; false
+   * shows "Request Cancellation" instead (asks a reason, sits pending until someone with this
+   * permission decides it from the Approvals tab). */
+  canApprove?: boolean;
 }) {
   const [doc, setDoc] = useState<SharedDocument | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -88,6 +94,10 @@ export function DocumentDetailModal({
   const [convertSaleOpen, setConvertSaleOpen] = useState(false);
   const [convertInvoiceOpen, setConvertInvoiceOpen] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [requestCancelOpen, setRequestCancelOpen] = useState(false);
+  const [requestCancelReason, setRequestCancelReason] = useState("");
+  const [requestCancelNotes, setRequestCancelNotes] = useState("");
+  const [requestCancelSent, setRequestCancelSent] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockCheck, setStockCheck] = useState<QuotationStockCheckItem[] | null>(null);
 
@@ -168,6 +178,18 @@ export function DocumentDetailModal({
       await api.cancelInvoice(saleId);
       setConfirmCancel(false);
       reload();
+    });
+  }
+
+  async function handleRequestCancel(): Promise<void> {
+    if (!requestCancelReason.trim()) {
+      setActionError("A reason is required.");
+      return;
+    }
+    await runAction("requestCancel", async () => {
+      await api.requestInvoiceCancellation(saleId, { reason: requestCancelReason.trim(), notes: requestCancelNotes.trim() || undefined });
+      setRequestCancelOpen(false);
+      setRequestCancelSent(true);
     });
   }
 
@@ -443,29 +465,47 @@ export function DocumentDetailModal({
                     {busyAction === "duplicate" ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
                     Duplicate
                   </button>
-                  {!confirmCancel ? (
+                  {canApprove ? (
+                    !confirmCancel ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCancel(true)}
+                        className="flex items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red"
+                      >
+                        <Trash2 className="size-3.5" aria-hidden="true" />
+                        Cancel Invoice
+                      </button>
+                    ) : (
+                      <div className="col-span-2 flex gap-2">
+                        <button type="button" onClick={() => setConfirmCancel(false)} className="flex-1 rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy">
+                          Never mind
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleCancel()}
+                          disabled={busyAction === "cancel"}
+                          className="flex-1 rounded-lg bg-red py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                        >
+                          {busyAction === "cancel" ? "Cancelling…" : "Confirm Cancel"}
+                        </button>
+                      </div>
+                    )
+                  ) : requestCancelSent ? (
+                    <p className="col-span-2 text-center text-[11px] font-semibold text-navy/50">Cancellation requested — awaiting approval.</p>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => setConfirmCancel(true)}
+                      onClick={() => {
+                        setRequestCancelReason("");
+                        setRequestCancelNotes("");
+                        setActionError(null);
+                        setRequestCancelOpen(true);
+                      }}
                       className="flex items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red"
                     >
                       <Trash2 className="size-3.5" aria-hidden="true" />
-                      Cancel Invoice
+                      Request Cancellation
                     </button>
-                  ) : (
-                    <div className="col-span-2 flex gap-2">
-                      <button type="button" onClick={() => setConfirmCancel(false)} className="flex-1 rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy">
-                        Never mind
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleCancel()}
-                        disabled={busyAction === "cancel"}
-                        className="flex-1 rounded-lg bg-red py-2.5 text-xs font-bold text-white disabled:opacity-50"
-                      >
-                        {busyAction === "cancel" ? "Cancelling…" : "Confirm Cancel"}
-                      </button>
-                    </div>
                   )}
                 </div>
               </div>
@@ -665,6 +705,60 @@ export function DocumentDetailModal({
               >
                 {busyAction === "payment" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
                 {busyAction === "payment" ? "Recording…" : "Record Payment"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {requestCancelOpen && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-navy-deep/60 sm:items-center" onClick={() => setRequestCancelOpen(false)}>
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-display text-lg text-navy">Request Cancellation</p>
+              <button type="button" onClick={() => setRequestCancelOpen(false)} aria-label="Close" className="grid size-8 place-items-center rounded-full text-navy/40 hover:bg-cream-dark">
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-navy/50">Nothing changes until someone with approval rights reviews this.</p>
+            <div className="space-y-2.5">
+              <label className="block">
+                <span className="text-[11px] font-semibold text-navy/50">Reason</span>
+                <textarea
+                  autoFocus
+                  value={requestCancelReason}
+                  onChange={(e) => setRequestCancelReason(e.target.value)}
+                  placeholder="Why should this invoice be cancelled?"
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold text-navy/50">Notes (optional)</span>
+                <textarea
+                  value={requestCancelNotes}
+                  onChange={(e) => setRequestCancelNotes(e.target.value)}
+                  placeholder="Anything else the approver should know"
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+                />
+              </label>
+              {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
+              <button
+                type="button"
+                onClick={() => void handleRequestCancel()}
+                disabled={busyAction === "requestCancel"}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-red py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {busyAction === "requestCancel" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                {busyAction === "requestCancel" ? "Sending…" : "Send Request"}
               </button>
             </div>
           </motion.div>
