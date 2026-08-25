@@ -7,6 +7,7 @@ import { Menu } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { MobileSessionInfo } from "@/lib/types";
+import { CheckoutTab } from "../tabs/CheckoutTab";
 import { DashboardTab } from "../tabs/DashboardTab";
 import { EmployeesTab } from "../tabs/EmployeesTab";
 import { ExpensesTab } from "../tabs/ExpensesTab";
@@ -17,7 +18,7 @@ import { QuotationsTab } from "../tabs/QuotationsTab";
 import { SalesTab } from "../tabs/SalesTab";
 import { StockLedgerTab } from "../tabs/StockLedgerTab";
 import { TransactionsTab } from "../tabs/TransactionsTab";
-import { navGroups, type TabKey } from "./navigation";
+import { navGroups, visibleNavGroups, type TabKey } from "./navigation";
 import { Sidebar } from "./Sidebar";
 
 const TAB_LABELS: Record<TabKey, string> = Object.fromEntries(
@@ -51,6 +52,21 @@ export function AppShell() {
     });
   }, []);
 
+  // Only Dashboard shows until real permissions arrive — no flash of tabs this employee doesn't
+  // actually have access to while /mobile/me is still loading.
+  const groups = visibleNavGroups(session?.permissions);
+
+  // A tab restored from localStorage (see setActiveTab below) can outlive the permission that made
+  // it visible — a role edited since the last visit, or a different employee's saved tab surviving
+  // on a shared device. Fall back to Dashboard rather than rendering a blank pane for a tab that's
+  // no longer in `groups`.
+  useEffect(() => {
+    if (!session) return;
+    const stillVisible = groups.some((group) => group.items.some((item) => item.key === activeTab));
+    if (!stillVisible) setActiveTab("dashboard");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
   function setActiveTab(tab: TabKey) {
     setActiveTabState(tab);
     if (typeof window !== "undefined") localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab);
@@ -78,6 +94,7 @@ export function AppShell() {
 
       <Sidebar
         open={drawerOpen}
+        navGroups={groups}
         activeTab={activeTab}
         employeeName={session?.employeeName ?? "Owner"}
         roleName={session?.roleName ?? "Super Admin"}
@@ -95,6 +112,9 @@ export function AppShell() {
           transition={{ duration: 0.2 }}
         >
           {activeTab === "dashboard" && <DashboardTab />}
+          {activeTab === "checkout" && (
+            <CheckoutTab branchId={session?.branchId ?? null} branchName={session?.branchName ?? null} currency={session?.currency ?? "KES"} />
+          )}
           {activeTab === "employees" && <EmployeesTab currency={session?.currency ?? "KES"} />}
           {activeTab === "sales" && <SalesTab />}
           {activeTab === "invoices" && <InvoicesTab />}

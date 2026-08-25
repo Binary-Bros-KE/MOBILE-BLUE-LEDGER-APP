@@ -1,4 +1,6 @@
 import type {
+  CheckoutRequest,
+  CheckoutResult,
   Employee,
   ExpenseListItem,
   InvoiceListItem,
@@ -8,6 +10,7 @@ import type {
   MobileSessionInfo,
   MobileTaxReport,
   OwnerDashboard,
+  PaymentMethodOption,
   ProductListItem,
   PurchaseDetail,
   PurchaseListItem,
@@ -133,6 +136,12 @@ export const api = {
   listTransactions: (locationId?: string) =>
     request<TransactionRow[]>(`/mobile/transactions${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   listProducts: () => request<ProductListItem[]>("/mobile/products"),
+  listPaymentMethods: () => request<PaymentMethodOption[]>("/mobile/payment-methods"),
+  /** Real, from-scratch checkout — SERVER recomputes every figure itself (see
+   * mobile-checkout-service.ts), this body is a proposal, not a trusted total. `body.id` must be
+   * minted client-side (crypto.randomUUID()) and resent UNCHANGED on any retry — that's the whole
+   * idempotency mechanism, a retried id is a safe no-op rather than a second sale. */
+  checkout: (body: CheckoutRequest) => request<CheckoutResult>("/mobile/sales", { method: "POST", body: JSON.stringify(body) }),
   listPurchases: (locationId?: string) =>
     request<PurchaseListItem[]>(`/mobile/purchases${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getPurchase: (id: string) => request<PurchaseDetail>(`/mobile/purchases/${id}`),

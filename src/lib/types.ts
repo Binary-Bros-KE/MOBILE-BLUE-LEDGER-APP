@@ -64,7 +64,19 @@ export type OwnerDashboard = {
   credit: OutstandingCredit;
 };
 
-export type MobileSessionInfo = { employeeName: string; roleName: string | null; currency: string };
+export type MobileSessionInfo = {
+  employeeName: string;
+  roleName: string | null;
+  currency: string;
+  /** Module -> allowed actions, same shape as DESKTOP's own PermissionsMap — gates which tabs/
+   * actions this employee sees. A module absent means no access, same convention as DESKTOP. */
+  permissions: Record<string, string[]>;
+  /** This employee's own assigned branch — null for a branch-less employee. Checkout resolves
+   * "which storefront am I selling from" from this, no picker (mobile checkout is always scoped to
+   * the signed-in employee's own branch in this phase). */
+  branchId: string | null;
+  branchName: string | null;
+};
 
 export type Employee = {
   id: string;
@@ -350,6 +362,10 @@ export type ProductListItem = {
   name: string;
   sku: string;
   categoryName: string | null;
+  /** Preview only for the Checkout cart — SERVER always recomputes the real total from the actual
+   * Product row at checkout time, never trusts what this list showed. */
+  sellingPriceCents: number;
+  taxType: string;
   reorderLevel: number;
   mainStoreQuantity: number | null;
   storefrontQuantity: number;
@@ -357,6 +373,32 @@ export type ProductListItem = {
   lowStock: boolean;
   outOfStock: boolean;
 };
+
+export type PaymentMethodOption = { id: string; name: string; requiresReference: boolean };
+
+/** One line in the Checkout cart — a client-side PREVIEW only. quantity/discountAmountCents are the
+ * only fields that actually reach SERVER (see CheckoutRequest below); unitPriceCents/lineTotalCents
+ * here exist purely to show the cashier a running total before they submit. */
+export type CheckoutCartLine = {
+  productId: string;
+  name: string;
+  sku: string;
+  unitPriceCents: number;
+  quantity: number;
+  discountAmountCents: number;
+};
+
+export type CheckoutRequest = {
+  id: string;
+  locationId: string;
+  items: Array<{ productId: string; quantity: number; discountAmountCents: number }>;
+  paymentMethodId: string;
+  paymentReference?: string;
+  customerId?: string;
+  amountReceivedCents: number;
+};
+
+export type CheckoutResult = { id: string; receiptNumber: string; grandTotalCents: number };
 
 export type PurchaseListItem = {
   id: string;

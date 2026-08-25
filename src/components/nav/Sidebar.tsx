@@ -2,12 +2,13 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, UserRound } from "lucide-react";
-import { navGroups, type TabKey } from "./navigation";
+import type { NavGroup, TabKey } from "./navigation";
 
 const DRAWER_TRANSITION = { duration: 0.32, ease: [0.4, 0, 0.2, 1] as const };
 
 export function Sidebar({
   open,
+  navGroups,
   activeTab,
   employeeName,
   roleName,
@@ -16,6 +17,9 @@ export function Sidebar({
   onSignOut,
 }: {
   open: boolean;
+  /** Already permission-filtered by the caller (see navigation.ts's visibleNavGroups) — this
+   * component just renders whatever it's given, no permission logic of its own. */
+  navGroups: NavGroup[];
   activeTab: TabKey;
   employeeName: string;
   roleName: string;
