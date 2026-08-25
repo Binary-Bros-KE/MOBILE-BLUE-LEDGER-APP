@@ -246,10 +246,19 @@ export function CheckoutTab({
         </button>
 
         {delivery ? (
-          <button
-            type="button"
+          // A <div>, not a <button> — it contains its own "remove" <button> below, and a <button>
+          // can never validly contain another <button> (React logged a hydration error over this
+          // exact nesting: "Warning: In HTML, <button> cannot be a descendant of <button>" — caught
+          // live, 2026-08-25). role="button" keeps this row keyboard/screen-reader operable without
+          // the invalid nesting.
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => setDeliveryModalOpen(true)}
-            className="mt-1.5 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-blue/30 bg-blue/5 px-3 py-2.5 text-left"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") setDeliveryModalOpen(true);
+            }}
+            className="mt-1.5 flex w-full cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-blue/30 bg-blue/5 px-3 py-2.5 text-left"
           >
             <Truck className="size-4 flex-none text-blue" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate text-sm font-bold text-navy">
@@ -267,7 +276,7 @@ export function CheckoutTab({
             >
               <X className="size-3.5" aria-hidden="true" />
             </button>
-          </button>
+          </div>
         ) : (
           <button
             type="button"
