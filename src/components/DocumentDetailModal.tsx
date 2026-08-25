@@ -59,6 +59,7 @@ export function DocumentDetailModal({
   kind = "sale",
   onClose,
   onChanged,
+  onEdit,
 }: {
   saleId: string;
   kind?: "sale" | "quotation";
@@ -67,6 +68,11 @@ export function DocumentDetailModal({
    * deleted) — lets the parent tab refresh its own list (balances/statuses shown there would
    * otherwise go stale until the next natural reload). */
   onChanged?: () => void;
+  /** Present only when the parent tab can open its own InvoiceFormModal/QuotationFormModal in edit
+   * mode — this modal doesn't own branchId/currency/tenantTaxConfig itself, so editing is delegated
+   * back up rather than duplicating that plumbing here. Omitted entirely (no Edit button shown) for
+   * a context that can't edit, e.g. read-only surfaces. */
+  onEdit?: () => void;
 }) {
   const [doc, setDoc] = useState<SharedDocument | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -418,6 +424,15 @@ export function DocumentDetailModal({
                     Record Payment
                   </button>
                 )}
+                {onEdit && doc.payments.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={onEdit}
+                    className="w-full rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy"
+                  >
+                    Edit Invoice
+                  </button>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -555,6 +570,15 @@ export function DocumentDetailModal({
 
                 {doc.quotationStatus === "draft" && (
                   <>
+                    {onEdit && (
+                      <button
+                        type="button"
+                        onClick={onEdit}
+                        className="w-full rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy"
+                      >
+                        Edit Quotation
+                      </button>
+                    )}
                     {!confirmDelete ? (
                       <button
                         type="button"

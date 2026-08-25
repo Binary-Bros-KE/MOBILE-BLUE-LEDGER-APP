@@ -38,7 +38,8 @@ export function InvoicesTab({
   const [customers, setCustomers] = useState<MobileCustomer[] | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [statementCustomerId, setStatementCustomerId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  // null = closed, "new" = create form, any other string = edit form for that invoice id.
+  const [formTarget, setFormTarget] = useState<string | null>(null);
 
   function refreshInvoices(): void {
     api
@@ -95,7 +96,7 @@ export function InvoicesTab({
             </button>
             <button
               type="button"
-              onClick={() => setCreateOpen(true)}
+              onClick={() => setFormTarget("new")}
               className="flex items-center gap-1.5 rounded-lg bg-navy px-3 py-1.5 text-xs font-bold text-white"
             >
               <Plus className="size-3.5" aria-hidden="true" />
@@ -145,18 +146,28 @@ export function InvoicesTab({
       </div>
 
       {selectedInvoiceId && (
-        <DocumentDetailModal saleId={selectedInvoiceId} onClose={() => setSelectedInvoiceId(null)} onChanged={refreshInvoices} />
+        <DocumentDetailModal
+          saleId={selectedInvoiceId}
+          onClose={() => setSelectedInvoiceId(null)}
+          onChanged={refreshInvoices}
+          onEdit={() => {
+            const id = selectedInvoiceId;
+            setSelectedInvoiceId(null);
+            setFormTarget(id);
+          }}
+        />
       )}
 
-      {createOpen && (
+      {formTarget && (
         <InvoiceFormModal
           branchId={branchId}
           branchName={branchName}
           currency={currency}
           tenantTaxConfig={tenantTaxConfig}
-          onClose={() => setCreateOpen(false)}
+          editId={formTarget === "new" ? undefined : formTarget}
+          onClose={() => setFormTarget(null)}
           onCreated={(id) => {
-            setCreateOpen(false);
+            setFormTarget(null);
             refreshInvoices();
             setSelectedInvoiceId(id);
           }}

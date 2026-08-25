@@ -32,7 +32,8 @@ export function QuotationsTab({
   const [error, setError] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
   const [selectedQuotationId, setSelectedQuotationId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  // null = closed, "new" = create form, any other string = edit form for that quotation id.
+  const [formTarget, setFormTarget] = useState<string | null>(null);
 
   useEffect(() => {
     api.listLocations().then(setLocations).catch(() => {
@@ -63,7 +64,7 @@ export function QuotationsTab({
           <p className="text-xs font-bold text-navy/50">Quotations</p>
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => setFormTarget("new")}
             className="flex items-center gap-1.5 rounded-lg bg-navy px-3 py-1.5 text-xs font-bold text-white"
           >
             <Plus className="size-3.5" aria-hidden="true" />
@@ -117,18 +118,24 @@ export function QuotationsTab({
           kind="quotation"
           onClose={() => setSelectedQuotationId(null)}
           onChanged={refreshQuotations}
+          onEdit={() => {
+            const id = selectedQuotationId;
+            setSelectedQuotationId(null);
+            setFormTarget(id);
+          }}
         />
       )}
 
-      {createOpen && (
+      {formTarget && (
         <QuotationFormModal
           branchId={branchId}
           branchName={branchName}
           currency={currency}
           tenantTaxConfig={tenantTaxConfig}
-          onClose={() => setCreateOpen(false)}
+          editId={formTarget === "new" ? undefined : formTarget}
+          onClose={() => setFormTarget(null)}
           onCreated={(id) => {
-            setCreateOpen(false);
+            setFormTarget(null);
             refreshQuotations();
             setSelectedQuotationId(id);
           }}

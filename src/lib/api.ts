@@ -14,8 +14,10 @@ import type {
   InvoiceListItem,
   MarkPaidRequest,
   MobileCustomer,
+  MobileInvoiceEditData,
   MobileLocation,
   MobilePeriod,
+  MobileQuotationEditData,
   MobileRider,
   MobileSessionInfo,
   MobileSupplier,
@@ -146,6 +148,8 @@ export const api = {
   listInvoices: (locationId?: string) =>
     request<InvoiceListItem[]>(`/mobile/invoices${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   createInvoice: (body: CreateInvoiceRequest) => request<DocumentIdResult>("/mobile/invoices", { method: "POST", body: JSON.stringify(body) }),
+  getInvoiceEditData: (id: string) => request<MobileInvoiceEditData>(`/mobile/invoices/${id}/edit`),
+  updateInvoice: (id: string, body: CreateInvoiceRequest) => request<DocumentIdResult>(`/mobile/invoices/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   recordInvoicePayment: (id: string, body: RecordPaymentRequest) =>
     request<DocumentIdResult>(`/mobile/invoices/${id}/payments`, { method: "POST", body: JSON.stringify(body) }),
   markInvoicePaid: (id: string, body: MarkPaidRequest) =>
@@ -166,6 +170,9 @@ export const api = {
     request<QuotationListItem[]>(`/mobile/quotations${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getQuotation: (id: string) => request<SharedDocument>(`/mobile/quotations/${id}`),
   createQuotation: (body: CreateQuotationRequest) => request<DocumentIdResult>("/mobile/quotations", { method: "POST", body: JSON.stringify(body) }),
+  getQuotationEditData: (id: string) => request<MobileQuotationEditData>(`/mobile/quotations/${id}/edit`),
+  updateQuotation: (id: string, body: CreateQuotationRequest) =>
+    request<DocumentIdResult>(`/mobile/quotations/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteQuotation: (id: string) => request<DocumentIdResult>(`/mobile/quotations/${id}`, { method: "DELETE" }),
   setQuotationStatus: (id: string, status: QuotationStatusValue) =>
     request<DocumentIdResult>(`/mobile/quotations/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),

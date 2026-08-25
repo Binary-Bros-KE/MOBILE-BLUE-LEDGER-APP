@@ -4,24 +4,45 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, Loader2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { computeCartTotals } from "@/lib/cart-totals";
+import { buildCartFromEditableItems, computeCartTotals } from "@/lib/cart-totals";
 import { formatCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem } from "@/lib/types";
+import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem } from "@/lib/types";
 import { CheckoutCustomerPickerModal } from "../tabs/CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "../tabs/CheckoutDeliveryModal";
 import { CartItemsEditor } from "./CartItemsEditor";
 
-/** Creates a new Invoice — a credit sale: goods/services are considered delivered now, payment can
- * follow over time. Mirrors DESKTOP's own Invoice creation form: a customer is REQUIRED (unlike
- * Checkout/Quotation's walk-in option — an invoice is a credit document, needs someone real to bill),
- * plus a due date and an optional initial payment. Reuses the exact same cart/customer/delivery
- * building blocks Checkout already established. */
+function deliveryDraftFromEditable(d: MobileEditableDelivery): DeliveryDraft {
+  return {
+    riderId: d.riderId,
+    recipientName: d.recipientName,
+    country: d.country,
+    town: d.town,
+    physicalAddress: d.physicalAddress,
+    notes: d.notes,
+    fee: d.feeCents > 0 ? (d.feeCents / 100).toFixed(2) : "",
+    cost: d.costCents > 0 ? (d.costCents / 100).toFixed(2) : "",
+  };
+}
+
+/** Creates a new Invoice, or edits an existing unpaid one when `editId` is given — a credit sale:
+ * goods/services are considered delivered now, payment can follow over time. Mirrors DESKTOP's own
+ * Invoice form: a customer is REQUIRED (unlike Checkout/Quotation's walk-in option — an invoice is a
+ * credit document, needs someone real to bill), plus a due date. Reuses the exact same cart/
+ * customer/delivery building blocks Checkout already established.
+ *
+ * Edit mode fetches GET /mobile/invoices/:id/edit (raw items — see MobileEditableItem, not the
+ * display-only SharedDocument shape) and rebuilds the cart against CURRENT product data
+ * (buildCartFromEditableItems) — matching what updateInvoice will actually re-validate against on
+ * submit. The initial-payment section is hidden entirely in edit mode: DESKTOP's own updateInvoice
+ * never touches payment (an edit is only reachable at all while amountPaidCents is still 0), so
+ * there's nothing to collect here. */
 export function InvoiceFormModal({
   branchId,
   branchName,
   currency,
   tenantTaxConfig,
+  editId,
   onClose,
   onCreated,
 }: {
@@ -29,6 +50,7 @@ export function InvoiceFormModal({
   branchName: string | null;
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
+  editId?: string;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
@@ -38,6 +60,7 @@ export function InvoiceFormModal({
   const [riders, setRiders] = useState<MobileRider[]>([]);
   const [suppliers, setSuppliers] = useState<MobileSupplier[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [prefilled, setPrefilled] = useState(!editId);
 
   const [cart, setCart] = useState<CheckoutCartLine[]>([]);
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -69,6 +92,25 @@ export function InvoiceFormModal({
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load products or payment methods."));
   }, []);
 
+  // Prefill waits for products to load first — buildCartFromEditableItems needs the CURRENT catalog
+  // to resolve each line's live taxType/pricesTaxInclusive/minimumPriceCents, not just its own
+  // frozen unitPriceCents.
+  useEffect(() => {
+    if (!editId || !products) return;
+    api
+      .getInvoiceEditData(editId)
+      .then((data) => {
+        setCustomerId(data.customerId);
+        setTransactionType(data.transactionType);
+        setDueDate(data.dueDate);
+        setInvoiceNotes(data.invoiceNotes ?? "");
+        setCart(buildCartFromEditableItems(data.items, products));
+        setDelivery(data.delivery ? deliveryDraftFromEditable(data.delivery) : null);
+        setPrefilled(true);
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this invoice for editing."));
+  }, [editId, products]);
+
   const selectedPaymentMethod = paymentMethods?.find((m) => m.id === paymentMethodId) ?? null;
   const customerLabel = customerId ? (customers.find((c) => c.id === customerId)?.name ?? "") : "";
   const totals = computeCartTotals(cart, tenantTaxConfig);
@@ -92,7 +134,7 @@ export function InvoiceFormModal({
       setSubmitError("Choose a due date.");
       return;
     }
-    if (collectInitialPayment) {
+    if (!editId && collectInitialPayment) {
       if (!paymentMethodId) {
         setSubmitError("Choose a payment method for the initial payment.");
         return;
@@ -106,7 +148,7 @@ export function InvoiceFormModal({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const result = await api.createInvoice({
+      const body = {
         customerId,
         transactionType,
         dueDate,
@@ -121,7 +163,7 @@ export function InvoiceFormModal({
           localSupplierId: line.isLocallySourced ? (line.localSupplierId ?? undefined) : undefined,
         })),
         initialPayment:
-          collectInitialPayment && initialPaymentAmount.trim()
+          !editId && collectInitialPayment && initialPaymentAmount.trim()
             ? { paymentMethodId, amountCents: Math.round(Number(initialPaymentAmount) * 100), reference: initialPaymentReference.trim() || undefined }
             : null,
         delivery: delivery
@@ -137,10 +179,11 @@ export function InvoiceFormModal({
             }
           : undefined,
         locationId: branchId,
-      });
+      };
+      const result = editId ? await api.updateInvoice(editId, body) : await api.createInvoice(body);
       onCreated(result.id);
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : "Failed to create invoice — check your connection and try again.");
+      setSubmitError(err instanceof ApiError ? err.message : `Failed to ${editId ? "save" : "create"} invoice — check your connection and try again.`);
     } finally {
       setSubmitting(false);
     }
@@ -158,7 +201,7 @@ export function InvoiceFormModal({
       >
         <div className="flex items-start justify-between p-5 pb-3">
           <div>
-            <p className="font-display text-lg text-navy">New Invoice</p>
+            <p className="font-display text-lg text-navy">{editId ? "Edit Invoice" : "New Invoice"}</p>
             {branchName && <p className="text-xs text-navy/50">Billed from {branchName}</p>}
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="grid size-8 flex-none place-items-center rounded-full text-navy/40 hover:bg-cream-dark hover:text-navy">
@@ -168,7 +211,10 @@ export function InvoiceFormModal({
 
         <div className="flex-1 overflow-y-auto px-5 pb-5">
           {loadError && <p className="mb-3 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{loadError}</p>}
+          {!prefilled && !loadError && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
 
+          {prefilled && (
+          <>
           <button
             type="button"
             onClick={() => setCustomerPickerOpen(true)}
@@ -289,12 +335,14 @@ export function InvoiceFormModal({
             </div>
           )}
 
+          {!editId && (
           <label className="mt-3 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-navy/60">
             <input type="checkbox" checked={collectInitialPayment} onChange={() => setCollectInitialPayment((v) => !v)} className="size-3.5 accent-blue" />
             Collect an initial payment now
           </label>
+          )}
 
-          {collectInitialPayment && (
+          {!editId && collectInitialPayment && (
             <div className="mt-2 space-y-2 rounded-lg bg-cream-dark/60 p-3">
               <div className="grid grid-cols-2 gap-2">
                 <select
@@ -339,8 +387,10 @@ export function InvoiceFormModal({
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
           >
             {submitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            {submitting ? "Creating…" : "Create Invoice"}
+            {submitting ? (editId ? "Saving…" : "Creating…") : editId ? "Save Changes" : "Create Invoice"}
           </button>
+          </>
+          )}
         </div>
       </motion.div>
 

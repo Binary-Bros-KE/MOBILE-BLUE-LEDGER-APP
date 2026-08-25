@@ -4,22 +4,40 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, Loader2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { computeCartTotals } from "@/lib/cart-totals";
+import { buildCartFromEditableItems, computeCartTotals } from "@/lib/cart-totals";
 import { formatCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileRider, MobileSupplier, ProductListItem } from "@/lib/types";
+import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, ProductListItem } from "@/lib/types";
 import { CheckoutCustomerPickerModal } from "../tabs/CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "../tabs/CheckoutDeliveryModal";
 import { CartItemsEditor } from "./CartItemsEditor";
 
-/** Creates a new Quotation — a non-binding proposal. No stock deducted/checked, no money collected
- * (see mobile-quotations-service.ts's own doc comment). Unlike Invoice, a walk-in (no customer)
- * quotation is valid — matches DESKTOP exactly. */
+function deliveryDraftFromEditable(d: MobileEditableDelivery): DeliveryDraft {
+  return {
+    riderId: d.riderId,
+    recipientName: d.recipientName,
+    country: d.country,
+    town: d.town,
+    physicalAddress: d.physicalAddress,
+    notes: d.notes,
+    fee: d.feeCents > 0 ? (d.feeCents / 100).toFixed(2) : "",
+    cost: d.costCents > 0 ? (d.costCents / 100).toFixed(2) : "",
+  };
+}
+
+/** Creates a new Quotation, or edits an existing draft when `editId` is given — a non-binding
+ * proposal. No stock deducted/checked, no money collected (see mobile-quotations-service.ts's own
+ * doc comment). Unlike Invoice, a walk-in (no customer) quotation is valid — matches DESKTOP
+ * exactly.
+ *
+ * Edit mode fetches GET /mobile/quotations/:id/edit and rebuilds the cart against CURRENT product
+ * data (buildCartFromEditableItems) — same reasoning as InvoiceFormModal's own edit mode. */
 export function QuotationFormModal({
   branchId,
   branchName,
   currency,
   tenantTaxConfig,
+  editId,
   onClose,
   onCreated,
 }: {
@@ -27,6 +45,7 @@ export function QuotationFormModal({
   branchName: string | null;
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
+  editId?: string;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
@@ -35,6 +54,7 @@ export function QuotationFormModal({
   const [riders, setRiders] = useState<MobileRider[]>([]);
   const [suppliers, setSuppliers] = useState<MobileSupplier[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [prefilled, setPrefilled] = useState(!editId);
 
   const [cart, setCart] = useState<CheckoutCartLine[]>([]);
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -58,6 +78,21 @@ export function QuotationFormModal({
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load products."));
   }, []);
 
+  useEffect(() => {
+    if (!editId || !products) return;
+    api
+      .getQuotationEditData(editId)
+      .then((data) => {
+        setCustomerId(data.customerId);
+        setValidUntil(data.validUntil);
+        setNotes(data.notes ?? "");
+        setCart(buildCartFromEditableItems(data.items, products));
+        setDelivery(data.delivery ? deliveryDraftFromEditable(data.delivery) : null);
+        setPrefilled(true);
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this quotation for editing."));
+  }, [editId, products]);
+
   const customerLabel = customerId ? (customers.find((c) => c.id === customerId)?.name ?? "") : "Walk-in Customer";
   const totals = computeCartTotals(cart, tenantTaxConfig);
   const deliveryFeeCents = delivery?.fee.trim() ? Math.round(Number(delivery.fee) * 100) : 0;
@@ -80,7 +115,7 @@ export function QuotationFormModal({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const result = await api.createQuotation({
+      const body = {
         customerId: customerId ?? undefined,
         validUntil,
         notes: notes.trim() || undefined,
@@ -106,10 +141,11 @@ export function QuotationFormModal({
             }
           : undefined,
         locationId: branchId,
-      });
+      };
+      const result = editId ? await api.updateQuotation(editId, body) : await api.createQuotation(body);
       onCreated(result.id);
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : "Failed to create quotation — check your connection and try again.");
+      setSubmitError(err instanceof ApiError ? err.message : `Failed to ${editId ? "save" : "create"} quotation — check your connection and try again.`);
     } finally {
       setSubmitting(false);
     }
@@ -127,7 +163,7 @@ export function QuotationFormModal({
       >
         <div className="flex items-start justify-between p-5 pb-3">
           <div>
-            <p className="font-display text-lg text-navy">New Quotation</p>
+            <p className="font-display text-lg text-navy">{editId ? "Edit Quotation" : "New Quotation"}</p>
             {branchName && <p className="text-xs text-navy/50">From {branchName}</p>}
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="grid size-8 flex-none place-items-center rounded-full text-navy/40 hover:bg-cream-dark hover:text-navy">
@@ -137,7 +173,10 @@ export function QuotationFormModal({
 
         <div className="flex-1 overflow-y-auto px-5 pb-5">
           {loadError && <p className="mb-3 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{loadError}</p>}
+          {!prefilled && !loadError && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
 
+          {prefilled && (
+          <>
           <button
             type="button"
             onClick={() => setCustomerPickerOpen(true)}
@@ -254,8 +293,10 @@ export function QuotationFormModal({
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
           >
             {submitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            {submitting ? "Creating…" : "Create Quotation"}
+            {submitting ? (editId ? "Saving…" : "Creating…") : editId ? "Save Changes" : "Create Quotation"}
           </button>
+          </>
+          )}
         </div>
       </motion.div>
 

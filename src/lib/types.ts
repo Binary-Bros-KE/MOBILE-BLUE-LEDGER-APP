@@ -513,6 +513,49 @@ export type ConvertToSaleRequest = {
 
 export type ConvertToInvoiceRequest = { dueDate: string; quantityOverrides?: QuantityOverride[] };
 
+/** Raw, re-editable line item shape — deliberately NOT SharedLineItem (that's a display-only shape
+ * with no productId/taxType/isLocallySourced). Returned by GET /mobile/invoices/:id/edit and
+ * GET /mobile/quotations/:id/edit, same shape items[] already sends on create/update. */
+export type MobileEditableItem = {
+  productId: string;
+  quantity: number;
+  unitPriceCents: number;
+  discountAmountCents: number;
+  isLocallySourced: boolean;
+  localCostCents: number | null;
+  localSupplierId: string | null;
+};
+
+export type MobileEditableDelivery = {
+  riderId: string | null;
+  recipientName: string;
+  country: string;
+  town: string;
+  physicalAddress: string;
+  notes: string;
+  feeCents: number;
+  costCents: number;
+};
+
+export type MobileInvoiceEditData = {
+  customerId: string;
+  transactionType: "invoice" | "wholesale_sale";
+  dueDate: string;
+  invoiceNotes: string | null;
+  includeTaxBreakdown: boolean;
+  items: MobileEditableItem[];
+  delivery: MobileEditableDelivery | null;
+};
+
+export type MobileQuotationEditData = {
+  customerId: string | null;
+  validUntil: string;
+  notes: string | null;
+  includeTaxBreakdown: boolean;
+  items: MobileEditableItem[];
+  delivery: MobileEditableDelivery | null;
+};
+
 export type PurchaseListItem = {
   id: string;
   purchaseNumber: string;
