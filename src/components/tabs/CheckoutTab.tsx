@@ -61,6 +61,14 @@ export function CheckoutTab({ branchId, branchName, currency }: { branchId: stri
   const amountReceivedCents = amountReceived.trim() ? Math.round(Number(amountReceived) * 100) : 0;
   const changeCents = amountReceivedCents - subtotalCents;
 
+  // submitError is only ever SET inside handleCheckout (on a failed submit attempt) — without this,
+  // fixing the thing that caused it (e.g. typing in the rest of the amount received) leaves the
+  // banner on screen until the cashier taps Charge again, which reads as "still blocked" even though
+  // the sale would now go through. Clear it the moment any input that could have caused it changes.
+  useEffect(() => {
+    setSubmitError(null);
+  }, [cart, paymentMethodId, paymentReference, amountReceived]);
+
   function addToCart(product: ProductListItem): void {
     setCart((prev) => {
       const existing = prev.find((line) => line.productId === product.id);
