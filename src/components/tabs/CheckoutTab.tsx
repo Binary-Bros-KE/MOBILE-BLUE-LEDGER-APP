@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Minus, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
+import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, PaymentMethodOption, ProductListItem } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
 
@@ -20,7 +21,17 @@ import { DocumentDetailModal } from "../DocumentDetailModal";
  * not a picker) — mobile-checkout-service.ts rejects any other locationId outright, matching
  * DESKTOP's own requireActiveSession for a branch-scoped employee.
  */
-export function CheckoutTab({ branchId, branchName, currency }: { branchId: string | null; branchName: string | null; currency: string }) {
+export function CheckoutTab({
+  branchId,
+  branchName,
+  currency,
+  tenantTaxConfig,
+}: {
+  branchId: string | null;
+  branchName: string | null;
+  currency: string;
+  tenantTaxConfig: TenantTaxConfig;
+}) {
   const [products, setProducts] = useState<ProductListItem[] | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -57,9 +68,23 @@ export function CheckoutTab({ branchId, branchName, currency }: { branchId: stri
 
   const selectedPaymentMethod = paymentMethods?.find((m) => m.id === paymentMethodId) ?? null;
 
-  const subtotalCents = cart.reduce((sum, line) => sum + line.unitPriceCents * line.quantity - line.discountAmountCents, 0);
+  // grossCents (per line) is what actually gets charged — already includes tax whether it's baked
+  // into the product's own price (inclusive) or added on top (exclusive). Summing THIS, not the raw
+  // pre-tax subtotal, is what must drive the Total shown/charged/validated below: SERVER's own
+  // grandTotalCents (mobile-checkout-service.ts) is computed the exact same way, and a preview that
+  // omitted tax meant a cashier could type exactly what this screen showed and still have the sale
+  // rejected as underpaid (caught live: a tax-exclusive product's real total was always higher than
+  // this naive sum — 2026-08-25).
+  const lineTaxResults = cart.map((line) => {
+    const taxableCents = line.unitPriceCents * line.quantity - line.discountAmountCents;
+    const productTaxConfig = resolveProductTaxConfig({ pricesTaxInclusive: line.pricesTaxInclusive }, tenantTaxConfig);
+    return computeLineTax(taxableCents, line.taxType, productTaxConfig);
+  });
+  const netSubtotalCents = lineTaxResults.reduce((sum, r) => sum + r.netCents, 0);
+  const taxAmountCents = lineTaxResults.reduce((sum, r) => sum + r.taxCents, 0);
+  const grandTotalCents = lineTaxResults.reduce((sum, r) => sum + r.grossCents, 0);
   const amountReceivedCents = amountReceived.trim() ? Math.round(Number(amountReceived) * 100) : 0;
-  const changeCents = amountReceivedCents - subtotalCents;
+  const changeCents = amountReceivedCents - grandTotalCents;
 
   // submitError is only ever SET inside handleCheckout (on a failed submit attempt) — without this,
   // fixing the thing that caused it (e.g. typing in the rest of the amount received) leaves the
@@ -84,6 +109,8 @@ export function CheckoutTab({ branchId, branchName, currency }: { branchId: stri
           unitPriceCents: product.sellingPriceCents,
           quantity: 1,
           discountAmountCents: 0,
+          taxType: product.taxType,
+          pricesTaxInclusive: product.pricesTaxInclusive,
         },
       ];
     });
@@ -128,7 +155,7 @@ export function CheckoutTab({ branchId, branchName, currency }: { branchId: stri
       setSubmitError(`${selectedPaymentMethod.name} requires a reference.`);
       return;
     }
-    if (amountReceivedCents < subtotalCents) {
+    if (amountReceivedCents < grandTotalCents) {
       setSubmitError("Amount received is less than the total.");
       return;
     }
@@ -215,7 +242,7 @@ export function CheckoutTab({ branchId, branchName, currency }: { branchId: stri
           </div>
         ) : (
           <div className="space-y-2">
-            {cart.map((line) => (
+            {cart.map((line, index) => (
               <div key={line.productId} className="rounded-lg border border-navy/10 bg-white p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -257,9 +284,7 @@ export function CheckoutTab({ branchId, branchName, currency }: { branchId: stri
                       className="w-16 rounded-md border border-navy/15 px-1.5 py-1 text-right text-xs font-semibold text-navy focus:border-blue focus:outline-none"
                     />
                   </label>
-                  <p className="flex-none text-sm font-bold text-navy">
-                    {formatCents(line.unitPriceCents * line.quantity - line.discountAmountCents, currency)}
-                  </p>
+                  <p className="flex-none text-sm font-bold text-navy">{formatCents(lineTaxResults[index].grossCents, currency)}</p>
                 </div>
               </div>
             ))}
@@ -269,9 +294,21 @@ export function CheckoutTab({ branchId, branchName, currency }: { branchId: stri
 
       {cart.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-navy/10 bg-white p-4 shadow-[0_-4px_16px_rgba(8,42,143,0.08)]">
+          {taxAmountCents > 0 && (
+            <>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-semibold text-navy/50">Subtotal</span>
+                <span className="text-xs font-semibold text-navy/50">{formatCents(netSubtotalCents, currency)}</span>
+              </div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-semibold text-navy/50">Tax</span>
+                <span className="text-xs font-semibold text-navy/50">{formatCents(taxAmountCents, currency)}</span>
+              </div>
+            </>
+          )}
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-navy/60">Total</span>
-            <span className="font-display text-lg text-navy">{formatCents(subtotalCents, currency)}</span>
+            <span className="font-display text-lg text-navy">{formatCents(grandTotalCents, currency)}</span>
           </div>
 
           <div className="mb-2 grid grid-cols-2 gap-2">
@@ -320,7 +357,7 @@ export function CheckoutTab({ branchId, branchName, currency }: { branchId: stri
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
           >
             {submitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            {submitting ? "Completing sale…" : `Charge ${formatCents(subtotalCents, currency)}`}
+            {submitting ? "Completing sale…" : `Charge ${formatCents(grandTotalCents, currency)}`}
           </button>
         </div>
       )}

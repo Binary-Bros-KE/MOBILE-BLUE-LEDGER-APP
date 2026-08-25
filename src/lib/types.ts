@@ -76,6 +76,11 @@ export type MobileSessionInfo = {
    * the signed-in employee's own branch in this phase). */
   branchId: string | null;
   branchName: string | null;
+  /** Tenant-wide tax defaults — Checkout needs these alongside each product's own pricesTaxInclusive
+   * override (see ProductListItem) to compute the real tax-inclusive total, matching what SERVER
+   * enforces authoritatively at submit time. */
+  vatRatePercent: number;
+  pricesTaxInclusive: boolean;
 };
 
 export type Employee = {
@@ -366,6 +371,9 @@ export type ProductListItem = {
    * Product row at checkout time, never trusts what this list showed. */
   sellingPriceCents: number;
   taxType: string;
+  /** This product's own inclusive/exclusive override, or null to fall back to the tenant default
+   * (MobileSessionInfo.pricesTaxInclusive) — see resolveProductTaxConfig in lib/tax.ts. */
+  pricesTaxInclusive: boolean | null;
   reorderLevel: number;
   mainStoreQuantity: number | null;
   storefrontQuantity: number;
@@ -386,6 +394,10 @@ export type CheckoutCartLine = {
   unitPriceCents: number;
   quantity: number;
   discountAmountCents: number;
+  /** Captured from the product at add-to-cart time — needed to compute this line's real
+   * tax-inclusive total (see lib/tax.ts's computeLineTax), same fields SERVER uses authoritatively. */
+  taxType: string;
+  pricesTaxInclusive: boolean | null;
 };
 
 export type CheckoutRequest = {

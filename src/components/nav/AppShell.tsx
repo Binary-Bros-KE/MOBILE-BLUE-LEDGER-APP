@@ -113,7 +113,12 @@ export function AppShell() {
         >
           {activeTab === "dashboard" && <DashboardTab />}
           {activeTab === "checkout" && (
-            <CheckoutTab branchId={session?.branchId ?? null} branchName={session?.branchName ?? null} currency={session?.currency ?? "KES"} />
+            <CheckoutTab
+              branchId={session?.branchId ?? null}
+              branchName={session?.branchName ?? null}
+              currency={session?.currency ?? "KES"}
+              tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
+            />
           )}
           {activeTab === "employees" && <EmployeesTab currency={session?.currency ?? "KES"} />}
           {activeTab === "sales" && <SalesTab />}
