@@ -3,6 +3,7 @@ import type {
   CheckoutResult,
   CreateCustomerInput,
   CreateRiderInput,
+  CreateSupplierInput,
   Employee,
   ExpenseListItem,
   InvoiceListItem,
@@ -11,6 +12,7 @@ import type {
   MobilePeriod,
   MobileRider,
   MobileSessionInfo,
+  MobileSupplier,
   MobileTaxReport,
   OwnerDashboard,
   PaymentMethodOption,
@@ -137,6 +139,9 @@ export const api = {
   getStatement: (customerId: string) => request<SharedStatement>(`/mobile/customers/${customerId}/statement`),
   listRiders: () => request<MobileRider[]>("/mobile/riders"),
   createRider: (body: CreateRiderInput) => request<MobileRider>("/mobile/riders", { method: "POST", body: JSON.stringify(body) }),
+  listSuppliers: () => request<MobileSupplier[]>("/mobile/suppliers"),
+  createSupplier: (body: CreateSupplierInput) =>
+    request<MobileSupplier>("/mobile/suppliers", { method: "POST", body: JSON.stringify(body) }),
   listQuotations: (locationId?: string) =>
     request<QuotationListItem[]>(`/mobile/quotations${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getQuotation: (id: string) => request<SharedDocument>(`/mobile/quotations/${id}`),

@@ -380,6 +380,9 @@ export type ProductListItem = {
   /** This product's own inclusive/exclusive override, or null to fall back to the tenant default
    * (MobileSessionInfo.pricesTaxInclusive) — see resolveProductTaxConfig in lib/tax.ts. */
   pricesTaxInclusive: boolean | null;
+  /** The floor a cashier's price override/discount can never push this line below — null means no
+   * floor. See CheckoutTab's price-override field. */
+  minimumPriceCents: number | null;
   reorderLevel: number;
   mainStoreQuantity: number | null;
   storefrontQuantity: number;
@@ -404,6 +407,19 @@ export type CheckoutCartLine = {
    * tax-inclusive total (see lib/tax.ts's computeLineTax), same fields SERVER uses authoritatively. */
   taxType: string;
   pricesTaxInclusive: boolean | null;
+  /** The floor this line's effective price (natural or overridden) can never drop below — copied
+   * from the product at add-to-cart time. */
+  minimumPriceCents: number | null;
+  /** Cashier-entered mark-up/override for this line only, raw text like discountAmountCents' own UI
+   * field — empty means "use the product's own listed price," same convention as DESKTOP's own
+   * priceOverride. Never written back to the product. */
+  priceOverride: string;
+  /** This line's product was bought from another shop on the spot rather than pulled from this
+   * shop's own stock — skips the usual stock deduction (see mobile-checkout-service.ts). localCost
+   * is raw text like priceOverride; localSupplierId is null until a supplier is picked/created. */
+  isLocallySourced: boolean;
+  localCost: string;
+  localSupplierId: string | null;
 };
 
 /** Mirrors DESKTOP's own ExtraChargesSection DeliveryDraft — see SERVER's
@@ -420,16 +436,31 @@ export type CheckoutDeliveryInput = {
   costCents: number;
 };
 
+export type CheckoutItemInput = {
+  productId: string;
+  quantity: number;
+  discountAmountCents: number;
+  unitPriceCents?: number;
+  isLocallySourced?: boolean;
+  localCostCents?: number;
+  localSupplierId?: string;
+};
+
 export type CheckoutRequest = {
   id: string;
   locationId: string;
-  items: Array<{ productId: string; quantity: number; discountAmountCents: number }>;
+  items: CheckoutItemInput[];
   paymentMethodId: string;
   paymentReference?: string;
   customerId?: string;
   amountReceivedCents: number;
   delivery?: CheckoutDeliveryInput;
+  notes?: string;
 };
+
+export type MobileSupplier = { id: string; businessName: string; phone1: string };
+
+export type CreateSupplierInput = { businessName: string; contactPerson?: string; phone1: string };
 
 export type CheckoutResult = { id: string; receiptNumber: string; grandTotalCents: number };
 

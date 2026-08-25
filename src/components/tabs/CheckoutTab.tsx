@@ -1,26 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Loader2, Minus, Plus, Search, ShoppingCart, Trash2, Truck, UserRound, X } from "lucide-react";
+import { ChevronRight, Loader2, Minus, Plus, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileRider, PaymentMethodOption, ProductListItem } from "@/lib/types";
+import type { CheckoutCartLine, MobileCustomer, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
+import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 import { CheckoutCustomerPickerModal } from "./CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "./CheckoutDeliveryModal";
 
 /**
  * Real, from-scratch mobile checkout — the counterpart to DESKTOP's Checkout screen. Customer
- * selection (CheckoutCustomerPickerModal) and delivery (CheckoutDeliveryModal) match DESKTOP's own
- * Checkout feature set; deliberately still lighter in other ways (no wholesale price break, no
- * cashier price override, no service charges, no customer credit yet — see
- * mobile-checkout-service.ts's own doc comment for what's covered). Delivery is a MODAL here rather
- * than DESKTOP's inline expanding panel (ExtraChargesSection) — a deliberate mobile-specific choice,
- * screen space is tighter here than on a desktop POS screen. Every figure shown here is a PREVIEW
- * only: SERVER re-fetches the real Product rows and recomputes pricing/tax/stock validation from
- * scratch at submit time, so this component never needs to duplicate DESKTOP's full
- * cart-pricing.ts logic — just enough to show the cashier a running total before they commit.
+ * selection, delivery, price override (mark-up), locally-sourced items, and order notes all match
+ * DESKTOP's own Checkout feature set; deliberately still lighter in a couple of ways (no wholesale
+ * price break, no service charges, no customer credit yet — see mobile-checkout-service.ts's own
+ * doc comment for what's covered). Delivery is a MODAL here rather than DESKTOP's inline expanding
+ * panel (ExtraChargesSection) — a deliberate mobile-specific choice, screen space is tighter here
+ * than on a desktop POS screen; the local-supplier picker is similarly a plain select+quick-create
+ * rather than DESKTOP's own searchable SupplierPicker modal, for the same reason. Every figure shown
+ * here is a PREVIEW only: SERVER re-fetches the real Product rows and recomputes pricing/tax/stock
+ * validation from scratch at submit time (including re-enforcing the price-override floor and
+ * skipping stock deduction for locally-sourced lines), so this component never needs to duplicate
+ * DESKTOP's full cart-pricing.ts logic — just enough to show the cashier a running total before they
+ * commit.
  *
  * Always scoped to the signed-in employee's own branch (branchId/branchName come from /mobile/me,
  * not a picker) — mobile-checkout-service.ts rejects any other locationId outright, matching
@@ -41,12 +45,15 @@ export function CheckoutTab({
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[] | null>(null);
   const [customers, setCustomers] = useState<MobileCustomer[]>([]);
   const [riders, setRiders] = useState<MobileRider[]>([]);
+  const [suppliers, setSuppliers] = useState<MobileSupplier[]>([]);
+  const [quickCreateSupplierFor, setQuickCreateSupplierFor] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CheckoutCartLine[]>([]);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [amountReceived, setAmountReceived] = useState("");
+  const [orderNotes, setOrderNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [completedSaleId, setCompletedSaleId] = useState<string | null>(null);
@@ -62,12 +69,13 @@ export function CheckoutTab({
   const checkoutIdRef = useRef(crypto.randomUUID());
 
   useEffect(() => {
-    Promise.all([api.listProducts(), api.listPaymentMethods(), api.listCustomers(), api.listRiders()])
-      .then(([productList, methods, customerList, riderList]) => {
+    Promise.all([api.listProducts(), api.listPaymentMethods(), api.listCustomers(), api.listRiders(), api.listSuppliers()])
+      .then(([productList, methods, customerList, riderList, supplierList]) => {
         setProducts(productList);
         setPaymentMethods(methods);
         setCustomers(customerList);
         setRiders(riderList);
+        setSuppliers(supplierList);
         if (methods.length > 0) setPaymentMethodId((current) => current || (methods[0] as PaymentMethodOption).id);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load products or payment methods."));
@@ -89,8 +97,13 @@ export function CheckoutTab({
   // omitted tax meant a cashier could type exactly what this screen showed and still have the sale
   // rejected as underpaid (caught live: a tax-exclusive product's real total was always higher than
   // this naive sum — 2026-08-25).
+  // effectiveUnitPriceCents (override or the product's natural price) drives every downstream figure
+  // for this line — the tax computation, the below-minimum check, and the line total shown.
+  function effectiveUnitPriceCents(line: CheckoutCartLine): number {
+    return line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : line.unitPriceCents;
+  }
   const lineTaxResults = cart.map((line) => {
-    const taxableCents = line.unitPriceCents * line.quantity - line.discountAmountCents;
+    const taxableCents = effectiveUnitPriceCents(line) * line.quantity - line.discountAmountCents;
     const productTaxConfig = resolveProductTaxConfig({ pricesTaxInclusive: line.pricesTaxInclusive }, tenantTaxConfig);
     return computeLineTax(taxableCents, line.taxType, productTaxConfig);
   });
@@ -131,6 +144,11 @@ export function CheckoutTab({
           discountAmountCents: 0,
           taxType: product.taxType,
           pricesTaxInclusive: product.pricesTaxInclusive,
+          minimumPriceCents: product.minimumPriceCents,
+          priceOverride: "",
+          isLocallySourced: false,
+          localCost: "",
+          localSupplierId: null,
         },
       ];
     });
@@ -147,6 +165,34 @@ export function CheckoutTab({
     setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, discountAmountCents } : line)));
   }
 
+  function updatePriceOverride(productId: string, value: string): void {
+    setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, priceOverride: value } : line)));
+  }
+
+  function toggleLocallySourced(productId: string): void {
+    setCart((prev) =>
+      prev.map((line) =>
+        line.productId === productId
+          ? {
+              ...line,
+              isLocallySourced: !line.isLocallySourced,
+              // Clears any half-entered cost/supplier when switching back off, so a stale value can't
+              // silently ride along if the cashier re-enables it later for a different sale.
+              ...(line.isLocallySourced ? { localCost: "", localSupplierId: null } : {}),
+            }
+          : line,
+      ),
+    );
+  }
+
+  function updateLocalCost(productId: string, value: string): void {
+    setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, localCost: value } : line)));
+  }
+
+  function updateLocalSupplier(productId: string, supplierId: string | null): void {
+    setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, localSupplierId: supplierId } : line)));
+  }
+
   function removeLine(productId: string): void {
     setCart((prev) => prev.filter((line) => line.productId !== productId));
   }
@@ -157,6 +203,7 @@ export function CheckoutTab({
     setAmountReceived("");
     setCustomerId(null);
     setDelivery(null);
+    setOrderNotes("");
     checkoutIdRef.current = crypto.randomUUID();
   }
 
@@ -188,11 +235,20 @@ export function CheckoutTab({
       const result = await api.checkout({
         id: checkoutIdRef.current,
         locationId: branchId,
-        items: cart.map((line) => ({ productId: line.productId, quantity: line.quantity, discountAmountCents: line.discountAmountCents })),
+        items: cart.map((line) => ({
+          productId: line.productId,
+          quantity: line.quantity,
+          discountAmountCents: line.discountAmountCents,
+          unitPriceCents: line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : undefined,
+          isLocallySourced: line.isLocallySourced,
+          localCostCents: line.isLocallySourced && line.localCost.trim() ? Math.round(Number(line.localCost) * 100) : undefined,
+          localSupplierId: line.isLocallySourced ? (line.localSupplierId ?? undefined) : undefined,
+        })),
         paymentMethodId,
         paymentReference: paymentReference.trim() || undefined,
         customerId: customerId ?? undefined,
         amountReceivedCents,
+        notes: orderNotes.trim() || undefined,
         delivery: delivery
           ? {
               riderId: delivery.riderId ?? undefined,
@@ -333,55 +389,151 @@ export function CheckoutTab({
           </div>
         ) : (
           <div className="space-y-2">
-            {cart.map((line, index) => (
-              <div key={line.productId} className="rounded-lg border border-navy/10 bg-white p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-navy">{line.name}</p>
-                    <p className="text-[11px] text-navy/50">@ {formatCents(line.unitPriceCents, currency)}</p>
-                  </div>
-                  <button type="button" onClick={() => removeLine(line.productId)} aria-label={`Remove ${line.name}`} className="flex-none text-navy/30 hover:text-red">
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  </button>
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => updateQuantity(line.productId, line.quantity - 1)}
-                      disabled={line.quantity <= 1}
-                      className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60 disabled:opacity-30"
-                    >
-                      <Minus className="size-3" aria-hidden="true" />
-                    </button>
-                    <span className="w-8 text-center text-sm font-bold text-navy">{line.quantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => updateQuantity(line.productId, line.quantity + 1)}
-                      className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60"
-                    >
-                      <Plus className="size-3" aria-hidden="true" />
+            {cart.map((line, index) => {
+              const priceBelowMinimum =
+                line.priceOverride.trim() &&
+                line.minimumPriceCents !== null &&
+                Math.round(Number(line.priceOverride) * 100) < line.minimumPriceCents;
+              return (
+                <div key={line.productId} className="rounded-lg border border-navy/10 bg-white p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-navy">{line.name}</p>
+                      <p className="text-[11px] text-navy/50">@ {formatCents(line.unitPriceCents, currency)}</p>
+                    </div>
+                    <button type="button" onClick={() => removeLine(line.productId)} aria-label={`Remove ${line.name}`} className="flex-none text-navy/30 hover:text-red">
+                      <Trash2 className="size-4" aria-hidden="true" />
                     </button>
                   </div>
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-navy/50">
-                    Discount
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(line.productId, line.quantity - 1)}
+                        disabled={line.quantity <= 1}
+                        className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60 disabled:opacity-30"
+                      >
+                        <Minus className="size-3" aria-hidden="true" />
+                      </button>
+                      <span className="w-8 text-center text-sm font-bold text-navy">{line.quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(line.productId, line.quantity + 1)}
+                        className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60"
+                      >
+                        <Plus className="size-3" aria-hidden="true" />
+                      </button>
+                    </div>
+                    <label className="flex flex-1 items-center gap-1.5 text-[11px] font-semibold text-navy/50">
+                      Price
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={line.priceOverride}
+                        onChange={(e) => updatePriceOverride(line.productId, e.target.value)}
+                        placeholder={(line.unitPriceCents / 100).toFixed(2)}
+                        className={`w-full min-w-0 rounded-md border px-1.5 py-1 text-right text-xs font-semibold focus:outline-none ${
+                          priceBelowMinimum ? "border-red text-red" : "border-navy/15 text-navy focus:border-blue"
+                        }`}
+                      />
+                    </label>
+                  </div>
+                  {priceBelowMinimum && (
+                    <p className="mt-1 text-right text-[10px] font-bold text-red">
+                      Below minimum price of {formatCents(line.minimumPriceCents as number, currency)}
+                    </p>
+                  )}
+
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-navy/50">
+                      Discount
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={line.discountAmountCents ? (line.discountAmountCents / 100).toString() : ""}
+                        onChange={(e) => updateDiscount(line.productId, e.target.value)}
+                        placeholder="0.00"
+                        className="w-16 rounded-md border border-navy/15 px-1.5 py-1 text-right text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+                      />
+                    </label>
+                    <p className="flex-none text-sm font-bold text-navy">{formatCents(lineTaxResults[index].grossCents, currency)}</p>
+                  </div>
+
+                  <label className="mt-2.5 flex cursor-pointer items-center gap-1.5 text-[10px] font-bold text-navy/50">
                     <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={line.discountAmountCents ? (line.discountAmountCents / 100).toString() : ""}
-                      onChange={(e) => updateDiscount(line.productId, e.target.value)}
-                      placeholder="0.00"
-                      className="w-16 rounded-md border border-navy/15 px-1.5 py-1 text-right text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+                      type="checkbox"
+                      checked={line.isLocallySourced}
+                      onChange={() => toggleLocallySourced(line.productId)}
+                      className="size-3.5 accent-blue"
                     />
+                    <Store className="size-3 flex-none" aria-hidden="true" />
+                    Sourced from another shop
                   </label>
-                  <p className="flex-none text-sm font-bold text-navy">{formatCents(lineTaxResults[index].grossCents, currency)}</p>
+
+                  {line.isLocallySourced && (
+                    <div className="mt-2 space-y-2 rounded-md bg-cream-dark/60 p-2.5">
+                      <label className="block">
+                        <span className="text-[11px] font-semibold text-navy/50">Cost paid</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={line.localCost}
+                          onChange={(e) => updateLocalCost(line.productId, e.target.value)}
+                          placeholder="0.00"
+                          className="mt-1 w-full rounded-md border border-navy/15 px-2.5 py-1.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+                        />
+                      </label>
+                      <div>
+                        <span className="text-[11px] font-semibold text-navy/50">Local Supplier</span>
+                        <div className="mt-1 flex gap-1.5">
+                          <select
+                            value={line.localSupplierId ?? ""}
+                            onChange={(e) => updateLocalSupplier(line.productId, e.target.value || null)}
+                            className="h-9 w-full rounded-md border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+                          >
+                            <option value="">Select a supplier…</option>
+                            {suppliers.map((supplier) => (
+                              <option key={supplier.id} value={supplier.id}>
+                                {supplier.businessName}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => setQuickCreateSupplierFor(line.productId)}
+                            className="grid h-9 w-9 flex-none place-items-center rounded-md border border-navy/15 text-navy/60"
+                          >
+                            <Plus className="size-3.5" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
+
+      {cart.length > 0 && (
+        <div className="px-4 pb-2">
+          <label className="block">
+            <span className="text-[11px] font-semibold text-navy/50">Notes to order</span>
+            <textarea
+              value={orderNotes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              placeholder="Optional notes for this sale"
+              rows={2}
+              className="mt-1 w-full rounded-lg border border-navy/15 bg-white px-3 py-2 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+            />
+          </label>
+        </div>
+      )}
 
       {cart.length > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-navy/10 bg-white p-4 shadow-[0_-4px_16px_rgba(8,42,143,0.08)]">
@@ -396,6 +548,12 @@ export function CheckoutTab({
                 <span className="text-xs font-semibold text-navy/50">{formatCents(taxAmountCents, currency)}</span>
               </div>
             </>
+          )}
+          {deliveryFeeCents > 0 && (
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold text-navy/50">Delivery Fee</span>
+              <span className="text-xs font-semibold text-navy/50">{formatCents(deliveryFeeCents, currency)}</span>
+            </div>
           )}
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-navy/60">Total</span>
@@ -484,6 +642,17 @@ export function CheckoutTab({
               : null
           }
           onClose={() => setDeliveryModalOpen(false)}
+        />
+      )}
+
+      {quickCreateSupplierFor && (
+        <QuickCreateSupplierModal
+          onClose={() => setQuickCreateSupplierFor(null)}
+          onCreated={(supplier) => {
+            setSuppliers((prev) => [...prev, supplier]);
+            updateLocalSupplier(quickCreateSupplierFor, supplier.id);
+            setQuickCreateSupplierFor(null);
+          }}
         />
       )}
 
