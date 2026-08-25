@@ -124,8 +124,22 @@ export function AppShell() {
           )}
           {activeTab === "employees" && <EmployeesTab currency={session?.currency ?? "KES"} />}
           {activeTab === "sales" && <SalesTab />}
-          {activeTab === "invoices" && <InvoicesTab />}
-          {activeTab === "quotations" && <QuotationsTab />}
+          {activeTab === "invoices" && (
+            <InvoicesTab
+              branchId={session?.branchId ?? null}
+              branchName={session?.branchName ?? null}
+              currency={session?.currency ?? "KES"}
+              tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
+            />
+          )}
+          {activeTab === "quotations" && (
+            <QuotationsTab
+              branchId={session?.branchId ?? null}
+              branchName={session?.branchName ?? null}
+              currency={session?.currency ?? "KES"}
+              tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
+            />
+          )}
           {activeTab === "transactions" && <TransactionsTab />}
           {activeTab === "customers" && <CustomersTab />}
           {activeTab === "riders" && <RidersTab />}

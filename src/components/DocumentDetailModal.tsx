@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Download, Loader2, Share2, X } from "lucide-react";
+import { Copy, Download, Loader2, Share2, Trash2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { taxBreakdownLabel } from "@/lib/tax";
-import type { SharedDocument } from "@/lib/types";
+import type { PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
 
 const KIND_LABEL: Record<SharedDocument["documentKind"], string> = {
   receipt: "Receipt",
@@ -58,10 +58,15 @@ export function DocumentDetailModal({
   saleId,
   kind = "sale",
   onClose,
+  onChanged,
 }: {
   saleId: string;
   kind?: "sale" | "quotation";
   onClose: () => void;
+  /** Fired after any mutating action below (payment recorded, status changed, converted, cancelled,
+   * deleted) — lets the parent tab refresh its own list (balances/statuses shown there would
+   * otherwise go stale until the next natural reload). */
+  onChanged?: () => void;
 }) {
   const [doc, setDoc] = useState<SharedDocument | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -69,6 +74,29 @@ export function DocumentDetailModal({
   const [sharing, setSharing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[] | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [convertSaleOpen, setConvertSaleOpen] = useState(false);
+  const [convertInvoiceOpen, setConvertInvoiceOpen] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [stockCheck, setStockCheck] = useState<QuotationStockCheckItem[] | null>(null);
+
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+
+  const [convertPaymentMethodId, setConvertPaymentMethodId] = useState("");
+  const [convertAmountReceived, setConvertAmountReceived] = useState("");
+  const [convertDueDate, setConvertDueDate] = useState("");
+
+  function reload(): void {
+    const fetchDoc = kind === "quotation" ? api.getQuotation(saleId) : api.getSale(saleId);
+    fetchDoc.then(setDoc).catch(() => undefined);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +112,108 @@ export function DocumentDetailModal({
       cancelled = true;
     };
   }, [saleId, kind]);
+
+  function ensurePaymentMethods(): void {
+    if (paymentMethods) return;
+    api.listPaymentMethods().then(setPaymentMethods).catch(() => undefined);
+  }
+
+  async function runAction(name: string, action: () => Promise<unknown>): Promise<void> {
+    setBusyAction(name);
+    setActionError(null);
+    try {
+      await action();
+      onChanged?.();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "That action failed — check your connection and try again.");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleRecordPayment(): Promise<void> {
+    if (!paymentMethodId || !paymentAmount.trim()) {
+      setActionError("Choose a payment method and amount.");
+      return;
+    }
+    await runAction("payment", async () => {
+      await api.recordInvoicePayment(saleId, {
+        paymentMethodId,
+        amountCents: Math.round(Number(paymentAmount) * 100),
+        reference: paymentReference.trim() || undefined,
+      });
+      setPaymentModalOpen(false);
+      setPaymentAmount("");
+      setPaymentReference("");
+      reload();
+    });
+  }
+
+  async function handleDuplicate(): Promise<void> {
+    await runAction("duplicate", async () => {
+      const result = await api.duplicateInvoice(saleId);
+      setNotice("Duplicate created — find it in your Invoices list.");
+      void result;
+    });
+  }
+
+  async function handleCancel(): Promise<void> {
+    await runAction("cancel", async () => {
+      await api.cancelInvoice(saleId);
+      setConfirmCancel(false);
+      reload();
+    });
+  }
+
+  async function handleSetStatus(status: QuotationStatusValue): Promise<void> {
+    await runAction(`status:${status}`, async () => {
+      await api.setQuotationStatus(saleId, status);
+      reload();
+    });
+  }
+
+  async function handleCheckStock(): Promise<void> {
+    await runAction("stockCheck", async () => {
+      const result = await api.checkQuotationStock(saleId);
+      setStockCheck(result);
+    });
+  }
+
+  async function handleConvertToSale(): Promise<void> {
+    if (!convertPaymentMethodId) {
+      setActionError("Choose a payment method.");
+      return;
+    }
+    await runAction("convertSale", async () => {
+      const result = await api.convertQuotationToSale(saleId, {
+        paymentMethodId: convertPaymentMethodId,
+        amountReceivedCents: convertAmountReceived.trim() ? Math.round(Number(convertAmountReceived) * 100) : null,
+      });
+      setConvertSaleOpen(false);
+      setNotice("Converted to a completed sale — find it in your Sales list.");
+      void result;
+    });
+  }
+
+  async function handleConvertToInvoice(): Promise<void> {
+    if (!convertDueDate) {
+      setActionError("Choose a due date.");
+      return;
+    }
+    await runAction("convertInvoice", async () => {
+      const result = await api.convertQuotationToInvoice(saleId, { dueDate: convertDueDate });
+      setConvertInvoiceOpen(false);
+      setNotice("Converted to an invoice — find it in your Invoices list.");
+      void result;
+    });
+  }
+
+  async function handleDelete(): Promise<void> {
+    await runAction("delete", async () => {
+      await api.deleteQuotation(saleId);
+      onClose();
+    });
+  }
 
   async function handleDownload(): Promise<void> {
     setDownloading(true);
@@ -271,9 +401,346 @@ export function DocumentDetailModal({
                 Share
               </button>
             </div>
+
+            {doc.documentKind === "invoice" && doc.paymentStatus !== "cancelled" && (
+              <div className="mt-3 space-y-2 border-t border-dashed border-navy/15 pt-3">
+                {doc.balanceDueCents !== null && doc.balanceDueCents > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      ensurePaymentMethods();
+                      setPaymentAmount(((doc.balanceDueCents as number) / 100).toFixed(2));
+                      setActionError(null);
+                      setPaymentModalOpen(true);
+                    }}
+                    className="w-full rounded-lg border border-blue/30 bg-blue/5 py-2.5 text-xs font-bold text-blue"
+                  >
+                    Record Payment
+                  </button>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleDuplicate()}
+                    disabled={busyAction === "duplicate"}
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy disabled:opacity-50"
+                  >
+                    {busyAction === "duplicate" ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+                    Duplicate
+                  </button>
+                  {!confirmCancel ? (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmCancel(true)}
+                      className="flex items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red"
+                    >
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                      Cancel Invoice
+                    </button>
+                  ) : (
+                    <div className="col-span-2 flex gap-2">
+                      <button type="button" onClick={() => setConfirmCancel(false)} className="flex-1 rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy">
+                        Never mind
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleCancel()}
+                        disabled={busyAction === "cancel"}
+                        className="flex-1 rounded-lg bg-red py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        {busyAction === "cancel" ? "Cancelling…" : "Confirm Cancel"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {doc.documentKind === "quotation" && doc.quotationStatus && (
+              <div className="mt-3 space-y-2 border-t border-dashed border-navy/15 pt-3">
+                {(doc.quotationStatus === "draft" || doc.quotationStatus === "sent") && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {doc.quotationStatus === "draft" && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSetStatus("sent")}
+                        disabled={busyAction === "status:sent"}
+                        className="rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy disabled:opacity-50"
+                      >
+                        Mark Sent
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void handleSetStatus("accepted")}
+                      disabled={busyAction === "status:accepted"}
+                      className="rounded-lg border border-green/30 bg-green/5 py-2.5 text-xs font-bold text-green disabled:opacity-50"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSetStatus("rejected")}
+                      disabled={busyAction === "status:rejected"}
+                      className="rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+
+                {doc.quotationStatus === "rejected" && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSetStatus("draft")}
+                    disabled={busyAction === "status:draft"}
+                    className="w-full rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy disabled:opacity-50"
+                  >
+                    Back to Draft
+                  </button>
+                )}
+
+                {doc.quotationStatus === "accepted" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleCheckStock()}
+                      disabled={busyAction === "stockCheck"}
+                      className="w-full rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy disabled:opacity-50"
+                    >
+                      {busyAction === "stockCheck" ? "Checking…" : "Check Stock"}
+                    </button>
+
+                    {stockCheck && (
+                      <div className="space-y-1 rounded-lg bg-cream-dark/60 p-2.5 text-xs">
+                        {stockCheck.length === 0 && <p className="text-navy/50">No stock-tracked items to check.</p>}
+                        {stockCheck.map((item) => (
+                          <div key={item.productId} className="flex items-center justify-between gap-2">
+                            <span className="truncate font-semibold text-navy">{item.productName}</span>
+                            <span className={item.sufficient ? "text-green" : "font-bold text-red"}>
+                              {item.availableQuantity} / {item.requestedQuantity} available
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          ensurePaymentMethods();
+                          setActionError(null);
+                          setConvertSaleOpen(true);
+                        }}
+                        className="rounded-lg bg-blue py-2.5 text-xs font-bold text-white"
+                      >
+                        Convert to Sale
+                      </button>
+                      {doc.customerName && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActionError(null);
+                            setConvertInvoiceOpen(true);
+                          }}
+                          className="rounded-lg border border-blue/30 bg-blue/5 py-2.5 text-xs font-bold text-blue"
+                        >
+                          Convert to Invoice
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {doc.quotationStatus === "draft" && (
+                  <>
+                    {!confirmDelete ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(true)}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red"
+                      >
+                        <Trash2 className="size-3.5" aria-hidden="true" />
+                        Delete Draft
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setConfirmDelete(false)} className="flex-1 rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy">
+                          Never mind
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete()}
+                          disabled={busyAction === "delete"}
+                          className="flex-1 rounded-lg bg-red py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                        >
+                          {busyAction === "delete" ? "Deleting…" : "Confirm Delete"}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </>
         )}
       </motion.div>
+
+      {paymentModalOpen && doc && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-navy-deep/60 sm:items-center" onClick={() => setPaymentModalOpen(false)}>
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-display text-lg text-navy">Record Payment</p>
+              <button type="button" onClick={() => setPaymentModalOpen(false)} aria-label="Close" className="grid size-8 place-items-center rounded-full text-navy/40 hover:bg-cream-dark">
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              <select
+                value={paymentMethodId}
+                onChange={(e) => setPaymentMethodId(e.target.value)}
+                className="h-10 w-full rounded-lg border border-navy/15 bg-white px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+              >
+                <option value="">Select a payment method…</option>
+                {(paymentMethods ?? []).map((method) => (
+                  <option key={method.id} value={method.id}>
+                    {method.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                placeholder="Amount"
+                className="h-10 w-full rounded-lg border border-navy/15 px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+              />
+              <input
+                type="text"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                placeholder="Reference (if required)"
+                className="h-10 w-full rounded-lg border border-navy/15 px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+              />
+              {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
+              <button
+                type="button"
+                onClick={() => void handleRecordPayment()}
+                disabled={busyAction === "payment"}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {busyAction === "payment" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                {busyAction === "payment" ? "Recording…" : "Record Payment"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {convertSaleOpen && doc && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-navy-deep/60 sm:items-center" onClick={() => setConvertSaleOpen(false)}>
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-display text-lg text-navy">Convert to Sale</p>
+              <button type="button" onClick={() => setConvertSaleOpen(false)} aria-label="Close" className="grid size-8 place-items-center rounded-full text-navy/40 hover:bg-cream-dark">
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-navy/50">Charging {money(doc.grandTotalCents)}. Leave amount blank to charge the exact total.</p>
+            <div className="space-y-2.5">
+              <select
+                value={convertPaymentMethodId}
+                onChange={(e) => setConvertPaymentMethodId(e.target.value)}
+                className="h-10 w-full rounded-lg border border-navy/15 bg-white px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+              >
+                <option value="">Select a payment method…</option>
+                {(paymentMethods ?? []).map((method) => (
+                  <option key={method.id} value={method.id}>
+                    {method.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={convertAmountReceived}
+                onChange={(e) => setConvertAmountReceived(e.target.value)}
+                placeholder="Amount received (optional)"
+                className="h-10 w-full rounded-lg border border-navy/15 px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+              />
+              {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
+              <button
+                type="button"
+                onClick={() => void handleConvertToSale()}
+                disabled={busyAction === "convertSale"}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {busyAction === "convertSale" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                {busyAction === "convertSale" ? "Converting…" : "Confirm Sale"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {convertInvoiceOpen && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-navy-deep/60 sm:items-center" onClick={() => setConvertInvoiceOpen(false)}>
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-display text-lg text-navy">Convert to Invoice</p>
+              <button type="button" onClick={() => setConvertInvoiceOpen(false)} aria-label="Close" className="grid size-8 place-items-center rounded-full text-navy/40 hover:bg-cream-dark">
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              <label className="block">
+                <span className="text-[11px] font-semibold text-navy/50">Due Date</span>
+                <input
+                  type="date"
+                  value={convertDueDate}
+                  onChange={(e) => setConvertDueDate(e.target.value)}
+                  className="mt-1 h-10 w-full rounded-lg border border-navy/15 bg-white px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+                />
+              </label>
+              {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
+              <button
+                type="button"
+                onClick={() => void handleConvertToInvoice()}
+                disabled={busyAction === "convertInvoice"}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {busyAction === "convertInvoice" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                {busyAction === "convertInvoice" ? "Converting…" : "Confirm Invoice"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

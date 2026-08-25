@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import type { TenantTaxConfig } from "@/lib/tax";
 import type { MobileLocation, QuotationListItem } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
+import { QuotationFormModal } from "../documents/QuotationFormModal";
 import { FilterChip } from "../FilterChip";
 import { QuotationCard } from "../QuotationCard";
 
@@ -13,18 +16,36 @@ const ALL_FILTER = "__all__";
  * Quotation is its own table (not a Sale row with invoiceNumber set) — see mobile-quotations-
  * service.ts — so DocumentDetailModal is told kind="quotation" to fetch/share through the right
  * endpoints; the rendered document template itself needs no changes. */
-export function QuotationsTab() {
+export function QuotationsTab({
+  branchId,
+  branchName,
+  currency,
+  tenantTaxConfig,
+}: {
+  branchId: string | null;
+  branchName: string | null;
+  currency: string;
+  tenantTaxConfig: TenantTaxConfig;
+}) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [quotations, setQuotations] = useState<QuotationListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
   const [selectedQuotationId, setSelectedQuotationId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     api.listLocations().then(setLocations).catch(() => {
       // Filter chips just fall back to "All only" — not worth failing the whole tab over.
     });
   }, []);
+
+  function refreshQuotations(): void {
+    api
+      .listQuotations(locationFilter === ALL_FILTER ? undefined : locationFilter)
+      .then(setQuotations)
+      .catch(() => undefined);
+  }
 
   useEffect(() => {
     setQuotations(null);
@@ -37,19 +58,32 @@ export function QuotationsTab() {
 
   return (
     <div className="pb-10">
-      {locations && locations.length > 1 && (
-        <div className="sticky top-[60px] z-10 flex gap-1.5 overflow-x-auto border-b border-navy/10 bg-cream-dark/95 px-4 py-3 backdrop-blur [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => setLocationFilter(ALL_FILTER)} />
-          {locations.map((location) => (
-            <FilterChip
-              key={location.id}
-              label={location.locationName}
-              active={locationFilter === location.id}
-              onClick={() => setLocationFilter(location.id)}
-            />
-          ))}
+      <div className="sticky top-[60px] z-10 border-b border-navy/10 bg-cream-dark/95 backdrop-blur">
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+          <p className="text-xs font-bold text-navy/50">Quotations</p>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-navy px-3 py-1.5 text-xs font-bold text-white"
+          >
+            <Plus className="size-3.5" aria-hidden="true" />
+            New
+          </button>
         </div>
-      )}
+        {locations && locations.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => setLocationFilter(ALL_FILTER)} />
+            {locations.map((location) => (
+              <FilterChip
+                key={location.id}
+                label={location.locationName}
+                active={locationFilter === location.id}
+                onClick={() => setLocationFilter(location.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="px-4 py-4">
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
@@ -78,7 +112,27 @@ export function QuotationsTab() {
       </div>
 
       {selectedQuotationId && (
-        <DocumentDetailModal saleId={selectedQuotationId} kind="quotation" onClose={() => setSelectedQuotationId(null)} />
+        <DocumentDetailModal
+          saleId={selectedQuotationId}
+          kind="quotation"
+          onClose={() => setSelectedQuotationId(null)}
+          onChanged={refreshQuotations}
+        />
+      )}
+
+      {createOpen && (
+        <QuotationFormModal
+          branchId={branchId}
+          branchName={branchName}
+          currency={currency}
+          tenantTaxConfig={tenantTaxConfig}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(id) => {
+            setCreateOpen(false);
+            refreshQuotations();
+            setSelectedQuotationId(id);
+          }}
+        />
       )}
     </div>
   );

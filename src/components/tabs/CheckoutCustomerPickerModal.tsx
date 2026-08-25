@@ -15,12 +15,16 @@ export function CheckoutCustomerPickerModal({
   onSelect,
   onCustomerCreated,
   onClose,
+  allowWalkIn = true,
 }: {
   customers: MobileCustomer[];
   selectedCustomerId: string | null;
   onSelect: (customerId: string | null) => void;
   onCustomerCreated: (customer: MobileCustomer) => void;
   onClose: () => void;
+  /** false for Invoice creation — a credit document needs a real customer to bill, matching
+   * DESKTOP's own invoice form (no Walk-in option there, unlike Checkout/Quotation). */
+  allowWalkIn?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -76,16 +80,18 @@ export function CheckoutCustomerPickerModal({
         </div>
 
         <div className="flex-1 space-y-1.5 overflow-y-auto px-5 pb-5">
-          <button
-            type="button"
-            onClick={() => onSelect(null)}
-            className={`flex w-full items-center justify-between rounded-lg border px-3.5 py-2.5 text-left ${
-              !selectedCustomerId ? "border-blue bg-blue/10" : "border-navy/15 hover:bg-cream-dark"
-            }`}
-          >
-            <span className="text-sm font-bold text-navy">Walk-in Customer</span>
-            <span className="rounded-full border border-dashed border-navy/25 px-2 py-0.5 text-[10px] font-bold text-navy/50">Default</span>
-          </button>
+          {allowWalkIn && (
+            <button
+              type="button"
+              onClick={() => onSelect(null)}
+              className={`flex w-full items-center justify-between rounded-lg border px-3.5 py-2.5 text-left ${
+                !selectedCustomerId ? "border-blue bg-blue/10" : "border-navy/15 hover:bg-cream-dark"
+              }`}
+            >
+              <span className="text-sm font-bold text-navy">Walk-in Customer</span>
+              <span className="rounded-full border border-dashed border-navy/25 px-2 py-0.5 text-[10px] font-bold text-navy/50">Default</span>
+            </button>
+          )}
 
           {filtered.map((customer) => (
             <button

@@ -464,6 +464,55 @@ export type CreateSupplierInput = { businessName: string; contactPerson?: string
 
 export type CheckoutResult = { id: string; receiptNumber: string; grandTotalCents: number };
 
+// --- Invoices & Quotations (Phase 2) ---
+
+export type DocumentIdResult = { id: string };
+
+export type CreateInvoiceRequest = {
+  customerId: string;
+  transactionType: "invoice" | "wholesale_sale";
+  dueDate: string;
+  invoiceNotes?: string;
+  items: CheckoutItemInput[];
+  initialPayment?: { paymentMethodId: string; amountCents: number; reference?: string } | null;
+  delivery?: CheckoutDeliveryInput;
+  locationId: string;
+};
+
+export type RecordPaymentRequest = { paymentMethodId: string; amountCents: number; reference?: string; notes?: string };
+
+export type MarkPaidRequest = { paymentMethodId: string; reference?: string; notes?: string };
+
+export type CreateQuotationRequest = {
+  customerId?: string;
+  validUntil: string;
+  notes?: string;
+  items: CheckoutItemInput[];
+  delivery?: CheckoutDeliveryInput;
+  locationId: string;
+};
+
+export type QuotationStatusValue = "draft" | "sent" | "accepted" | "rejected" | "expired" | "converted";
+
+export type QuotationStockCheckItem = {
+  productId: string;
+  productName: string;
+  requestedQuantity: number;
+  availableQuantity: number;
+  sufficient: boolean;
+};
+
+export type QuantityOverride = { productId: string; quantity: number };
+
+export type ConvertToSaleRequest = {
+  paymentMethodId: string;
+  paymentReference?: string;
+  amountReceivedCents?: number | null;
+  quantityOverrides?: QuantityOverride[];
+};
+
+export type ConvertToInvoiceRequest = { dueDate: string; quantityOverrides?: QuantityOverride[] };
+
 export type PurchaseListItem = {
   id: string;
   purchaseNumber: string;

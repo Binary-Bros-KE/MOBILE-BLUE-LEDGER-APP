@@ -1,12 +1,18 @@
 import type {
   CheckoutRequest,
   CheckoutResult,
+  ConvertToInvoiceRequest,
+  ConvertToSaleRequest,
   CreateCustomerInput,
+  CreateInvoiceRequest,
+  CreateQuotationRequest,
   CreateRiderInput,
   CreateSupplierInput,
+  DocumentIdResult,
   Employee,
   ExpenseListItem,
   InvoiceListItem,
+  MarkPaidRequest,
   MobileCustomer,
   MobileLocation,
   MobilePeriod,
@@ -20,6 +26,9 @@ import type {
   PurchaseDetail,
   PurchaseListItem,
   QuotationListItem,
+  QuotationStatusValue,
+  QuotationStockCheckItem,
+  RecordPaymentRequest,
   Salary,
   SaleListItem,
   SalesReportBreakdowns,
@@ -136,6 +145,14 @@ export const api = {
   getSale: (id: string) => request<SharedDocument>(`/mobile/sales/${id}`),
   listInvoices: (locationId?: string) =>
     request<InvoiceListItem[]>(`/mobile/invoices${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
+  createInvoice: (body: CreateInvoiceRequest) => request<DocumentIdResult>("/mobile/invoices", { method: "POST", body: JSON.stringify(body) }),
+  recordInvoicePayment: (id: string, body: RecordPaymentRequest) =>
+    request<DocumentIdResult>(`/mobile/invoices/${id}/payments`, { method: "POST", body: JSON.stringify(body) }),
+  markInvoicePaid: (id: string, body: MarkPaidRequest) =>
+    request<DocumentIdResult>(`/mobile/invoices/${id}/mark-paid`, { method: "POST", body: JSON.stringify(body) }),
+  duplicateInvoice: (id: string) => request<DocumentIdResult>(`/mobile/invoices/${id}/duplicate`, { method: "POST" }),
+  cancelInvoice: (id: string, reason?: string) =>
+    request<DocumentIdResult>(`/mobile/invoices/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }),
   listCustomers: () => request<MobileCustomer[]>("/mobile/customers"),
   createCustomer: (body: CreateCustomerInput) =>
     request<MobileCustomer>("/mobile/customers", { method: "POST", body: JSON.stringify(body) }),
@@ -148,6 +165,15 @@ export const api = {
   listQuotations: (locationId?: string) =>
     request<QuotationListItem[]>(`/mobile/quotations${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getQuotation: (id: string) => request<SharedDocument>(`/mobile/quotations/${id}`),
+  createQuotation: (body: CreateQuotationRequest) => request<DocumentIdResult>("/mobile/quotations", { method: "POST", body: JSON.stringify(body) }),
+  deleteQuotation: (id: string) => request<DocumentIdResult>(`/mobile/quotations/${id}`, { method: "DELETE" }),
+  setQuotationStatus: (id: string, status: QuotationStatusValue) =>
+    request<DocumentIdResult>(`/mobile/quotations/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
+  checkQuotationStock: (id: string) => request<QuotationStockCheckItem[]>(`/mobile/quotations/${id}/stock-check`),
+  convertQuotationToSale: (id: string, body: ConvertToSaleRequest) =>
+    request<DocumentIdResult>(`/mobile/quotations/${id}/convert-to-sale`, { method: "POST", body: JSON.stringify(body) }),
+  convertQuotationToInvoice: (id: string, body: ConvertToInvoiceRequest) =>
+    request<DocumentIdResult>(`/mobile/quotations/${id}/convert-to-invoice`, { method: "POST", body: JSON.stringify(body) }),
   listTransactions: (locationId?: string) =>
     request<TransactionRow[]>(`/mobile/transactions${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   listProducts: () => request<ProductListItem[]>("/mobile/products"),

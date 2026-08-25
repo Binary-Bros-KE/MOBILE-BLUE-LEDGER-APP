@@ -1,21 +1,33 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileBarChart, Search } from "lucide-react";
+import { FileBarChart, Plus, Search } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import type { TenantTaxConfig } from "@/lib/tax";
 import type { InvoiceListItem, MobileCustomer, MobileLocation } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
+import { InvoiceFormModal } from "../documents/InvoiceFormModal";
 import { FilterChip } from "../FilterChip";
 import { InvoiceCard } from "../InvoiceCard";
 import { StatementDetailModal } from "../StatementDetailModal";
 
 const ALL_FILTER = "__all__";
 
-/** Same storefront-filter + dashed-timeline pattern as SalesTab, plus a "Statement" action in its
- * own small header — matching DESKTOP's own InvoicesRoute.tsx, where Statement lives as a toolbar
- * button on the Invoices tab rather than a nav entry of its own (see
+/** Same storefront-filter + dashed-timeline pattern as SalesTab, plus a "Statement" action and a
+ * "New Invoice" action in its own small header — matching DESKTOP's own InvoicesRoute.tsx, where
+ * Statement lives as a toolbar button on the Invoices tab rather than a nav entry of its own (see
  * [[project_customer_statement_feature]] for why). */
-export function InvoicesTab() {
+export function InvoicesTab({
+  branchId,
+  branchName,
+  currency,
+  tenantTaxConfig,
+}: {
+  branchId: string | null;
+  branchName: string | null;
+  currency: string;
+  tenantTaxConfig: TenantTaxConfig;
+}) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [invoices, setInvoices] = useState<InvoiceListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +38,14 @@ export function InvoicesTab() {
   const [customers, setCustomers] = useState<MobileCustomer[] | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [statementCustomerId, setStatementCustomerId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  function refreshInvoices(): void {
+    api
+      .listInvoices(locationFilter === ALL_FILTER ? undefined : locationFilter)
+      .then(setInvoices)
+      .catch(() => undefined);
+  }
 
   useEffect(() => {
     api.listLocations().then(setLocations).catch(() => {
@@ -64,14 +84,24 @@ export function InvoicesTab() {
       <div className="sticky top-[60px] z-10 border-b border-navy/10 bg-cream-dark/95 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-4 py-3">
           <p className="text-xs font-bold text-navy/50">Billing &amp; Receivables</p>
-          <button
-            type="button"
-            onClick={openStatementPicker}
-            className="flex items-center gap-1.5 rounded-lg bg-navy px-3 py-1.5 text-xs font-bold text-white"
-          >
-            <FileBarChart className="size-3.5" aria-hidden="true" />
-            Statement
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={openStatementPicker}
+              className="flex items-center gap-1.5 rounded-lg border border-navy/15 bg-white px-3 py-1.5 text-xs font-bold text-navy"
+            >
+              <FileBarChart className="size-3.5" aria-hidden="true" />
+              Statement
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-navy px-3 py-1.5 text-xs font-bold text-white"
+            >
+              <Plus className="size-3.5" aria-hidden="true" />
+              New
+            </button>
+          </div>
         </div>
         {locations && locations.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -114,7 +144,24 @@ export function InvoicesTab() {
         )}
       </div>
 
-      {selectedInvoiceId && <DocumentDetailModal saleId={selectedInvoiceId} onClose={() => setSelectedInvoiceId(null)} />}
+      {selectedInvoiceId && (
+        <DocumentDetailModal saleId={selectedInvoiceId} onClose={() => setSelectedInvoiceId(null)} onChanged={refreshInvoices} />
+      )}
+
+      {createOpen && (
+        <InvoiceFormModal
+          branchId={branchId}
+          branchName={branchName}
+          currency={currency}
+          tenantTaxConfig={tenantTaxConfig}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(id) => {
+            setCreateOpen(false);
+            refreshInvoices();
+            setSelectedInvoiceId(id);
+          }}
+        />
+      )}
 
       {statementPickerOpen && (
         <div
