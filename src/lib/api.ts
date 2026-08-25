@@ -128,6 +128,9 @@ export const api = {
   listEmployees: () => request<Employee[]>("/mobile/employees"),
   getEmployeeSalaries: (employeeId: string) => request<Salary[]>(`/mobile/employees/${employeeId}/salaries`),
   listLocations: () => request<MobileLocation[]>("/mobile/locations"),
+  /** Active, storefront-type locations only — backs Checkout's StorefrontPicker for a branch-less
+   * employee, unlike listLocations above (which includes every location, for report filter chips). */
+  listStorefronts: () => request<MobileLocation[]>("/mobile/storefronts"),
   listSales: (locationId?: string) =>
     request<SaleListItem[]>(`/mobile/sales${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getSale: (id: string) => request<SharedDocument>(`/mobile/sales/${id}`),

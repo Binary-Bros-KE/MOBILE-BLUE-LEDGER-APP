@@ -5,7 +5,7 @@ import { ChevronRight, Loader2, Minus, Plus, Search, ShoppingCart, Store, Trash2
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem } from "@/lib/types";
+import type { CheckoutCartLine, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 import { CheckoutCustomerPickerModal } from "./CheckoutCustomerPickerModal";
@@ -26,9 +26,11 @@ import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from ".
  * DESKTOP's full cart-pricing.ts logic — just enough to show the cashier a running total before they
  * commit.
  *
- * Always scoped to the signed-in employee's own branch (branchId/branchName come from /mobile/me,
- * not a picker) — mobile-checkout-service.ts rejects any other locationId outright, matching
- * DESKTOP's own requireActiveSession for a branch-scoped employee.
+ * Scoped to the signed-in employee's own branch (branchId/branchName come from /mobile/me) when
+ * they have one — mobile-checkout-service.ts rejects any other locationId outright for that case,
+ * matching DESKTOP's own requireActiveSession. A branch-less employee (Super Admin, typically) gets
+ * an inline StorefrontPicker instead of being blocked entirely — same DESKTOP precedent (real user
+ * feedback: being flatly blocked was "annoying"), same effectiveLocationId fallback pattern.
  */
 export function CheckoutTab({
   branchId,
@@ -63,10 +65,24 @@ export function CheckoutTab({
   const [delivery, setDelivery] = useState<DeliveryDraft | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
 
+  // Only ever consulted when branchId is null (see the StorefrontPicker below) — otherwise SERVER
+  // always uses the employee's own assigned branch regardless of this value.
+  const [storefronts, setStorefronts] = useState<MobileLocation[] | null>(null);
+  const [storefrontId, setStorefrontId] = useState("");
+  const effectiveLocationId = branchId ?? (storefrontId || null);
+
   // Minted ONCE per checkout attempt, resent unchanged on any retry — this is the whole idempotency
   // mechanism (see mobile-checkout-service.ts). Only regenerated after a sale actually completes or
   // the cart is cleared, never on every render.
   const checkoutIdRef = useRef(crypto.randomUUID());
+
+  useEffect(() => {
+    if (branchId) return;
+    api
+      .listStorefronts()
+      .then(setStorefronts)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load storefronts."));
+  }, [branchId]);
 
   useEffect(() => {
     Promise.all([api.listProducts(), api.listPaymentMethods(), api.listCustomers(), api.listRiders(), api.listSuppliers()])
@@ -208,8 +224,8 @@ export function CheckoutTab({
   }
 
   async function handleCheckout(): Promise<void> {
-    if (!branchId) {
-      setSubmitError("Your account has no assigned storefront — ask your Super Admin to set one.");
+    if (!effectiveLocationId) {
+      setSubmitError("Choose a storefront before completing this sale.");
       return;
     }
     if (cart.length === 0) {
@@ -234,7 +250,7 @@ export function CheckoutTab({
     try {
       const result = await api.checkout({
         id: checkoutIdRef.current,
-        locationId: branchId,
+        locationId: effectiveLocationId,
         items: cart.map((line) => ({
           productId: line.productId,
           quantity: line.quantity,
@@ -272,22 +288,33 @@ export function CheckoutTab({
     }
   }
 
-  if (!branchId) {
-    return (
-      <div className="px-4 py-10 text-center">
-        <p className="text-sm font-semibold text-navy/60">
-          Your account has no assigned storefront yet — ask your Super Admin to assign one before you can sell here.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="pb-32">
       <div className="px-4 pt-4 pb-2">
-        <p className="text-xs font-semibold text-navy/50">
-          Selling from <span className="font-bold text-navy">{branchName}</span>
-        </p>
+        {branchId ? (
+          <p className="text-xs font-semibold text-navy/50">
+            Selling from <span className="font-bold text-navy">{branchName}</span>
+          </p>
+        ) : (
+          <div className="rounded-lg border border-dashed border-gold bg-gold/10 p-3">
+            <div className="flex items-center gap-1.5">
+              <Store className="size-4 flex-none text-gold-text" aria-hidden="true" />
+              <p className="text-xs font-bold text-navy">Your account has no assigned branch — choose a storefront for this sale.</p>
+            </div>
+            <select
+              value={storefrontId}
+              onChange={(e) => setStorefrontId(e.target.value)}
+              className="mt-2 h-9 w-full max-w-xs rounded-lg border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+            >
+              <option value="">{storefronts === null ? "Loading…" : "Select a storefront"}</option>
+              {(storefronts ?? []).map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.locationName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="px-4 pb-2">
