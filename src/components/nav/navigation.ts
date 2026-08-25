@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Bike,
   CreditCard,
   FileSpreadsheet,
   FileText,
@@ -7,6 +8,7 @@ import {
   Package,
   ShoppingCart,
   Truck,
+  UserRound,
   Users,
   Wallet,
   Warehouse,
@@ -24,7 +26,9 @@ export type TabKey =
   | "purchases"
   | "expenses"
   | "stockLedger"
-  | "employees";
+  | "employees"
+  | "customers"
+  | "riders";
 
 export type NavItem = {
   key: TabKey;
@@ -60,6 +64,11 @@ export const navGroups: NavGroup[] = [
       { key: "invoices", label: "Invoices", icon: FileText, ready: true, permission: { module: "sales", action: "view" } },
       { key: "quotations", label: "Quotations", icon: FileSpreadsheet, ready: true, permission: { module: "quotations", action: "view" } },
       { key: "transactions", label: "Transactions", icon: ArrowLeftRight, ready: true, permission: { module: "reports", action: "view" } },
+      // Same permission DESKTOP's own customer.list()/rider.list() require — a cashier needs these
+      // granted to even open Checkout's customer/delivery pickers there too, not just to see these
+      // tabs (see CheckoutTab's CustomerPickerModal/DeliveryModal).
+      { key: "customers", label: "Customers", icon: UserRound, ready: true, permission: { module: "customers", action: "view" } },
+      { key: "riders", label: "Riders", icon: Bike, ready: true, permission: { module: "riders", action: "view" } },
     ],
   },
   {

@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { MobileSessionInfo } from "@/lib/types";
 import { CheckoutTab } from "../tabs/CheckoutTab";
+import { CustomersTab } from "../tabs/CustomersTab";
 import { DashboardTab } from "../tabs/DashboardTab";
 import { EmployeesTab } from "../tabs/EmployeesTab";
 import { ExpensesTab } from "../tabs/ExpensesTab";
@@ -15,6 +16,7 @@ import { InvoicesTab } from "../tabs/InvoicesTab";
 import { ProductsTab } from "../tabs/ProductsTab";
 import { PurchasesTab } from "../tabs/PurchasesTab";
 import { QuotationsTab } from "../tabs/QuotationsTab";
+import { RidersTab } from "../tabs/RidersTab";
 import { SalesTab } from "../tabs/SalesTab";
 import { StockLedgerTab } from "../tabs/StockLedgerTab";
 import { TransactionsTab } from "../tabs/TransactionsTab";
@@ -125,6 +127,8 @@ export function AppShell() {
           {activeTab === "invoices" && <InvoicesTab />}
           {activeTab === "quotations" && <QuotationsTab />}
           {activeTab === "transactions" && <TransactionsTab />}
+          {activeTab === "customers" && <CustomersTab />}
+          {activeTab === "riders" && <RidersTab />}
           {activeTab === "products" && <ProductsTab />}
           {activeTab === "purchases" && <PurchasesTab />}
           {activeTab === "expenses" && <ExpensesTab />}

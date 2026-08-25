@@ -1,21 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Minus, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
+import { ChevronRight, Loader2, Minus, Plus, Search, ShoppingCart, Trash2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, PaymentMethodOption, ProductListItem } from "@/lib/types";
+import type { CheckoutCartLine, MobileCustomer, MobileRider, PaymentMethodOption, ProductListItem } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
+import { CheckoutCustomerPickerModal } from "./CheckoutCustomerPickerModal";
+import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "./CheckoutDeliveryModal";
 
 /**
- * Real, from-scratch mobile checkout — the counterpart to DESKTOP's Checkout screen, deliberately
- * lighter (no wholesale price break, no cashier price override, no service charges/delivery/
- * customer credit yet — see mobile-checkout-service.ts's own doc comment for what Phase 1 covers).
- * Every figure shown here is a PREVIEW only: SERVER re-fetches the real Product rows and recomputes
- * pricing/tax/stock validation from scratch at submit time, so this component never needs to
- * duplicate DESKTOP's full cart-pricing.ts logic — just enough to show the cashier a running total
- * before they commit.
+ * Real, from-scratch mobile checkout — the counterpart to DESKTOP's Checkout screen. Customer
+ * selection (CheckoutCustomerPickerModal) and delivery (CheckoutDeliveryModal) match DESKTOP's own
+ * Checkout feature set; deliberately still lighter in other ways (no wholesale price break, no
+ * cashier price override, no service charges, no customer credit yet — see
+ * mobile-checkout-service.ts's own doc comment for what's covered). Delivery is a MODAL here rather
+ * than DESKTOP's inline expanding panel (ExtraChargesSection) — a deliberate mobile-specific choice,
+ * screen space is tighter here than on a desktop POS screen. Every figure shown here is a PREVIEW
+ * only: SERVER re-fetches the real Product rows and recomputes pricing/tax/stock validation from
+ * scratch at submit time, so this component never needs to duplicate DESKTOP's full
+ * cart-pricing.ts logic — just enough to show the cashier a running total before they commit.
  *
  * Always scoped to the signed-in employee's own branch (branchId/branchName come from /mobile/me,
  * not a picker) — mobile-checkout-service.ts rejects any other locationId outright, matching
@@ -34,6 +39,8 @@ export function CheckoutTab({
 }) {
   const [products, setProducts] = useState<ProductListItem[] | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[] | null>(null);
+  const [customers, setCustomers] = useState<MobileCustomer[]>([]);
+  const [riders, setRiders] = useState<MobileRider[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CheckoutCartLine[]>([]);
@@ -44,16 +51,23 @@ export function CheckoutTab({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [completedSaleId, setCompletedSaleId] = useState<string | null>(null);
 
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [delivery, setDelivery] = useState<DeliveryDraft | null>(null);
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+
   // Minted ONCE per checkout attempt, resent unchanged on any retry — this is the whole idempotency
   // mechanism (see mobile-checkout-service.ts). Only regenerated after a sale actually completes or
   // the cart is cleared, never on every render.
   const checkoutIdRef = useRef(crypto.randomUUID());
 
   useEffect(() => {
-    Promise.all([api.listProducts(), api.listPaymentMethods()])
-      .then(([productList, methods]) => {
+    Promise.all([api.listProducts(), api.listPaymentMethods(), api.listCustomers(), api.listRiders()])
+      .then(([productList, methods, customerList, riderList]) => {
         setProducts(productList);
         setPaymentMethods(methods);
+        setCustomers(customerList);
+        setRiders(riderList);
         if (methods.length > 0) setPaymentMethodId((current) => current || (methods[0] as PaymentMethodOption).id);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load products or payment methods."));
@@ -82,9 +96,15 @@ export function CheckoutTab({
   });
   const netSubtotalCents = lineTaxResults.reduce((sum, r) => sum + r.netCents, 0);
   const taxAmountCents = lineTaxResults.reduce((sum, r) => sum + r.taxCents, 0);
-  const grandTotalCents = lineTaxResults.reduce((sum, r) => sum + r.grossCents, 0);
+  // Delivery fee folds straight into the grand total — matching SERVER's own mobile-checkout-service
+  // (which validates amountReceivedCents against this SAME inclusive figure), so a cashier collecting
+  // a delivery fee is never shown/charged a total that's short of what checkout will actually enforce.
+  const deliveryFeeCents = delivery?.fee.trim() ? Math.round(Number(delivery.fee) * 100) : 0;
+  const grandTotalCents = lineTaxResults.reduce((sum, r) => sum + r.grossCents, 0) + deliveryFeeCents;
   const amountReceivedCents = amountReceived.trim() ? Math.round(Number(amountReceived) * 100) : 0;
   const changeCents = amountReceivedCents - grandTotalCents;
+
+  const customerLabel = customerId ? (customers.find((c) => c.id === customerId)?.name ?? "Walk-in Customer") : "Walk-in Customer";
 
   // submitError is only ever SET inside handleCheckout (on a failed submit attempt) — without this,
   // fixing the thing that caused it (e.g. typing in the rest of the amount received) leaves the
@@ -92,7 +112,7 @@ export function CheckoutTab({
   // the sale would now go through. Clear it the moment any input that could have caused it changes.
   useEffect(() => {
     setSubmitError(null);
-  }, [cart, paymentMethodId, paymentReference, amountReceived]);
+  }, [cart, paymentMethodId, paymentReference, amountReceived, customerId, delivery]);
 
   function addToCart(product: ProductListItem): void {
     setCart((prev) => {
@@ -135,6 +155,8 @@ export function CheckoutTab({
     setCart([]);
     setPaymentReference("");
     setAmountReceived("");
+    setCustomerId(null);
+    setDelivery(null);
     checkoutIdRef.current = crypto.randomUUID();
   }
 
@@ -169,7 +191,20 @@ export function CheckoutTab({
         items: cart.map((line) => ({ productId: line.productId, quantity: line.quantity, discountAmountCents: line.discountAmountCents })),
         paymentMethodId,
         paymentReference: paymentReference.trim() || undefined,
+        customerId: customerId ?? undefined,
         amountReceivedCents,
+        delivery: delivery
+          ? {
+              riderId: delivery.riderId ?? undefined,
+              recipientName: delivery.recipientName,
+              country: delivery.country,
+              town: delivery.town,
+              physicalAddress: delivery.physicalAddress,
+              notes: delivery.notes,
+              feeCents: delivery.fee.trim() ? Math.round(Number(delivery.fee) * 100) : 0,
+              costCents: delivery.cost.trim() ? Math.round(Number(delivery.cost) * 100) : 0,
+            }
+          : undefined,
       });
       setCompletedSaleId(result.id);
     } catch (err) {
@@ -197,6 +232,53 @@ export function CheckoutTab({
         <p className="text-xs font-semibold text-navy/50">
           Selling from <span className="font-bold text-navy">{branchName}</span>
         </p>
+      </div>
+
+      <div className="px-4 pb-2">
+        <button
+          type="button"
+          onClick={() => setCustomerPickerOpen(true)}
+          className="flex w-full items-center gap-1.5 rounded-lg border border-dashed border-navy/15 bg-white px-3 py-2.5 text-left"
+        >
+          <UserRound className="size-4 flex-none text-blue" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate text-sm font-bold text-navy">{customerLabel}</span>
+          <ChevronRight className="size-4 flex-none text-navy/30" aria-hidden="true" />
+        </button>
+
+        {delivery ? (
+          <button
+            type="button"
+            onClick={() => setDeliveryModalOpen(true)}
+            className="mt-1.5 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-blue/30 bg-blue/5 px-3 py-2.5 text-left"
+          >
+            <Truck className="size-4 flex-none text-blue" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-sm font-bold text-navy">
+              Delivery to {delivery.town || delivery.physicalAddress}
+              {deliveryFeeCents > 0 && <span className="text-navy/50"> · {formatCents(deliveryFeeCents, currency)}</span>}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDelivery(null);
+              }}
+              aria-label="Remove delivery"
+              className="grid size-6 flex-none place-items-center rounded-full text-navy/40 hover:bg-white hover:text-red"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setDeliveryModalOpen(true)}
+            className="mt-1.5 flex w-full items-center gap-1.5 rounded-lg border border-dashed border-navy/15 bg-white px-3 py-2.5 text-left"
+          >
+            <Truck className="size-4 flex-none text-navy/40" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-navy/50">Add delivery for this sale</span>
+            <ChevronRight className="size-4 flex-none text-navy/30" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {loadError && <p className="mx-4 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{loadError}</p>}
@@ -360,6 +442,40 @@ export function CheckoutTab({
             {submitting ? "Completing sale…" : `Charge ${formatCents(grandTotalCents, currency)}`}
           </button>
         </div>
+      )}
+
+      {customerPickerOpen && (
+        <CheckoutCustomerPickerModal
+          customers={customers}
+          selectedCustomerId={customerId}
+          onSelect={(id) => {
+            setCustomerId(id);
+            setCustomerPickerOpen(false);
+          }}
+          onCustomerCreated={(customer) => setCustomers((prev) => [...prev, customer])}
+          onClose={() => setCustomerPickerOpen(false)}
+        />
+      )}
+
+      {deliveryModalOpen && (
+        <CheckoutDeliveryModal
+          initialDraft={delivery ?? emptyDeliveryDraft(customerLabel !== "Walk-in Customer" ? customerLabel : "")}
+          riders={riders}
+          onRiderCreated={(rider) => setRiders((prev) => [...prev, rider])}
+          onSave={(draft) => {
+            setDelivery(draft);
+            setDeliveryModalOpen(false);
+          }}
+          onRemove={
+            delivery
+              ? () => {
+                  setDelivery(null);
+                  setDeliveryModalOpen(false);
+                }
+              : null
+          }
+          onClose={() => setDeliveryModalOpen(false)}
+        />
       )}
 
       {completedSaleId && (

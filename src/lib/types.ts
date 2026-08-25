@@ -239,7 +239,13 @@ export type InvoiceListItem = {
   currency: string;
 };
 
-export type MobileCustomer = { id: string; name: string; phone: string };
+export type MobileCustomer = { id: string; name: string; phone: string; customerCode: string };
+
+export type CreateCustomerInput = { name: string; phone: string };
+
+export type MobileRider = { id: string; name: string; phone: string; vehicleDescription: string | null };
+
+export type CreateRiderInput = { name: string; phone: string; vehicleDescription?: string };
 
 export type SharedStatementInvoiceLine = {
   id: string;
@@ -400,6 +406,20 @@ export type CheckoutCartLine = {
   pricesTaxInclusive: boolean | null;
 };
 
+/** Mirrors DESKTOP's own ExtraChargesSection DeliveryDraft — see SERVER's
+ * mobileCheckoutDeliverySchema for the authoritative field list. feeCents/costCents are already
+ * converted to cents by the time this is built (see CheckoutTab's DeliveryModal). */
+export type CheckoutDeliveryInput = {
+  riderId?: string;
+  recipientName: string;
+  country: string;
+  town: string;
+  physicalAddress: string;
+  notes: string;
+  feeCents: number;
+  costCents: number;
+};
+
 export type CheckoutRequest = {
   id: string;
   locationId: string;
@@ -408,6 +428,7 @@ export type CheckoutRequest = {
   paymentReference?: string;
   customerId?: string;
   amountReceivedCents: number;
+  delivery?: CheckoutDeliveryInput;
 };
 
 export type CheckoutResult = { id: string; receiptNumber: string; grandTotalCents: number };
