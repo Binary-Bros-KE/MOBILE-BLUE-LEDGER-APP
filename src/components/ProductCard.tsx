@@ -34,7 +34,7 @@ export function ProductCard({ product, currency }: { product: ProductListItem; c
           <p>
             Main Store: <span className="font-bold text-navy">{product.mainStoreQuantity ?? "—"}</span>
           </p>
-          {product.storefrontBreakdown.map((entry) => (
+          {(product.storefrontBreakdown ?? []).map((entry) => (
             <p key={entry.locationId}>
               {entry.locationName}: <span className="font-bold text-navy">{entry.quantity}</span>
             </p>
