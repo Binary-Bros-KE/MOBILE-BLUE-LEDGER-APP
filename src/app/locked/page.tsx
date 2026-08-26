@@ -48,6 +48,15 @@ export default function LockedPage() {
     };
   }, [router]);
 
+  // logout() only clears the token and flips auth-context's status — it never navigates on its own
+  // (mirrors AppShell's own handleSignOut, which pairs it with an explicit redirect the same way).
+  // Without this, nothing visibly happens until this page's own 30s poll tick next fires, gets a
+  // 401, and handleUnauthorized() redirects indirectly — reads as "the button doesn't work."
+  function handleSignOut(): void {
+    logout();
+    router.replace("/login");
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-navy px-4 py-10">
       <div className="w-full max-w-sm rounded-lg bg-white p-8 text-center shadow-xl">
@@ -62,7 +71,7 @@ export default function LockedPage() {
 
         <button
           type="button"
-          onClick={() => logout()}
+          onClick={handleSignOut}
           className="mx-auto mt-6 flex items-center justify-center gap-2 rounded bg-navy/5 px-4 py-2.5 text-xs font-bold tracking-wide text-navy/70 transition hover:bg-navy/10"
         >
           Sign Out
