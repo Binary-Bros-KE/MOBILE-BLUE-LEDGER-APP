@@ -8,6 +8,7 @@ import { buildCartFromEditableItems, computeCartTotals, serviceChargeDraftsToInp
 import { formatCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import { CheckboxField } from "../CheckboxField";
 import { ServiceChargesModal } from "../ServiceChargesModal";
 import { CheckoutCustomerPickerModal } from "../tabs/CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "../tabs/CheckoutDeliveryModal";
@@ -44,6 +45,7 @@ export function InvoiceFormModal({
   currency,
   tenantTaxConfig,
   editId,
+  defaultIncludeBusinessInfo,
   onClose,
   onCreated,
 }: {
@@ -52,6 +54,10 @@ export function InvoiceFormModal({
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
   editId?: string;
+  /** Only used on create — see Location["defaultIncludeBusinessInfo"]'s own doc comment. Edit mode
+   * always reads the document's own already-saved includeBusinessInfo instead (see the edit-data
+   * fetch below). Null/undefined (no storefront default, or none assigned yet) falls back to true. */
+  defaultIncludeBusinessInfo?: boolean | null;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
@@ -73,6 +79,8 @@ export function InvoiceFormModal({
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [serviceCharges, setServiceCharges] = useState<ServiceChargeDraft[]>([]);
   const [serviceChargesModalOpen, setServiceChargesModalOpen] = useState(false);
+  const [includeTaxBreakdown, setIncludeTaxBreakdown] = useState(true);
+  const [includeBusinessInfo, setIncludeBusinessInfo] = useState(defaultIncludeBusinessInfo ?? true);
 
   const [collectInitialPayment, setCollectInitialPayment] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState("");
@@ -110,6 +118,8 @@ export function InvoiceFormModal({
         setCart(buildCartFromEditableItems(data.items, products));
         setDelivery(data.delivery ? deliveryDraftFromEditable(data.delivery) : null);
         setServiceCharges(serviceChargeInputsToDrafts(data.serviceCharges));
+        setIncludeTaxBreakdown(data.includeTaxBreakdown);
+        setIncludeBusinessInfo(data.includeBusinessInfo);
         setPrefilled(true);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this invoice for editing."));
@@ -158,6 +168,8 @@ export function InvoiceFormModal({
         transactionType,
         dueDate,
         invoiceNotes: invoiceNotes.trim() || undefined,
+        includeTaxBreakdown,
+        includeBusinessInfo,
         items: cart.map((line) => ({
           productId: line.productId,
           quantity: line.quantity,
@@ -385,6 +397,20 @@ export function InvoiceFormModal({
               </div>
             </div>
           )}
+
+          <CheckboxField
+            label="Include tax information"
+            description="Shows the Tax Breakdown section on this invoice's print, download, and share"
+            checked={includeTaxBreakdown}
+            onChange={setIncludeTaxBreakdown}
+          />
+
+          <CheckboxField
+            label="Include storefront information"
+            description="Shows the shop name, logo, address, contacts and header/footer text on this invoice"
+            checked={includeBusinessInfo}
+            onChange={setIncludeBusinessInfo}
+          />
 
           {!editId && (
           <label className="mt-3 flex cursor-pointer items-center gap-1.5 text-xs font-bold text-navy/60">

@@ -62,6 +62,9 @@ export type OwnerDashboard = {
   expensesAndProfit: ExpensesAndProfit;
   stock: StockAlerts;
   credit: OutstandingCredit;
+  /** The signed-in employee's own sales, same SalesSnapshot shape as `sales` above but scoped to
+   * them — powers the Cashier dashboard variant's personal stat cards. */
+  mySales: SalesSnapshot | null;
 };
 
 export type MobileSessionInfo = {
@@ -76,6 +79,10 @@ export type MobileSessionInfo = {
    * the signed-in employee's own branch in this phase). */
   branchId: string | null;
   branchName: string | null;
+  /** Pre-fills the "Include storefront information" checkbox's initial value on a brand-new sale/
+   * invoice/quotation — see SERVER's Location["defaultIncludeBusinessInfo"] doc comment. Null for a
+   * branch-less employee; every create form falls back to true in that case. */
+  defaultIncludeBusinessInfo: boolean | null;
   /** Tenant-wide tax defaults — Checkout needs these alongside each product's own pricesTaxInclusive
    * override (see ProductListItem) to compute the real tax-inclusive total, matching what SERVER
    * enforces authoritatively at submit time. */
@@ -481,6 +488,8 @@ export type CheckoutRequest = {
   delivery?: CheckoutDeliveryInput;
   serviceCharges?: ServiceChargeInput[];
   notes?: string;
+  includeTaxBreakdown?: boolean;
+  includeBusinessInfo?: boolean;
 };
 
 export type MobileSupplier = { id: string; businessName: string; phone1: string };
@@ -498,6 +507,8 @@ export type CreateInvoiceRequest = {
   transactionType: "invoice" | "wholesale_sale";
   dueDate: string;
   invoiceNotes?: string;
+  includeTaxBreakdown?: boolean;
+  includeBusinessInfo?: boolean;
   items: CheckoutItemInput[];
   initialPayment?: { paymentMethodId: string; amountCents: number; reference?: string } | null;
   delivery?: CheckoutDeliveryInput;
@@ -513,6 +524,8 @@ export type CreateQuotationRequest = {
   customerId?: string;
   validUntil: string;
   notes?: string;
+  includeTaxBreakdown?: boolean;
+  includeBusinessInfo?: boolean;
   items: CheckoutItemInput[];
   delivery?: CheckoutDeliveryInput;
   serviceCharges?: ServiceChargeInput[];
@@ -570,6 +583,7 @@ export type MobileInvoiceEditData = {
   dueDate: string;
   invoiceNotes: string | null;
   includeTaxBreakdown: boolean;
+  includeBusinessInfo: boolean;
   items: MobileEditableItem[];
   delivery: MobileEditableDelivery | null;
   serviceCharges: ServiceChargeInput[];
@@ -580,6 +594,7 @@ export type MobileQuotationEditData = {
   validUntil: string;
   notes: string | null;
   includeTaxBreakdown: boolean;
+  includeBusinessInfo: boolean;
   items: MobileEditableItem[];
   delivery: MobileEditableDelivery | null;
   serviceCharges: ServiceChargeInput[];

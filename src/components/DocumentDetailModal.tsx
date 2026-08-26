@@ -5,8 +5,10 @@ import { motion } from "framer-motion";
 import { Copy, Download, Loader2, Share2, Trash2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { formatCents } from "@/lib/money";
+import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/share-preferences";
 import { taxBreakdownLabel } from "@/lib/tax";
 import type { PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
+import { CheckboxField } from "./CheckboxField";
 
 const KIND_LABEL: Record<SharedDocument["documentKind"], string> = {
   receipt: "Receipt",
@@ -86,6 +88,7 @@ export function DocumentDetailModal({
   const [sharing, setSharing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [includeWhatsappPreview, setIncludeWhatsappPreviewState] = useState(() => getIncludeWhatsappPreview());
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[] | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -263,12 +266,17 @@ export function DocumentDetailModal({
     }
   }
 
+  function handleToggleIncludeWhatsappPreview(next: boolean): void {
+    setIncludeWhatsappPreviewState(next);
+    setIncludeWhatsappPreview(next);
+  }
+
   async function handleShare(): Promise<void> {
     setSharing(true);
     setActionError(null);
     setNotice(null);
     try {
-      const link = await api.createShareLink(kind, saleId, true);
+      const link = await api.createShareLink(kind, saleId, includeWhatsappPreview);
       if (navigator.share) {
         await navigator.share({ title: documentLabel, text: link.message, url: link.url });
       } else {
@@ -405,6 +413,13 @@ export function DocumentDetailModal({
                 </>
               )}
             </div>
+
+            <CheckboxField
+              label="Include WhatsApp preview"
+              description="Shares the full formatted document text alongside the link, not just a short summary"
+              checked={includeWhatsappPreview}
+              onChange={handleToggleIncludeWhatsappPreview}
+            />
 
             {actionError && (
               <p className="mt-3 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>

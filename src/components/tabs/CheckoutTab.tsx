@@ -39,11 +39,15 @@ export function CheckoutTab({
   branchName,
   currency,
   tenantTaxConfig,
+  defaultIncludeBusinessInfo,
 }: {
   branchId: string | null;
   branchName: string | null;
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
+  /** See InvoiceFormModal's identical prop for the same reasoning — the active storefront's own
+   * configured default, null/undefined falls back to true. */
+  defaultIncludeBusinessInfo?: boolean | null;
 }) {
   const [products, setProducts] = useState<ProductListItem[] | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[] | null>(null);
@@ -68,6 +72,8 @@ export function CheckoutTab({
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [serviceCharges, setServiceCharges] = useState<ServiceChargeDraft[]>([]);
   const [serviceChargesModalOpen, setServiceChargesModalOpen] = useState(false);
+  const [includeTaxBreakdown, setIncludeTaxBreakdown] = useState(true);
+  const [includeBusinessInfo, setIncludeBusinessInfo] = useState(defaultIncludeBusinessInfo ?? true);
 
   // Only ever consulted when branchId is null (see the StorefrontPicker below) — otherwise SERVER
   // always uses the employee's own assigned branch regardless of this value.
@@ -274,6 +280,8 @@ export function CheckoutTab({
         customerId: customerId ?? undefined,
         amountReceivedCents,
         notes: orderNotes.trim() || undefined,
+        includeTaxBreakdown,
+        includeBusinessInfo,
         serviceCharges: serviceChargeDraftsToInputs(serviceCharges),
         delivery: delivery
           ? {
@@ -645,6 +653,17 @@ export function CheckoutTab({
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-navy/60">Total</span>
             <span className="font-display text-lg text-navy">{formatCents(grandTotalCents, currency)}</span>
+          </div>
+
+          <div className="mb-2 flex items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-bold text-navy/60">
+              <input type="checkbox" checked={includeTaxBreakdown} onChange={(e) => setIncludeTaxBreakdown(e.target.checked)} className="size-3.5 accent-blue" />
+              Include tax info
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-bold text-navy/60">
+              <input type="checkbox" checked={includeBusinessInfo} onChange={(e) => setIncludeBusinessInfo(e.target.checked)} className="size-3.5 accent-blue" />
+              Include shop info
+            </label>
           </div>
 
           <div className="mb-2 grid grid-cols-2 gap-2">

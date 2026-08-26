@@ -21,11 +21,14 @@ export function QuotationsTab({
   branchName,
   currency,
   tenantTaxConfig,
+  defaultIncludeBusinessInfo,
 }: {
   branchId: string | null;
   branchName: string | null;
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
+  /** See InvoiceFormModal's identical prop for the same reasoning. */
+  defaultIncludeBusinessInfo?: boolean | null;
 }) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [quotations, setQuotations] = useState<QuotationListItem[] | null>(null);
@@ -133,6 +136,7 @@ export function QuotationsTab({
           currency={currency}
           tenantTaxConfig={tenantTaxConfig}
           editId={formTarget === "new" ? undefined : formTarget}
+          defaultIncludeBusinessInfo={defaultIncludeBusinessInfo}
           onClose={() => setFormTarget(null)}
           onCreated={(id) => {
             setFormTarget(null);

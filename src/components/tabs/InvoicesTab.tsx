@@ -23,6 +23,7 @@ export function InvoicesTab({
   currency,
   tenantTaxConfig,
   canApprove,
+  defaultIncludeBusinessInfo,
 }: {
   branchId: string | null;
   branchName: string | null;
@@ -31,6 +32,8 @@ export function InvoicesTab({
   /** Whether the signed-in employee has approvals.approve — passed straight through to
    * DocumentDetailModal, which decides "Cancel Invoice" vs. "Request Cancellation" from it. */
   canApprove: boolean;
+  /** See InvoiceFormModal's identical prop for the same reasoning. */
+  defaultIncludeBusinessInfo?: boolean | null;
 }) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [invoices, setInvoices] = useState<InvoiceListItem[] | null>(null);
@@ -170,6 +173,7 @@ export function InvoicesTab({
           currency={currency}
           tenantTaxConfig={tenantTaxConfig}
           editId={formTarget === "new" ? undefined : formTarget}
+          defaultIncludeBusinessInfo={defaultIncludeBusinessInfo}
           onClose={() => setFormTarget(null)}
           onCreated={(id) => {
             setFormTarget(null);

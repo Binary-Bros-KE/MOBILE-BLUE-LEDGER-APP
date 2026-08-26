@@ -3,20 +3,30 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CreditCard, PackageX } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { getDashboardVariant } from "@/lib/dashboard-role";
 import { formatCents } from "@/lib/money";
-import type { MobileLocation, OwnerDashboard } from "@/lib/types";
+import type { MobileLocation, MobileSessionInfo, OwnerDashboard } from "@/lib/types";
 import { FilterChip } from "../FilterChip";
 import { SalesReportSection } from "../SalesReportSection";
+import type { TabKey } from "../nav/navigation";
+import { CashierDashboardTab } from "./CashierDashboardTab";
+import { StorekeeperDashboardTab } from "./StorekeeperDashboardTab";
 
 const ALL_FILTER = "__all__";
 
-/** Stock Alerts and Outstanding Credit are "as of right now" snapshots, not period-scoped — same
- * philosophy as DESKTOP's own Debtors/Creditors section (see DebtorsCreditorsSection.tsx: "live
- * snapshot as of today", explicitly NOT scoped to whatever period the Sales Report is showing).
- * computeStockAlerts/computeOutstandingCredit (mobile-metrics-service.ts) never actually read the
- * period range internally, so a single fixed "today" call is fetched once here, independent of the
- * Sales Report's own period selector below. */
-export function DashboardTab() {
+/** Thin dispatcher — mirrors DESKTOP's own DashboardRoute.tsx + dashboard-role.ts. Cashier and
+ * Storekeeper each get their own narrow, role-appropriate variant (below); everyone else (Admin/
+ * Manager/Super Admin) falls through to this same component's own original content — mobile
+ * collapses DESKTOP's separate Super Admin/Manager split into one variant since every mobile query
+ * is already branch-scoped for a non-Super-Admin (see getDashboardVariant's own doc comment). */
+export function DashboardTab({ session, onNavigate }: { session: MobileSessionInfo | null; onNavigate: (tab: TabKey) => void }) {
+  const variant = getDashboardVariant(session);
+  if (variant === "cashier") return <CashierDashboardTab branchId={session?.branchId ?? null} onNavigate={onNavigate} />;
+  if (variant === "storekeeper") return <StorekeeperDashboardTab branchId={session?.branchId ?? null} onNavigate={onNavigate} />;
+  return <AdminDashboardTab />;
+}
+
+function AdminDashboardTab() {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);

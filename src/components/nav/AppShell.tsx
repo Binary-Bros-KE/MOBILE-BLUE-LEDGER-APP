@@ -115,13 +115,14 @@ export function AppShell() {
           exit={{ opacity: 0, x: -12 }}
           transition={{ duration: 0.2 }}
         >
-          {activeTab === "dashboard" && <DashboardTab />}
+          {activeTab === "dashboard" && <DashboardTab session={session} onNavigate={setActiveTab} />}
           {activeTab === "checkout" && (
             <CheckoutTab
               branchId={session?.branchId ?? null}
               branchName={session?.branchName ?? null}
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
+              defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}
           {activeTab === "employees" && <EmployeesTab currency={session?.currency ?? "KES"} />}
@@ -133,6 +134,7 @@ export function AppShell() {
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
               canApprove={session?.permissions?.["approvals"]?.includes("approve") ?? false}
+              defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}
           {activeTab === "quotations" && (
@@ -141,6 +143,7 @@ export function AppShell() {
               branchName={session?.branchName ?? null}
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
+              defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}
           {activeTab === "transactions" && <TransactionsTab />}

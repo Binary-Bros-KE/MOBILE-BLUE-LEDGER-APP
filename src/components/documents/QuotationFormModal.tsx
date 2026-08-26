@@ -8,6 +8,7 @@ import { buildCartFromEditableItems, computeCartTotals, serviceChargeDraftsToInp
 import { formatCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import { CheckboxField } from "../CheckboxField";
 import { ServiceChargesModal } from "../ServiceChargesModal";
 import { CheckoutCustomerPickerModal } from "../tabs/CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "../tabs/CheckoutDeliveryModal";
@@ -39,6 +40,7 @@ export function QuotationFormModal({
   currency,
   tenantTaxConfig,
   editId,
+  defaultIncludeBusinessInfo,
   onClose,
   onCreated,
 }: {
@@ -47,6 +49,8 @@ export function QuotationFormModal({
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
   editId?: string;
+  /** Only used on create — see InvoiceFormModal's identical prop for the same reasoning. */
+  defaultIncludeBusinessInfo?: boolean | null;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
@@ -66,6 +70,8 @@ export function QuotationFormModal({
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [serviceCharges, setServiceCharges] = useState<ServiceChargeDraft[]>([]);
   const [serviceChargesModalOpen, setServiceChargesModalOpen] = useState(false);
+  const [includeTaxBreakdown, setIncludeTaxBreakdown] = useState(true);
+  const [includeBusinessInfo, setIncludeBusinessInfo] = useState(defaultIncludeBusinessInfo ?? true);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -92,6 +98,8 @@ export function QuotationFormModal({
         setCart(buildCartFromEditableItems(data.items, products));
         setDelivery(data.delivery ? deliveryDraftFromEditable(data.delivery) : null);
         setServiceCharges(serviceChargeInputsToDrafts(data.serviceCharges));
+        setIncludeTaxBreakdown(data.includeTaxBreakdown);
+        setIncludeBusinessInfo(data.includeBusinessInfo);
         setPrefilled(true);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this quotation for editing."));
@@ -124,6 +132,8 @@ export function QuotationFormModal({
         customerId: customerId ?? undefined,
         validUntil,
         notes: notes.trim() || undefined,
+        includeTaxBreakdown,
+        includeBusinessInfo,
         items: cart.map((line) => ({
           productId: line.productId,
           quantity: line.quantity,
@@ -334,6 +344,20 @@ export function QuotationFormModal({
               </div>
             </div>
           )}
+
+          <CheckboxField
+            label="Include tax information"
+            description="Shows the Tax Breakdown section on this quotation's print, download, and share"
+            checked={includeTaxBreakdown}
+            onChange={setIncludeTaxBreakdown}
+          />
+
+          <CheckboxField
+            label="Include storefront information"
+            description="Shows the shop name, logo, address, contacts and header/footer text on this quotation"
+            checked={includeBusinessInfo}
+            onChange={setIncludeBusinessInfo}
+          />
 
           {submitError && <p className="mt-3 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{submitError}</p>}
 
