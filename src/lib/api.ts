@@ -44,6 +44,9 @@ import type {
   ShareLinkResult,
   StockMovementRow,
   TransactionRow,
+  WorkingHoursListItem,
+  WorkingHoursConfig,
+  WorkingHoursUpsertInput,
 } from "./types";
 import { timezoneOffsetMinutes } from "./period";
 
@@ -59,11 +62,16 @@ export const LICENSE_KEY_STORAGE_KEY = "bl_owner_license_key";
 
 export class ApiError extends Error {
   status: number;
+  /** Set only when SERVER's error body includes one (see SERVER's HttpError) — lets a call site
+   * tell a specific error apart from an ordinary same-status failure without string-matching
+   * `message`. Currently only "WORKING_HOURS_LOCKED" sets this. */
+  code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -82,6 +90,17 @@ function handleUnauthorized(): void {
   localStorage.removeItem(TOKEN_STORAGE_KEY);
   if (window.location.pathname !== "/login") {
     window.location.href = "/login";
+  }
+}
+
+/** A 403 with this code means the system is locked outside working hours (see SERVER's
+ * requireOwnerAppAccess) — unlike handleUnauthorized, the session itself is still valid and
+ * temporarily blocked, not expired, so the token is deliberately NOT cleared here. The /locked page
+ * self-polls and redirects back once it's no longer locked. */
+function handleWorkingHoursLocked(): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname !== "/locked" && window.location.pathname !== "/login") {
+    window.location.href = "/locked";
   }
 }
 
@@ -107,8 +126,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(401, body?.error ?? "Session expired");
   }
 
+  if (res.status === 403 && body?.code === "WORKING_HOURS_LOCKED") {
+    handleWorkingHoursLocked();
+    throw new ApiError(403, body?.error ?? "This system is locked outside working hours", body.code);
+  }
+
   if (!res.ok) {
-    throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`);
+    throw new ApiError(res.status, body?.error ?? `Request failed (${res.status})`, body?.code);
   }
 
   return body as T;
@@ -218,6 +242,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ entity, entityId, includePreview }),
     }),
+  listWorkingHours: () => request<WorkingHoursListItem[]>("/mobile/working-hours"),
+  getWorkingHours: (locationId: string) => request<WorkingHoursConfig | null>(`/mobile/working-hours/${locationId}`),
+  saveWorkingHours: (locationId: string, body: WorkingHoursUpsertInput) =>
+    request<WorkingHoursConfig>(`/mobile/working-hours/${locationId}`, { method: "PUT", body: JSON.stringify(body) }),
+  toggleManualLock: (locationId: string, locked: boolean) =>
+    request<WorkingHoursConfig>(`/mobile/working-hours/${locationId}/toggle-manual-lock`, { method: "POST", body: JSON.stringify({ locked }) }),
 };
 
 /** The actual PDF file — a plain cross-origin link (not a fetch), so this is a real file download

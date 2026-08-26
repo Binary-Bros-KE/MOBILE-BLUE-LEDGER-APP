@@ -21,6 +21,7 @@ import { RidersTab } from "../tabs/RidersTab";
 import { SalesTab } from "../tabs/SalesTab";
 import { StockLedgerTab } from "../tabs/StockLedgerTab";
 import { TransactionsTab } from "../tabs/TransactionsTab";
+import { WorkingHoursTab } from "../tabs/WorkingHoursTab";
 import { navGroups, visibleNavGroups, type TabKey } from "./navigation";
 import { Sidebar } from "./Sidebar";
 
@@ -57,7 +58,7 @@ export function AppShell() {
 
   // Only Dashboard shows until real permissions arrive — no flash of tabs this employee doesn't
   // actually have access to while /mobile/me is still loading.
-  const groups = visibleNavGroups(session?.permissions);
+  const groups = visibleNavGroups(session?.permissions, session?.isSuperAdmin ?? false);
 
   // A tab restored from localStorage (see setActiveTab below) can outlive the permission that made
   // it visible — a role edited since the last visit, or a different employee's saved tab surviving
@@ -150,6 +151,7 @@ export function AppShell() {
           {activeTab === "expenses" && <ExpensesTab />}
           {activeTab === "stockLedger" && <StockLedgerTab />}
           {activeTab === "approvals" && <ApprovalsTab />}
+          {activeTab === "workingHours" && <WorkingHoursTab />}
         </motion.main>
       </AnimatePresence>
     </div>

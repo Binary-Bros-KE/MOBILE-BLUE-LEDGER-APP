@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   Bike,
   CheckCircle2,
+  Clock,
   CreditCard,
   FileSpreadsheet,
   FileText,
@@ -30,7 +31,8 @@ export type TabKey =
   | "employees"
   | "customers"
   | "riders"
-  | "approvals";
+  | "approvals"
+  | "workingHours";
 
 export type NavItem = {
   key: TabKey;
@@ -42,6 +44,9 @@ export type NavItem = {
    * filter navGroups against the signed-in employee's actual permissions from /mobile/me). Omit for
    * a tab visible to anyone who can open the app at all (just Dashboard today). */
   permission?: { module: string; action: string };
+  /** Gated by MobileSessionInfo.isSuperAdmin instead of `permission` above — for a feature that's
+   * inherently Super-Admin-exclusive (not a delegable module/action), e.g. Working Hours. */
+  superAdminOnly?: boolean;
 };
 
 export type NavGroup = { title: string; items: NavItem[] };
@@ -74,6 +79,7 @@ export const navGroups: NavGroup[] = [
       // Same permission DESKTOP's own Approvals inbox requires — approving a manager-level decision
       // needs the same grant here as it does there, not a mobile-specific one.
       { key: "approvals", label: "Approvals", icon: CheckCircle2, ready: true, permission: { module: "approvals", action: "approve" } },
+      { key: "workingHours", label: "Working Hours", icon: Clock, ready: true, superAdminOnly: true },
     ],
   },
   {
@@ -92,15 +98,19 @@ export const navGroups: NavGroup[] = [
 ];
 
 /** Filters navGroups against the signed-in employee's actual permissions (from /mobile/me) — a tab
- * with no `permission` requirement (just Dashboard today) is always visible; every other tab needs
- * its own module+action present. Drops any group left with zero visible items entirely, so an empty
+ * with no `permission`/`superAdminOnly` requirement (just Dashboard today) is always visible; every
+ * other tab needs its own module+action present, or (for superAdminOnly tabs like Working Hours)
+ * `isSuperAdmin` to be true. Drops any group left with zero visible items entirely, so an empty
  * "Team" heading never shows for a role with no employees.view. */
-export function visibleNavGroups(permissions: Record<string, string[]> | null | undefined): NavGroup[] {
+export function visibleNavGroups(permissions: Record<string, string[]> | null | undefined, isSuperAdmin: boolean): NavGroup[] {
   const perms = permissions ?? {};
   return navGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.permission || (perms[item.permission.module]?.includes(item.permission.action) ?? false)),
+      items: group.items.filter((item) => {
+        if (item.superAdminOnly) return isSuperAdmin;
+        return !item.permission || (perms[item.permission.module]?.includes(item.permission.action) ?? false);
+      }),
     }))
     .filter((group) => group.items.length > 0);
 }

@@ -81,6 +81,9 @@ export type MobileSessionInfo = {
    * enforces authoritatively at submit time. */
   vatRatePercent: number;
   pricesTaxInclusive: boolean;
+  /** Server-authoritative — see SERVER's Role.isSuperAdmin doc comment. Gates the Working Hours tab
+   * (view AND edit are Super-Admin-exclusive, not a delegable module/action permission). */
+  isSuperAdmin: boolean;
 };
 
 export type Employee = {
@@ -700,4 +703,35 @@ export type SharedStatement = {
   totalInvoicedCents: number;
   totalPaidCents: number;
   totalOutstandingCents: number;
+};
+
+// --- Working Hours lockout (Super Admin only) ---
+
+export type WorkingHoursLockMode = "auto" | "manual";
+
+export type WorkingHoursScheduleDay = { isOpen: boolean; openTime: string | null; closeTime: string | null };
+
+/** Keyed "0".."6" — 0=Sunday..6=Saturday, matches JS Date.getDay(). */
+export type WorkingHoursSchedule = Record<string, WorkingHoursScheduleDay>;
+
+export type WorkingHoursConfig = {
+  locationId: string;
+  locationName: string;
+  lockEnabled: boolean;
+  lockMode: WorkingHoursLockMode;
+  manuallyLocked: boolean;
+  timezoneOffsetMinutes: number;
+  schedule: WorkingHoursSchedule;
+};
+
+/** One row per storefront for the Working Hours tab's picker — `config: null` means that
+ * storefront has never been configured (always-open by default). */
+export type WorkingHoursListItem = { locationId: string; locationName: string; config: WorkingHoursConfig | null };
+
+export type WorkingHoursUpsertInput = {
+  lockEnabled: boolean;
+  lockMode: WorkingHoursLockMode;
+  manuallyLocked: boolean;
+  timezoneOffsetMinutes: number;
+  schedule: WorkingHoursSchedule;
 };
