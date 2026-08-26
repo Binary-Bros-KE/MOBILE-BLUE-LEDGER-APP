@@ -1,35 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, PackageX, Truck } from "lucide-react";
+import { AlertTriangle, PackageX, Store, Truck } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import type { OwnerDashboard, PurchaseListItem, StockMovementRow as StockMovementRowType } from "@/lib/types";
+import { OverviewCard } from "../OverviewCard";
 import { StockMovementRow } from "../StockMovementRow";
 import type { TabKey } from "../nav/navigation";
-
-function StatCard({ label, value, tone }: { label: string; value: string; tone: "warning" | "danger" }) {
-  const toneClass = tone === "warning" ? "border-gold text-gold-text" : "border-red text-red";
-  return (
-    <div className={`rounded-lg border-2 border-dashed bg-white p-3 ${toneClass}`}>
-      <p className="font-display text-xl text-navy">{value}</p>
-      <p className="text-[11px] font-bold uppercase tracking-wide">{label}</p>
-    </div>
-  );
-}
 
 const OUTSTANDING_STATUSES = new Set(["ordered", "partially_received"]);
 
 /** The Storekeeper's own dashboard variant — a scoped-down port of DESKTOP's
- * StorekeeperDashboard.tsx: stock health first, no sales/revenue figures at all. Three widgets
- * reuse data mobile already exposes elsewhere (no new SERVER work needed for any of them):
- * OwnerDashboard.stock (already powers the Admin dashboard's own Stock Alerts card), the same
- * api.listStockMovements(locationId) StockLedgerTab.tsx already calls, and api.listPurchases(locationId)
- * summed client-side for an "outstanding purchases" figure. DESKTOP's own "products needing
- * reallocation" table is deliberately NOT ported — it's powered by Main Store allocation data that's
- * explicitly local-only/unrecoverable server-side (see project_owner_app_feature memory) and mobile
- * has no Main Store tab at all to link it to. */
-export function StorekeeperDashboardTab({ branchId, onNavigate }: { branchId: string | null; onNavigate: (tab: TabKey) => void }) {
+ * StorekeeperDashboard.tsx, using this app's own colorful/textured OverviewCard (the earlier version
+ * of this file used plain dashed boxes — a real regression against this project's own established
+ * visual language, same fix as CashierDashboardTab's). Three widgets reuse data mobile already
+ * exposes elsewhere (no new SERVER work needed for any of them): OwnerDashboard.stock (already
+ * powers the Admin dashboard's own Stock Alerts card), the same api.listStockMovements(locationId)
+ * StockLedgerTab.tsx already calls, and api.listPurchases(locationId) summed client-side for an
+ * "outstanding purchases" figure. DESKTOP's own "products needing reallocation" table is
+ * deliberately NOT ported — it's powered by Main Store allocation data that's explicitly local-only/
+ * unrecoverable server-side (see project_owner_app_feature memory) and mobile has no Main Store tab
+ * at all to link it to. */
+export function StorekeeperDashboardTab({ branchId, branchName, onNavigate }: { branchId: string | null; branchName: string | null; onNavigate: (tab: TabKey) => void }) {
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);
   const [movements, setMovements] = useState<StockMovementRowType[] | null>(null);
   const [purchases, setPurchases] = useState<PurchaseListItem[] | null>(null);
@@ -59,14 +52,22 @@ export function StorekeeperDashboardTab({ branchId, onNavigate }: { branchId: st
 
   return (
     <div className="space-y-4 px-4 py-4 pb-10">
-      <p className="text-xs font-bold uppercase tracking-wide text-navy/50">Stock health</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold uppercase tracking-wide text-navy/50">Stock health</p>
+        {branchName && (
+          <span className="flex items-center gap-1 text-[11px] font-bold text-blue">
+            <Store className="size-3" aria-hidden="true" />
+            {branchName}
+          </span>
+        )}
+      </div>
 
       {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
 
       {stock && (
-        <div className="grid grid-cols-2 gap-2">
-          <StatCard label="Low Stock" value={String(stock.lowStockCount)} tone="warning" />
-          <StatCard label="Out of Stock" value={String(stock.outOfStockCount)} tone="danger" />
+        <div className="grid grid-cols-2 gap-3">
+          <OverviewCard tone="gold" label="Low Stock" displayValue={String(stock.lowStockCount)} formula="Below reorder level" footnote={branchName ?? "At this storefront"} />
+          <OverviewCard tone="red" label="Out of Stock" displayValue={String(stock.outOfStockCount)} formula="At zero right now" footnote={branchName ?? "At this storefront"} />
         </div>
       )}
 
@@ -87,16 +88,16 @@ export function StorekeeperDashboardTab({ branchId, onNavigate }: { branchId: st
       <button
         type="button"
         onClick={() => onNavigate("purchases")}
-        className="flex w-full items-center justify-between gap-2 rounded-lg bg-white p-4 text-left shadow-sm"
+        className="flex w-full items-center justify-between gap-2 rounded-lg bg-navy p-4 text-left shadow-sm"
       >
         <div className="flex items-center gap-2">
-          <Truck className="size-4 flex-none text-blue" aria-hidden="true" />
+          <Truck className="size-4 flex-none text-white/70" aria-hidden="true" />
           <div>
-            <p className="text-sm font-bold text-navy">Outstanding Purchases</p>
-            <p className="text-xs text-navy/50">{outstanding.count} order{outstanding.count === 1 ? "" : "s"} still owed</p>
+            <p className="text-sm font-bold text-white">Outstanding Purchases</p>
+            <p className="text-xs text-white/60">{outstanding.count} order{outstanding.count === 1 ? "" : "s"} still owed</p>
           </div>
         </div>
-        <p className="font-display text-sm text-navy">{formatCents(outstanding.totalOwedCents, outstanding.currency)}</p>
+        <p className="font-display text-sm text-white">{formatCents(outstanding.totalOwedCents, outstanding.currency)}</p>
       </button>
 
       <div>

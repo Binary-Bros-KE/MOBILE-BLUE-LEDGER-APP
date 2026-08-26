@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { defaultAnchorForMode } from "@/lib/period";
@@ -15,71 +14,9 @@ import type {
   SalesTrendResult,
 } from "@/lib/types";
 import { HorizontalBarList } from "./charts/HorizontalBarList";
+import { OverviewCard } from "./OverviewCard";
 import { TrendAreaChart } from "./charts/TrendAreaChart";
 import { SalesReportPeriodSelector } from "./SalesReportPeriodSelector";
-
-type CardTone = "navy" | "blue" | "red" | "green";
-const TONE_BG: Record<CardTone, string> = { navy: "bg-navy", blue: "bg-blue", red: "bg-red", green: "bg-green" };
-
-/** Concentric rings bleeding off the top-right corner — ported from DESKTOP's own CardTexture
- * (FinancialOverviewCards.tsx), the "fingerprint" texture matching this project's own established
- * "colorful/textured cards, never plain white" preference. */
-function CardTexture() {
-  const radii = [14, 28, 42, 56, 70, 84, 98, 112];
-  return (
-    <svg className="pointer-events-none absolute inset-0 size-full" viewBox="0 0 200 140" preserveAspectRatio="none" aria-hidden="true">
-      {radii.map((r) => (
-        <circle key={r} cx={190} cy={-10} r={r} fill="none" stroke="#fffdf7" strokeWidth={1.25} opacity={0.16} />
-      ))}
-    </svg>
-  );
-}
-
-function DeltaBadge({ percent }: { percent: number | null }) {
-  if (percent === null) {
-    return <span className="text-[11px] font-semibold text-white/60">No prior data to compare</span>;
-  }
-  const isFlat = Math.abs(percent) < 0.05;
-  const isUp = percent > 0 && !isFlat;
-  const Icon = isFlat ? Minus : isUp ? TrendingUp : TrendingDown;
-  return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-white/85">
-      <Icon className="size-3" aria-hidden="true" />
-      {percent > 0 ? "+" : ""}
-      {percent.toFixed(1)}% vs previous period
-    </span>
-  );
-}
-
-function OverviewCard({
-  tone,
-  label,
-  valueCents,
-  currency,
-  formula,
-  deltaPercent,
-}: {
-  tone: CardTone;
-  label: string;
-  valueCents: number;
-  currency: string;
-  formula: string;
-  deltaPercent: number | null;
-}) {
-  return (
-    <div className={`relative overflow-hidden rounded-lg p-4 shadow-sm ${TONE_BG[tone]}`}>
-      <CardTexture />
-      <div className="relative">
-        <p className="text-[11px] font-bold tracking-wide text-white/75 uppercase">{label}</p>
-        <p className="mt-2 font-display text-xl text-white">{formatCents(valueCents, currency)}</p>
-        <p className="mt-1.5 text-[11px] font-semibold text-white/60">{formula}</p>
-        <div className="mt-2.5">
-          <DeltaBadge percent={deltaPercent} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (

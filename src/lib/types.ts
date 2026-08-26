@@ -65,6 +65,16 @@ export type OwnerDashboard = {
   /** The signed-in employee's own sales, same SalesSnapshot shape as `sales` above but scoped to
    * them — powers the Cashier dashboard variant's personal stat cards. */
   mySales: SalesSnapshot | null;
+  /** The individual transactions behind mySales — most recent first, capped at 20. Powers the
+   * Cashier dashboard variant's "My sales today" activity list. */
+  myRecentSales: MyRecentSale[] | null;
+};
+
+export type MyRecentSale = {
+  id: string;
+  documentNumber: string | null;
+  occurredAt: string;
+  amountCents: number;
 };
 
 export type MobileSessionInfo = {

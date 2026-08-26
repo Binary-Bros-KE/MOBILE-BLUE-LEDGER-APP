@@ -21,8 +21,12 @@ const ALL_FILTER = "__all__";
  * is already branch-scoped for a non-Super-Admin (see getDashboardVariant's own doc comment). */
 export function DashboardTab({ session, onNavigate }: { session: MobileSessionInfo | null; onNavigate: (tab: TabKey) => void }) {
   const variant = getDashboardVariant(session);
-  if (variant === "cashier") return <CashierDashboardTab branchId={session?.branchId ?? null} onNavigate={onNavigate} />;
-  if (variant === "storekeeper") return <StorekeeperDashboardTab branchId={session?.branchId ?? null} onNavigate={onNavigate} />;
+  if (variant === "cashier") {
+    return <CashierDashboardTab branchId={session?.branchId ?? null} branchName={session?.branchName ?? null} onNavigate={onNavigate} />;
+  }
+  if (variant === "storekeeper") {
+    return <StorekeeperDashboardTab branchId={session?.branchId ?? null} branchName={session?.branchName ?? null} onNavigate={onNavigate} />;
+  }
   return <AdminDashboardTab />;
 }
 
