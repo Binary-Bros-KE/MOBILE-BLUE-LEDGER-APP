@@ -143,7 +143,19 @@ export type Salary = {
 
 export type MobileLocation = { id: string; locationName: string };
 
-export type SaleListItem = {
+/** Mirrors SERVER's SaleStatusFlags (mobile-sales-service.ts) exactly — a completed sale can
+ * independently have a void request and a return request, each with its own approved/pending/
+ * rejected lifecycle. Void/return only apply to receipts, same as DESKTOP. */
+export type SaleStatusFlags = {
+  approvedVoid: boolean;
+  pendingVoid: boolean;
+  rejectedVoid: boolean;
+  approvedReturn: boolean;
+  pendingReturn: boolean;
+  rejectedReturn: boolean;
+};
+
+export type SaleListItem = SaleStatusFlags & {
   id: string;
   receiptNumber: string | null;
   customerName: string | null;
@@ -157,6 +169,7 @@ export type SaleListItem = {
   completedAt: string | null;
   createdAt: string;
   hasDeliveryNote: boolean;
+  deliveryIsDelivered: boolean | null;
   currency: string;
 };
 
@@ -197,7 +210,7 @@ export type TaxBreakdownEntry = {
   grossCents: number;
 };
 
-export type SharedDocument = {
+export type SharedDocument = Partial<SaleStatusFlags> & {
   documentKind: PricedDocumentKind;
   businessName: string;
   physicalAddress: string | null;
@@ -231,6 +244,8 @@ export type SharedDocument = {
   /** Whether this document has a delivery note attached — gates the "View Delivery Note" button on
    * DocumentDetailModal, same signal SERVER's SharedDocumentResult carries. */
   hasDeliveryNote: boolean;
+  /** Null when hasDeliveryNote is false. */
+  deliveryIsDelivered: boolean | null;
   vatRatePercent: number;
   grandTotalCents: number;
   paymentMethodName: string | null;

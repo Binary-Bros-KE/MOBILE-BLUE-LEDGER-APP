@@ -187,6 +187,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ value }),
     }),
+  setDeliveryDelivered: (kind: "sale" | "quotation", id: string, value: boolean) =>
+    request<DocumentIdResult>(`/mobile/${kind === "quotation" ? "quotations" : "sales"}/${id}/delivery/delivered`, {
+      method: "POST",
+      body: JSON.stringify({ value }),
+    }),
   // Receipts only — an invoice has its own separate Request Cancellation flow instead. Request-only:
   // approving/rejecting a return stays DESKTOP-only, never built on mobile.
   getSaleReturnableItems: (id: string) => request<MobileReturnableItem[]>(`/mobile/sales/${id}/returnable-items`),

@@ -65,6 +65,7 @@ export function DocumentDetailModal({
   onChanged,
   onEdit,
   canApprove = false,
+  canManageDelivery = false,
 }: {
   saleId: string;
   kind?: "sale" | "quotation";
@@ -83,6 +84,9 @@ export function DocumentDetailModal({
    * shows "Request Cancellation" instead (asks a reason, sits pending until someone with this
    * permission decides it from the Approvals tab). */
   canApprove?: boolean;
+  /** sales:edit — gates the "Mark as Delivered" button inside DeliveryNoteModal, mirroring DESKTOP's
+   * own single permission gate for a delivery regardless of sale/quotation ownership. */
+  canManageDelivery?: boolean;
 }) {
   const [doc, setDoc] = useState<SharedDocument | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -346,6 +350,49 @@ export function DocumentDetailModal({
             <X className="size-4" aria-hidden="true" />
           </button>
         </div>
+
+        {doc && (doc.hasDeliveryNote || doc.documentKind === "receipt") && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {doc.hasDeliveryNote && (
+              <span
+                className={`inline-flex items-center rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${
+                  doc.deliveryIsDelivered ? "border-green text-green" : "border-gold text-gold-text"
+                }`}
+              >
+                {doc.deliveryIsDelivered ? "Delivered" : "Pending Delivery"}
+              </span>
+            )}
+            {doc.documentKind === "receipt" && (
+              <>
+                {doc.approvedVoid && (
+                  <span className="inline-flex items-center rounded-full border border-dashed border-red px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-red uppercase">
+                    Voided
+                  </span>
+                )}
+                {doc.approvedReturn && (
+                  <span className="inline-flex items-center rounded-full border border-dashed border-gold px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-gold-text uppercase">
+                    Returned
+                  </span>
+                )}
+                {(doc.pendingVoid || doc.pendingReturn) && (
+                  <span className="inline-flex items-center rounded-full border border-dashed border-blue px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-blue uppercase">
+                    Pending Approval
+                  </span>
+                )}
+                {doc.rejectedVoid && (
+                  <span className="inline-flex items-center rounded-full border border-dashed border-navy/30 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-navy/50 uppercase">
+                    Void Rejected
+                  </span>
+                )}
+                {doc.rejectedReturn && (
+                  <span className="inline-flex items-center rounded-full border border-dashed border-navy/30 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-navy/50 uppercase">
+                    Return Rejected
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {loadError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{loadError}</p>}
         {!doc && !loadError && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
@@ -860,7 +907,13 @@ export function DocumentDetailModal({
       )}
 
       {deliveryNoteOpen && (
-        <DeliveryNoteModal saleId={saleId} kind={kind} onClose={() => setDeliveryNoteOpen(false)} />
+        <DeliveryNoteModal
+          saleId={saleId}
+          kind={kind}
+          canManageDelivery={canManageDelivery}
+          onClose={() => setDeliveryNoteOpen(false)}
+          onDeliveredChange={() => reload()}
+        />
       )}
 
       {convertSaleOpen && doc && (

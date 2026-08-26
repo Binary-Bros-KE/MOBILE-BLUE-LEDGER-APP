@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Clock, Download, Loader2, Package, Share2, X } from "lucide-react";
+import { CheckCircle2, Clock, Download, Loader2, Package, RotateCcw, Share2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/share-preferences";
 import type { MobileDeliveryNote } from "@/lib/types";
@@ -21,20 +21,27 @@ function Field({ label, value }: { label: string; value: string | null }) {
 /** View + share a delivery note attached to a receipt/invoice/quotation — mirrors
  * DocumentDetailModal's own Download/Share handlers exactly, just pointed at the "*_delivery" share
  * entity instead of the parent document, and DESKTOP's own DeliveryNotePreview for which fields to
- * show. Read-only: no "mark delivered" control here — that stays DESKTOP-only. */
+ * show, including the "Mark as Delivered" toggle (DeliveryNotePreview.tsx's own
+ * handleToggleDelivered). canManageDelivery gates the button the same way DESKTOP gates it with
+ * "sales":"edit" — SERVER still enforces the real permission regardless. */
 export function DeliveryNoteModal({
   saleId,
   kind,
+  canManageDelivery,
   onClose,
+  onDeliveredChange,
 }: {
   saleId: string;
   kind: "sale" | "quotation";
+  canManageDelivery: boolean;
   onClose: () => void;
+  onDeliveredChange?: (isDelivered: boolean) => void;
 }) {
   const [note, setNote] = useState<MobileDeliveryNote | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [togglingDelivered, setTogglingDelivered] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [includeWhatsappPreview, setIncludeWhatsappPreviewState] = useState(() => getIncludeWhatsappPreview());
@@ -78,6 +85,22 @@ export function DeliveryNoteModal({
       setActionError(err instanceof ApiError ? err.message : "Couldn't prepare the download.");
     } finally {
       setDownloading(false);
+    }
+  }
+
+  async function handleToggleDelivered(): Promise<void> {
+    if (!note) return;
+    setTogglingDelivered(true);
+    setActionError(null);
+    try {
+      const next = !note.isDelivered;
+      await api.setDeliveryDelivered(kind, saleId, next);
+      setNote((prev) => (prev ? { ...prev, isDelivered: next, deliveredAt: next ? new Date().toISOString() : null } : prev));
+      onDeliveredChange?.(next);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Failed to update delivery status.");
+    } finally {
+      setTogglingDelivered(false);
     }
   }
 
@@ -138,6 +161,26 @@ export function DeliveryNoteModal({
                 {note.isDelivered ? <CheckCircle2 className="size-3" aria-hidden="true" /> : <Clock className="size-3" aria-hidden="true" />}
                 {note.isDelivered ? "Delivered" : "Pending Delivery"}
               </span>
+
+              {canManageDelivery && (
+                <button
+                  type="button"
+                  onClick={() => void handleToggleDelivered()}
+                  disabled={togglingDelivered}
+                  className={`mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-bold disabled:opacity-50 ${
+                    note.isDelivered ? "border border-navy/15 bg-white text-navy" : "bg-green text-white"
+                  }`}
+                >
+                  {togglingDelivered ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                  ) : note.isDelivered ? (
+                    <RotateCcw className="size-3.5" aria-hidden="true" />
+                  ) : (
+                    <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                  )}
+                  {note.isDelivered ? "Mark as Not Delivered" : "Mark as Delivered"}
+                </button>
+              )}
 
               <div className="mt-3 rounded-lg border border-navy/10 bg-cream-dark/40 p-3">
                 <p className="text-[10px] font-extrabold uppercase tracking-wide text-navy/40">Deliver To</p>

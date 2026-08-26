@@ -21,12 +21,15 @@ export function QuotationsTab({
   branchName,
   currency,
   tenantTaxConfig,
+  canManageDelivery = false,
   defaultIncludeBusinessInfo,
 }: {
   branchId: string | null;
   branchName: string | null;
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
+  /** sales:edit — gates the "Mark as Delivered" button, passed straight through. */
+  canManageDelivery?: boolean;
   /** See InvoiceFormModal's identical prop for the same reasoning. */
   defaultIncludeBusinessInfo?: boolean | null;
 }) {
@@ -121,6 +124,7 @@ export function QuotationsTab({
           kind="quotation"
           onClose={() => setSelectedQuotationId(null)}
           onChanged={refreshQuotations}
+          canManageDelivery={canManageDelivery}
           onEdit={() => {
             const id = selectedQuotationId;
             setSelectedQuotationId(null);

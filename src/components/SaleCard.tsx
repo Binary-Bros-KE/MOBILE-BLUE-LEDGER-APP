@@ -40,11 +40,37 @@ export function SaleCard({ sale, onSelect }: { sale: SaleListItem; onSelect: () 
           </p>
         )}
       </div>
-      {sale.hasDeliveryNote && (
-        <span className="flex-none rounded-full border border-dashed border-green/40 bg-green/5 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-green uppercase">
-          Delivery
-        </span>
-      )}
+      <div className="flex flex-none flex-col items-end gap-1">
+        {sale.hasDeliveryNote && (
+          <span
+            className={`rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${
+              sale.deliveryIsDelivered ? "border-green/40 bg-green/5 text-green" : "border-gold/40 bg-gold/5 text-gold-text"
+            }`}
+          >
+            {sale.deliveryIsDelivered ? "Delivered" : "Pending Delivery"}
+          </span>
+        )}
+        {sale.approvedVoid && (
+          <span className="rounded-full border border-dashed border-red/40 bg-red/5 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-red uppercase">
+            Voided
+          </span>
+        )}
+        {sale.approvedReturn && (
+          <span className="rounded-full border border-dashed border-gold/40 bg-gold/5 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-gold-text uppercase">
+            Returned
+          </span>
+        )}
+        {(sale.pendingVoid || sale.pendingReturn) && (
+          <span className="rounded-full border border-dashed border-blue/40 bg-blue/5 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-blue uppercase">
+            Pending Approval
+          </span>
+        )}
+        {(sale.rejectedVoid || sale.rejectedReturn) && (
+          <span className="rounded-full border border-dashed border-navy/20 bg-navy/5 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-navy/50 uppercase">
+            {sale.rejectedVoid ? "Void Rejected" : "Return Rejected"}
+          </span>
+        )}
+      </div>
     </button>
   );
 }

@@ -126,7 +126,9 @@ export function AppShell() {
             />
           )}
           {activeTab === "employees" && <EmployeesTab currency={session?.currency ?? "KES"} />}
-          {activeTab === "sales" && <SalesTab />}
+          {activeTab === "sales" && (
+            <SalesTab canManageDelivery={session?.permissions?.["sales"]?.includes("edit") ?? false} />
+          )}
           {activeTab === "invoices" && (
             <InvoicesTab
               branchId={session?.branchId ?? null}
@@ -134,6 +136,7 @@ export function AppShell() {
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
               canApprove={session?.permissions?.["approvals"]?.includes("approve") ?? false}
+              canManageDelivery={session?.permissions?.["sales"]?.includes("edit") ?? false}
               defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}
@@ -143,6 +146,7 @@ export function AppShell() {
               branchName={session?.branchName ?? null}
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
+              canManageDelivery={session?.permissions?.["sales"]?.includes("edit") ?? false}
               defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}

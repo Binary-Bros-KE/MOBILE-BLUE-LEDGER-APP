@@ -23,6 +23,7 @@ export function InvoicesTab({
   currency,
   tenantTaxConfig,
   canApprove,
+  canManageDelivery = false,
   defaultIncludeBusinessInfo,
 }: {
   branchId: string | null;
@@ -32,6 +33,8 @@ export function InvoicesTab({
   /** Whether the signed-in employee has approvals.approve — passed straight through to
    * DocumentDetailModal, which decides "Cancel Invoice" vs. "Request Cancellation" from it. */
   canApprove: boolean;
+  /** sales:edit — gates the "Mark as Delivered" button, passed straight through. */
+  canManageDelivery?: boolean;
   /** See InvoiceFormModal's identical prop for the same reasoning. */
   defaultIncludeBusinessInfo?: boolean | null;
 }) {
@@ -158,6 +161,7 @@ export function InvoicesTab({
           onClose={() => setSelectedInvoiceId(null)}
           onChanged={refreshInvoices}
           canApprove={canApprove}
+          canManageDelivery={canManageDelivery}
           onEdit={() => {
             const id = selectedInvoiceId;
             setSelectedInvoiceId(null);
