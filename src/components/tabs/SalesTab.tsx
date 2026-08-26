@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { MobileLocation, SaleListItem } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
@@ -19,7 +20,17 @@ export function SalesTab({ canManageDelivery = false }: { canManageDelivery?: bo
   const [sales, setSales] = useState<SaleListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+
+  const filteredSales = useMemo(() => {
+    if (!sales) return null;
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return sales;
+    return sales.filter((sale) =>
+      [sale.receiptNumber, sale.customerName, sale.employeeName].filter(Boolean).join(" ").toLowerCase().includes(term),
+    );
+  }, [sales, searchTerm]);
 
   useEffect(() => {
     api.listLocations().then(setLocations).catch(() => {
@@ -52,19 +63,34 @@ export function SalesTab({ canManageDelivery = false }: { canManageDelivery?: bo
         </div>
       )}
 
+      <div className="px-4 pt-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-navy/30" aria-hidden="true" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search receipt #, customer, or cashier..."
+            className="h-10 w-full rounded-lg border border-navy/15 bg-white pr-3 pl-9 text-sm outline-none focus:border-blue"
+          />
+        </div>
+      </div>
+
       <div className="px-4 py-4">
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
         {!sales && !error && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
-        {sales && sales.length === 0 && <p className="py-10 text-center text-sm text-navy/50">No sales yet.</p>}
+        {sales && filteredSales?.length === 0 && (
+          <p className="py-10 text-center text-sm text-navy/50">{searchTerm ? "No sales match your search." : "No sales yet."}</p>
+        )}
 
-        {sales && sales.length > 0 && (
+        {filteredSales && filteredSales.length > 0 && (
           <div className="relative">
             <div
               className="pointer-events-none absolute top-2 bottom-2 left-3 border-l-2 border-dashed border-navy/20"
               aria-hidden="true"
             />
             <div className="space-y-3 pl-7">
-              {sales.map((sale) => (
+              {filteredSales.map((sale) => (
                 <div key={sale.id} className="relative">
                   <span
                     className="pointer-events-none absolute top-9 -left-[19px] size-2 -translate-y-1/2 rounded-full border-2 border-navy/25 bg-cream-dark"

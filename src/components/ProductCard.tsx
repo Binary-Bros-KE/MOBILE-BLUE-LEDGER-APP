@@ -1,6 +1,7 @@
 "use client";
 
 import { Package } from "lucide-react";
+import { formatCents } from "@/lib/money";
 import type { ProductListItem } from "@/lib/types";
 
 /** Read-only, at-a-glance stock card — no tap-to-open-modal (unlike every other card in this app),
@@ -8,8 +9,10 @@ import type { ProductListItem } from "@/lib/types";
  * list plus Low Stock / Out of Stock filtering, not a drill-down view.
  *
  * mainStoreQuantity is null when the tenant has no Main Store location at all — shown as "—" rather
- * than 0, since those mean different things (no Main Store vs. a Main Store that's empty). */
-export function ProductCard({ product }: { product: ProductListItem }) {
+ * than 0, since those mean different things (no Main Store vs. a Main Store that's empty). Every
+ * storefront gets its OWN line (not a summed total) — per explicit client ask, "not just a sum of
+ * all storefronts." */
+export function ProductCard({ product, currency }: { product: ProductListItem; currency: string }) {
   const flagTone = product.outOfStock ? "border-red text-red" : product.lowStock ? "border-gold text-gold-text" : null;
   const flagLabel = product.outOfStock ? "Out of Stock" : product.lowStock ? "Low Stock" : null;
 
@@ -20,20 +23,22 @@ export function ProductCard({ product }: { product: ProductListItem }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="truncate font-bold text-navy">{product.name}</p>
-          <p className="flex-none font-display text-sm text-navy">{product.totalQuantity}</p>
+          <p className="break-words font-bold text-navy">{product.name}</p>
+          <p className="flex-none font-display text-sm text-navy">{formatCents(product.sellingPriceCents, currency)}</p>
         </div>
-        <p className="truncate text-xs text-navy/50">
+        <p className="text-xs text-navy/50">
           {product.sku}
           {product.categoryName && ` · ${product.categoryName}`}
         </p>
-        <div className="mt-1.5 flex gap-4 text-[11px] text-navy/70">
-          <span>
+        <div className="mt-1.5 space-y-0.5 text-[11px] text-navy/70">
+          <p>
             Main Store: <span className="font-bold text-navy">{product.mainStoreQuantity ?? "—"}</span>
-          </span>
-          <span>
-            Storefronts: <span className="font-bold text-navy">{product.storefrontQuantity}</span>
-          </span>
+          </p>
+          {product.storefrontBreakdown.map((entry) => (
+            <p key={entry.locationId}>
+              {entry.locationName}: <span className="font-bold text-navy">{entry.quantity}</span>
+            </p>
+          ))}
         </div>
       </div>
       {flagLabel && (

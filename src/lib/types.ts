@@ -476,6 +476,9 @@ export type ProductListItem = {
   reorderLevel: number;
   mainStoreQuantity: number | null;
   storefrontQuantity: number;
+  /** Same total as storefrontQuantity, broken out per storefront — every active storefront-type
+   * location appears here, even at 0. */
+  storefrontBreakdown: { locationId: string; locationName: string; quantity: number }[];
   totalQuantity: number;
   lowStock: boolean;
   outOfStock: boolean;

@@ -153,7 +153,7 @@ export function AppShell() {
           {activeTab === "transactions" && <TransactionsTab />}
           {activeTab === "customers" && <CustomersTab />}
           {activeTab === "riders" && <RidersTab />}
-          {activeTab === "products" && <ProductsTab />}
+          {activeTab === "products" && <ProductsTab currency={session?.currency ?? "KES"} />}
           {activeTab === "purchases" && <PurchasesTab />}
           {activeTab === "expenses" && <ExpensesTab />}
           {activeTab === "stockLedger" && <StockLedgerTab />}

@@ -30,20 +30,19 @@ export function QuotationCard({ quotation, onSelect }: { quotation: QuotationLis
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="truncate font-bold text-navy">{quotation.quotationNumber}</p>
+          <p className="break-words font-bold text-navy">{quotation.quotationNumber}</p>
           <p className="flex-none font-display text-sm text-navy">{formatCents(quotation.grandTotalCents, quotation.currency)}</p>
         </div>
-        <p className="truncate text-xs text-navy/50">
-          Valid until {new Date(quotation.validUntil).toLocaleDateString()} · {quotation.employeeName}
-        </p>
-        <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-bold text-blue">
+        <p className="text-xs text-navy/50">Valid until {new Date(quotation.validUntil).toLocaleDateString()}</p>
+        <p className="text-xs text-navy/50">{quotation.employeeName}</p>
+        <p className="mt-0.5 flex items-center gap-1 text-xs font-bold text-blue">
           <Store className="size-3.5 flex-none" aria-hidden="true" />
-          {quotation.locationName}
+          <span className="break-words">{quotation.locationName}</span>
         </p>
         {quotation.customerName && (
-          <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-navy/50">
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-navy/50">
             <User className="size-3.5 flex-none" aria-hidden="true" />
-            {quotation.customerName}
+            <span className="break-words">{quotation.customerName}</span>
           </p>
         )}
       </div>

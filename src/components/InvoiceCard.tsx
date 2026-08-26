@@ -28,20 +28,19 @@ export function InvoiceCard({ invoice, onSelect }: { invoice: InvoiceListItem; o
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="truncate font-bold text-navy">{invoice.invoiceNumber ?? "Invoice"}</p>
+          <p className="break-words font-bold text-navy">{invoice.invoiceNumber ?? "Invoice"}</p>
           <p className="flex-none font-display text-sm text-navy">{formatCents(invoice.grandTotalCents, invoice.currency)}</p>
         </div>
-        <p className="truncate text-xs text-navy/50">
-          Due {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "-"} · {invoice.employeeName}
-        </p>
-        <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-bold text-blue">
+        <p className="text-xs text-navy/50">Due {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : "-"}</p>
+        <p className="text-xs text-navy/50">{invoice.employeeName}</p>
+        <p className="mt-0.5 flex items-center gap-1 text-xs font-bold text-blue">
           <Store className="size-3.5 flex-none" aria-hidden="true" />
-          {invoice.locationName}
+          <span className="break-words">{invoice.locationName}</span>
         </p>
         {invoice.customerName && (
-          <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-navy/50">
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-navy/50">
             <User className="size-3.5 flex-none" aria-hidden="true" />
-            {invoice.customerName}
+            <span className="break-words">{invoice.customerName}</span>
           </p>
         )}
       </div>

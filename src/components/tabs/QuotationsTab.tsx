@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Search } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { MobileLocation, QuotationListItem } from "@/lib/types";
@@ -37,9 +37,19 @@ export function QuotationsTab({
   const [quotations, setQuotations] = useState<QuotationListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedQuotationId, setSelectedQuotationId] = useState<string | null>(null);
   // null = closed, "new" = create form, any other string = edit form for that quotation id.
   const [formTarget, setFormTarget] = useState<string | null>(null);
+
+  const filteredQuotations = useMemo(() => {
+    if (!quotations) return null;
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return quotations;
+    return quotations.filter((quotation) =>
+      [quotation.quotationNumber, quotation.customerName, quotation.employeeName].filter(Boolean).join(" ").toLowerCase().includes(term),
+    );
+  }, [quotations, searchTerm]);
 
   useEffect(() => {
     api.listLocations().then(setLocations).catch(() => {
@@ -77,6 +87,18 @@ export function QuotationsTab({
             New
           </button>
         </div>
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-navy/30" aria-hidden="true" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search quotation #, customer, or cashier..."
+              className="h-10 w-full rounded-lg border border-navy/15 bg-white pr-3 pl-9 text-sm outline-none focus:border-blue"
+            />
+          </div>
+        </div>
         {locations && locations.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => setLocationFilter(ALL_FILTER)} />
@@ -95,16 +117,18 @@ export function QuotationsTab({
       <div className="px-4 py-4">
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
         {!quotations && !error && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
-        {quotations && quotations.length === 0 && <p className="py-10 text-center text-sm text-navy/50">No quotations yet.</p>}
+        {quotations && filteredQuotations?.length === 0 && (
+          <p className="py-10 text-center text-sm text-navy/50">{searchTerm ? "No quotations match your search." : "No quotations yet."}</p>
+        )}
 
-        {quotations && quotations.length > 0 && (
+        {filteredQuotations && filteredQuotations.length > 0 && (
           <div className="relative">
             <div
               className="pointer-events-none absolute top-2 bottom-2 left-3 border-l-2 border-dashed border-navy/20"
               aria-hidden="true"
             />
             <div className="space-y-3 pl-7">
-              {quotations.map((quotation) => (
+              {filteredQuotations.map((quotation) => (
                 <div key={quotation.id} className="relative">
                   <span
                     className="pointer-events-none absolute top-9 -left-[19px] size-2 -translate-y-1/2 rounded-full border-2 border-navy/25 bg-cream-dark"
