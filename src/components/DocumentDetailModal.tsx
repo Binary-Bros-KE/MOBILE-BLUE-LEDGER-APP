@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Download, Loader2, Share2, Trash2, Undo2, X } from "lucide-react";
+import { Copy, Download, Loader2, Package, Share2, Trash2, Undo2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/share-preferences";
 import { taxBreakdownLabel } from "@/lib/tax";
 import type { PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
 import { CheckboxField } from "./CheckboxField";
+import { DeliveryNoteModal } from "./DeliveryNoteModal";
 import { RequestReturnModal } from "./RequestReturnModal";
 
 const KIND_LABEL: Record<SharedDocument["documentKind"], string> = {
@@ -104,6 +105,7 @@ export function DocumentDetailModal({
   const [requestCancelSent, setRequestCancelSent] = useState(false);
   const [requestReturnOpen, setRequestReturnOpen] = useState(false);
   const [requestReturnSent, setRequestReturnSent] = useState(false);
+  const [deliveryNoteOpen, setDeliveryNoteOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockCheck, setStockCheck] = useState<QuotationStockCheckItem[] | null>(null);
 
@@ -482,6 +484,17 @@ export function DocumentDetailModal({
               </button>
             </div>
 
+            {doc.hasDeliveryNote && (
+              <button
+                type="button"
+                onClick={() => setDeliveryNoteOpen(true)}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-navy/15 bg-white py-2.5 text-xs font-bold text-navy"
+              >
+                <Package className="size-3.5" aria-hidden="true" />
+                View Delivery Note
+              </button>
+            )}
+
             {doc.documentKind === "invoice" && doc.paymentStatus !== "cancelled" && (
               <div className="mt-3 space-y-2 border-t border-dashed border-navy/15 pt-3">
                 {doc.balanceDueCents !== null && doc.balanceDueCents > 0 && (
@@ -844,6 +857,10 @@ export function DocumentDetailModal({
             setRequestReturnSent(true);
           }}
         />
+      )}
+
+      {deliveryNoteOpen && (
+        <DeliveryNoteModal saleId={saleId} kind={kind} onClose={() => setDeliveryNoteOpen(false)} />
       )}
 
       {convertSaleOpen && doc && (

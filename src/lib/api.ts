@@ -15,6 +15,7 @@ import type {
   InvoiceListItem,
   MarkPaidRequest,
   MobileCustomer,
+  MobileDeliveryNote,
   MobileInvoiceEditData,
   MobileLocation,
   MobilePeriod,
@@ -172,6 +173,7 @@ export const api = {
   listSales: (locationId?: string) =>
     request<SaleListItem[]>(`/mobile/sales${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getSale: (id: string) => request<SharedDocument>(`/mobile/sales/${id}`),
+  getSaleDeliveryNote: (id: string) => request<MobileDeliveryNote>(`/mobile/sales/${id}/delivery-note`),
   // Both toggle endpoints branch on `kind` since a receipt/invoice (Sale) and a Quotation are
   // separate tables/routes server-side — mirrors DocumentDetailModal's own kind-based branching for
   // getSale/getQuotation above.
@@ -221,6 +223,7 @@ export const api = {
   listQuotations: (locationId?: string) =>
     request<QuotationListItem[]>(`/mobile/quotations${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getQuotation: (id: string) => request<SharedDocument>(`/mobile/quotations/${id}`),
+  getQuotationDeliveryNote: (id: string) => request<MobileDeliveryNote>(`/mobile/quotations/${id}/delivery-note`),
   createQuotation: (body: CreateQuotationRequest) => request<DocumentIdResult>("/mobile/quotations", { method: "POST", body: JSON.stringify(body) }),
   getQuotationEditData: (id: string) => request<MobileQuotationEditData>(`/mobile/quotations/${id}/edit`),
   updateQuotation: (id: string, body: CreateQuotationRequest) =>

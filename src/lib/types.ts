@@ -228,6 +228,9 @@ export type SharedDocument = {
    * heading with everything else null/empty — this flag itself isn't needed by any render logic
    * here, just carried through for type parity with SERVER's SharedDocumentResult. */
   includeBusinessInfo: boolean;
+  /** Whether this document has a delivery note attached — gates the "View Delivery Note" button on
+   * DocumentDetailModal, same signal SERVER's SharedDocumentResult carries. */
+  hasDeliveryNote: boolean;
   vatRatePercent: number;
   grandTotalCents: number;
   paymentMethodName: string | null;
@@ -244,9 +247,33 @@ export type SharedDocument = {
   quotationStatus: string | null;
 };
 
-export type ShareDocumentEntity = "sale" | "quotation" | "customer_statement";
+export type ShareDocumentEntity = "sale" | "quotation" | "customer_statement" | "sale_delivery" | "quotation_delivery";
 
 export type ShareLinkResult = { url: string; message: string };
+
+/** Non-pricing view-model for an attached delivery note — mirrors SERVER's SharedDeliveryNoteResult
+ * exactly (see share-service.ts's own doc comment for why it carries no fee/cost figures). */
+export type MobileDeliveryNote = {
+  documentKind: "delivery_note";
+  businessName: string;
+  physicalAddress: string | null;
+  primaryPhone: string | null;
+  deliveryNoteNumber: string;
+  sourceDocumentLabel: string;
+  sourceDocumentNumber: string | null;
+  dateLabel: string;
+  recipientName: string;
+  country: string | null;
+  town: string | null;
+  deliveryAddress: string;
+  deliveryNotes: string | null;
+  riderName: string | null;
+  riderPhone: string | null;
+  riderCompany: string | null;
+  riderVehicleDescription: string | null;
+  isDelivered: boolean;
+  deliveredAt: string | null;
+};
 
 /** Backs the "Request Return" form's item/quantity picker on a receipt — see SERVER's
  * getSaleReturnableItems (mobile-sales-service.ts) for the full doc comment on why this is a
