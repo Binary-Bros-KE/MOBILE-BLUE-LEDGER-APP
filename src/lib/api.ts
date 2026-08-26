@@ -170,6 +170,19 @@ export const api = {
   listSales: (locationId?: string) =>
     request<SaleListItem[]>(`/mobile/sales${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getSale: (id: string) => request<SharedDocument>(`/mobile/sales/${id}`),
+  // Both toggle endpoints branch on `kind` since a receipt/invoice (Sale) and a Quotation are
+  // separate tables/routes server-side — mirrors DocumentDetailModal's own kind-based branching for
+  // getSale/getQuotation above.
+  setIncludeTaxBreakdown: (kind: "sale" | "quotation", id: string, value: boolean) =>
+    request<DocumentIdResult>(`/mobile/${kind === "quotation" ? "quotations" : "sales"}/${id}/include-tax-breakdown`, {
+      method: "POST",
+      body: JSON.stringify({ value }),
+    }),
+  setIncludeBusinessInfo: (kind: "sale" | "quotation", id: string, value: boolean) =>
+    request<DocumentIdResult>(`/mobile/${kind === "quotation" ? "quotations" : "sales"}/${id}/include-business-info`, {
+      method: "POST",
+      body: JSON.stringify({ value }),
+    }),
   listInvoices: (locationId?: string) =>
     request<InvoiceListItem[]>(`/mobile/invoices${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   createInvoice: (body: CreateInvoiceRequest) => request<DocumentIdResult>("/mobile/invoices", { method: "POST", body: JSON.stringify(body) }),

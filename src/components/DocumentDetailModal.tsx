@@ -271,6 +271,20 @@ export function DocumentDetailModal({
     setIncludeWhatsappPreview(next);
   }
 
+  async function handleToggleTaxBreakdown(next: boolean): Promise<void> {
+    await runAction("toggleTax", async () => {
+      await api.setIncludeTaxBreakdown(kind, saleId, next);
+      reload();
+    });
+  }
+
+  async function handleToggleBusinessInfo(next: boolean): Promise<void> {
+    await runAction("toggleBusinessInfo", async () => {
+      await api.setIncludeBusinessInfo(kind, saleId, next);
+      reload();
+    });
+  }
+
   async function handleShare(): Promise<void> {
     setSharing(true);
     setActionError(null);
@@ -413,6 +427,24 @@ export function DocumentDetailModal({
                 </>
               )}
             </div>
+
+            {doc && (
+              <CheckboxField
+                label="Include tax information"
+                description="Shows the Tax Breakdown section on this document's print, download, and share"
+                checked={doc.includeTaxBreakdown}
+                onChange={(checked) => void handleToggleTaxBreakdown(checked)}
+              />
+            )}
+
+            {doc && (
+              <CheckboxField
+                label="Include storefront information"
+                description="Shows the shop name, logo, address, contacts and header/footer text. Turn off for a fully anonymous document."
+                checked={doc.includeBusinessInfo}
+                onChange={(checked) => void handleToggleBusinessInfo(checked)}
+              />
+            )}
 
             <CheckboxField
               label="Include WhatsApp preview"
