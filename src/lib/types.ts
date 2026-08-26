@@ -248,6 +248,25 @@ export type ShareDocumentEntity = "sale" | "quotation" | "customer_statement";
 
 export type ShareLinkResult = { url: string; message: string };
 
+/** Backs the "Request Return" form's item/quantity picker on a receipt — see SERVER's
+ * getSaleReturnableItems (mobile-sales-service.ts) for the full doc comment on why this is a
+ * separate raw lookup, not the display-only SharedDocument shape. */
+export type MobileReturnableItem = {
+  saleItemId: string;
+  productId: string;
+  productName: string;
+  quantitySold: number;
+  alreadyReturnedQuantity: number;
+  remainingQuantity: number;
+  unitPriceCents: number;
+};
+
+export type RequestSaleReturnInput = {
+  reason: string;
+  notes?: string;
+  items: Array<{ saleItemId: string; quantity: number }>;
+};
+
 export type InvoiceListItem = {
   id: string;
   invoiceNumber: string | null;

@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Download, Loader2, Share2, Trash2, X } from "lucide-react";
+import { Copy, Download, Loader2, Share2, Trash2, Undo2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/share-preferences";
 import { taxBreakdownLabel } from "@/lib/tax";
 import type { PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
 import { CheckboxField } from "./CheckboxField";
+import { RequestReturnModal } from "./RequestReturnModal";
 
 const KIND_LABEL: Record<SharedDocument["documentKind"], string> = {
   receipt: "Receipt",
@@ -101,6 +102,8 @@ export function DocumentDetailModal({
   const [requestCancelReason, setRequestCancelReason] = useState("");
   const [requestCancelNotes, setRequestCancelNotes] = useState("");
   const [requestCancelSent, setRequestCancelSent] = useState(false);
+  const [requestReturnOpen, setRequestReturnOpen] = useState(false);
+  const [requestReturnSent, setRequestReturnSent] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockCheck, setStockCheck] = useState<QuotationStockCheckItem[] | null>(null);
 
@@ -560,6 +563,23 @@ export function DocumentDetailModal({
               </div>
             )}
 
+            {doc.documentKind === "receipt" && (
+              <div className="mt-3 border-t border-dashed border-navy/15 pt-3">
+                {requestReturnSent ? (
+                  <p className="text-center text-[11px] font-semibold text-navy/50">Return requested — awaiting approval.</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setRequestReturnOpen(true)}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red"
+                  >
+                    <Undo2 className="size-3.5" aria-hidden="true" />
+                    Request Return
+                  </button>
+                )}
+              </div>
+            )}
+
             {doc.documentKind === "quotation" && doc.quotationStatus && (
               <div className="mt-3 space-y-2 border-t border-dashed border-navy/15 pt-3">
                 {(doc.quotationStatus === "draft" || doc.quotationStatus === "sent") && (
@@ -812,6 +832,18 @@ export function DocumentDetailModal({
             </div>
           </motion.div>
         </div>
+      )}
+
+      {requestReturnOpen && doc && (
+        <RequestReturnModal
+          saleId={saleId}
+          currency={doc.currency}
+          onClose={() => setRequestReturnOpen(false)}
+          onRequested={() => {
+            setRequestReturnOpen(false);
+            setRequestReturnSent(true);
+          }}
+        />
       )}
 
       {convertSaleOpen && doc && (

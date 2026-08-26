@@ -19,6 +19,7 @@ import type {
   MobileLocation,
   MobilePeriod,
   MobileQuotationEditData,
+  MobileReturnableItem,
   MobileRider,
   MobileSessionInfo,
   MobileSupplier,
@@ -32,6 +33,7 @@ import type {
   QuotationStatusValue,
   QuotationStockCheckItem,
   RecordPaymentRequest,
+  RequestSaleReturnInput,
   Salary,
   SaleListItem,
   SalesReportBreakdowns,
@@ -183,6 +185,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ value }),
     }),
+  // Receipts only — an invoice has its own separate Request Cancellation flow instead. Request-only:
+  // approving/rejecting a return stays DESKTOP-only, never built on mobile.
+  getSaleReturnableItems: (id: string) => request<MobileReturnableItem[]>(`/mobile/sales/${id}/returnable-items`),
+  requestSaleReturn: (id: string, body: RequestSaleReturnInput) =>
+    request<DocumentIdResult>(`/mobile/sales/${id}/request-return`, { method: "POST", body: JSON.stringify(body) }),
   listInvoices: (locationId?: string) =>
     request<InvoiceListItem[]>(`/mobile/invoices${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   createInvoice: (body: CreateInvoiceRequest) => request<DocumentIdResult>("/mobile/invoices", { method: "POST", body: JSON.stringify(body) }),
