@@ -335,7 +335,7 @@ export function DocumentDetailModal({
 
               <div className="my-3 border-t border-dashed border-navy/15" />
               <div className="space-y-0.5 text-xs text-navy/70">
-                <Row label="Served by" value={`${doc.employeeName} · ${doc.branchName}`} />
+                <Row label="Served by" value={doc.branchName ? `${doc.employeeName} · ${doc.branchName}` : doc.employeeName} />
                 {doc.customerName && <Row label="Customer" value={doc.customerName} />}
                 {doc.dueDate && <Row label="Due" value={new Date(doc.dueDate).toLocaleDateString()} />}
                 {doc.validUntil && <Row label="Valid until" value={new Date(doc.validUntil).toLocaleDateString()} />}

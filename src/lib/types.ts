@@ -206,6 +206,11 @@ export type SharedDocument = {
    * Sale/Quotation Prisma model doc comment for the same field. taxBreakdown itself is always
    * present regardless. */
   includeTaxBreakdown: boolean;
+  /** Whether this document shows ANY shop identity — see SERVER's Sale/Quotation Prisma model doc
+   * comment for the same field. When false, businessName/etc. already come through as a generic
+   * heading with everything else null/empty — this flag itself isn't needed by any render logic
+   * here, just carried through for type parity with SERVER's SharedDocumentResult. */
+  includeBusinessInfo: boolean;
   vatRatePercent: number;
   grandTotalCents: number;
   paymentMethodName: string | null;
