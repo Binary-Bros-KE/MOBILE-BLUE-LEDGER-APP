@@ -8,12 +8,13 @@ import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileSupplier, ProductListItem } from "@/lib/types";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 
-/** The product-search-and-add + cart-line-list UI shared by Checkout, and the Invoice/Quotation
- * create/edit forms — price override (mark-up, floored at the product's own minimumPriceCents),
- * discount, and "sourced from another shop" (cost + supplier) are identical across all three
- * documents, matching how DESKTOP itself shares this exact cart-editing surface
- * (ExtraChargesSection/computeLinePricing) across Checkout/Invoice/Quotation. Fully controlled — the
- * parent owns `cart` and gets a new array back via `onCartChange`. */
+/** The product-search-and-add + cart-line-list UI shared by the Invoice and Quotation create/edit
+ * forms — price override (mark-up, floored at the product's own minimumPriceCents), discount, and
+ * "sourced from another shop" (cost + supplier). CheckoutTab.tsx has its own separate, independently
+ * maintained inline copy of this same UI rather than actually rendering this component (despite an
+ * earlier version of this comment claiming otherwise) — keep both in sync by hand if either changes,
+ * e.g. money.ts's unitCostToTotalCents/totalCentsToUnitCostText pair. Fully controlled — the parent
+ * owns `cart` and gets a new array back via `onCartChange`. */
 export function CartItemsEditor({
   products,
   cart,
