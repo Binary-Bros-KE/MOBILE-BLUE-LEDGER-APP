@@ -19,7 +19,14 @@ function time(iso: string): string {
  * number — see mySales/myRecentSales on the dashboard response, mobile-metrics-service.ts), the
  * shop's own pulse second and smaller (matching DESKTOP's own framing), and a New Sale shortcut. No
  * trend/week-over-week, no team ranking, no Held Sales widget — mobile Checkout has no hold/suspend
- * concept at all, unlike DESKTOP's. */
+ * concept at all, unlike DESKTOP's.
+ *
+ * Only the hero card and the bottom shop-wide card carry money — per explicit client correction, a
+ * cashier should never see the shop's (or even their own) total revenue, so those two specifically
+ * became "Number of Sales" and "Waiting Approval" (see pendingApprovalsToday's own doc comment,
+ * mobile-metrics-service.ts, for why that count is safe to show — no money in it). The middle
+ * Transactions/Average-Sale pair and the per-sale activity feed below are untouched — the client only
+ * flagged those two specific cards, not this whole layout. */
 export function CashierDashboardTab({ branchId, branchName, onNavigate }: { branchId: string | null; branchName: string | null; onNavigate: (tab: TabKey) => void }) {
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,10 +45,10 @@ export function CashierDashboardTab({ branchId, branchName, onNavigate }: { bran
 
   return (
     <div className="space-y-4 px-4 py-4 pb-10">
-      <div className="flex items-center justify-between">
+      <div>
         <p className="text-xs font-bold uppercase tracking-wide text-navy/50">Your performance today</p>
         {branchName && (
-          <span className="flex items-center gap-1 text-[11px] font-bold text-blue">
+          <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-blue">
             <Store className="size-3" aria-hidden="true" />
             {branchName}
           </span>
@@ -53,7 +60,7 @@ export function CashierDashboardTab({ branchId, branchName, onNavigate }: { bran
       {dashboard && (
         <>
           <div className="grid grid-cols-1 gap-3">
-            <OverviewCard tone="navy" label="My Sales Today" valueCents={mySales?.revenueCents ?? 0} currency={currency} formula="Total revenue you've rung up" footnote="So far today" />
+            <OverviewCard tone="navy" label="Number of Sales" displayValue={String(mySales?.transactionCount ?? 0)} formula="Sales you've completed" footnote="So far today" />
             <div className="grid grid-cols-2 gap-3">
               <OverviewCard tone="blue" label="My Transactions" displayValue={String(mySales?.transactionCount ?? 0)} formula="Sales completed" footnote="So far today" />
               <OverviewCard tone="gold" label="My Average Sale" valueCents={averageSaleCents} currency={currency} formula="Per transaction" footnote="So far today" />
@@ -100,15 +107,9 @@ export function CashierDashboardTab({ branchId, branchName, onNavigate }: { bran
             <p className="text-[11px] font-bold uppercase tracking-wide text-navy/50">
               {branchName ? `${branchName} today` : "Storefront today"}
             </p>
-            <div className="mt-2 flex items-center justify-between">
-              <div>
-                <p className="font-display text-lg text-navy">{formatCents(dashboard.sales.revenueCents, currency)}</p>
-                <p className="text-[11px] text-navy/50">Total revenue, whole team</p>
-              </div>
-              <div className="text-right">
-                <p className="font-display text-lg text-navy">{dashboard.sales.transactionCount}</p>
-                <p className="text-[11px] text-navy/50">Transactions</p>
-              </div>
+            <div className="mt-2">
+              <p className="font-display text-lg text-navy">{dashboard.pendingApprovalsToday}</p>
+              <p className="text-[11px] text-navy/50">Sales waiting on manager approval</p>
             </div>
           </div>
         </>

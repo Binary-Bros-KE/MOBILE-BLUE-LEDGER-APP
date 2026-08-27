@@ -68,6 +68,9 @@ export type OwnerDashboard = {
   /** The individual transactions behind mySales — most recent first, capped at 20. Powers the
    * Cashier dashboard variant's "My sales today" activity list. */
   myRecentSales: MyRecentSale[] | null;
+  /** Distinct sales, storefront-scoped, with a void or return request still pending today —
+   * intentionally not a money figure, so it's fine to show on the Cashier dashboard too. */
+  pendingApprovalsToday: number;
 };
 
 export type MyRecentSale = {
