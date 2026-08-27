@@ -1,3 +1,4 @@
+import { totalCentsToUnitCostText } from "./money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "./tax";
 import type { CheckoutCartLine, MobileEditableItem, ProductListItem, ServiceChargeDraft, ServiceChargeInput } from "./types";
 
@@ -100,7 +101,9 @@ export function buildCartFromEditableItems(items: MobileEditableItem[], products
       wholesaleMinQuantity,
       priceOverride: item.unitPriceCents !== naturalPriceCents ? (item.unitPriceCents / 100).toFixed(2) : "",
       isLocallySourced: item.isLocallySourced,
-      localCost: item.localCostCents !== null ? (item.localCostCents / 100).toFixed(2) : "",
+      // item.localCostCents is stored as the TOTAL for this line — back it out to the per-unit
+      // figure this field shows (see money.ts's own doc comment on the pair).
+      localCost: totalCentsToUnitCostText(item.localCostCents, item.quantity),
       localSupplierId: item.localSupplierId,
     };
   });

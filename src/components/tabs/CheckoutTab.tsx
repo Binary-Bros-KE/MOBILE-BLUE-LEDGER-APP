@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Loader2, Minus, Plus, Receipt, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { effectiveUnitPriceCents, naturalUnitPriceCents, serviceChargeDraftsToInputs, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
-import { formatCents } from "@/lib/money";
+import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
 import { DocumentDetailModal } from "../DocumentDetailModal";
@@ -272,7 +272,10 @@ export function CheckoutTab({
           discountAmountCents: line.discountAmountCents,
           unitPriceCents: line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : undefined,
           isLocallySourced: line.isLocallySourced,
-          localCostCents: line.isLocallySourced && line.localCost.trim() ? Math.round(Number(line.localCost) * 100) : undefined,
+          // line.localCost is what the cashier typed as the PER-UNIT cost — localCostCents itself is
+          // still stored/reported as the line's total (see money.ts's own doc comment), so multiply
+          // here rather than changing anything downstream.
+          localCostCents: line.isLocallySourced && line.localCost.trim() ? unitCostToTotalCents(line.localCost, line.quantity) : undefined,
           localSupplierId: line.isLocallySourced ? (line.localSupplierId ?? undefined) : undefined,
         })),
         paymentMethodId,
@@ -565,7 +568,7 @@ export function CheckoutTab({
                   {line.isLocallySourced && (
                     <div className="mt-2 space-y-2 rounded-md bg-cream-dark/60 p-2.5">
                       <label className="block">
-                        <span className="text-[11px] font-semibold text-navy/50">Cost paid</span>
+                        <span className="text-[11px] font-semibold text-navy/50">Unit Cost</span>
                         <input
                           type="number"
                           min={0}
@@ -576,6 +579,11 @@ export function CheckoutTab({
                           className="mt-1 w-full rounded-md border border-navy/15 px-2.5 py-1.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
                         />
                       </label>
+                      {line.localCost.trim() && (
+                        <p className="text-[10px] font-semibold text-navy/40">
+                          Total for {line.quantity}: {formatCents(unitCostToTotalCents(line.localCost, line.quantity), currency)}
+                        </p>
+                      )}
                       <div>
                         <span className="text-[11px] font-semibold text-navy/50">Local Supplier</span>
                         <div className="mt-1 flex gap-1.5">

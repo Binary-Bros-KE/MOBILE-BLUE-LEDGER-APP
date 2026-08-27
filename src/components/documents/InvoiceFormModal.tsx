@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ChevronRight, Loader2, Receipt, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { buildCartFromEditableItems, computeCartTotals, serviceChargeDraftsToInputs, serviceChargeInputsToDrafts, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
-import { formatCents } from "@/lib/money";
+import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
 import { CheckboxField } from "../CheckboxField";
@@ -176,7 +176,10 @@ export function InvoiceFormModal({
           discountAmountCents: line.discountAmountCents,
           unitPriceCents: line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : undefined,
           isLocallySourced: line.isLocallySourced,
-          localCostCents: line.isLocallySourced && line.localCost.trim() ? Math.round(Number(line.localCost) * 100) : undefined,
+          // line.localCost is what the user typed as the PER-UNIT cost — localCostCents itself is
+          // still stored/reported as the line's total (see money.ts's own doc comment), so multiply
+          // here rather than changing anything downstream.
+          localCostCents: line.isLocallySourced && line.localCost.trim() ? unitCostToTotalCents(line.localCost, line.quantity) : undefined,
           localSupplierId: line.isLocallySourced ? (line.localSupplierId ?? undefined) : undefined,
         })),
         initialPayment:

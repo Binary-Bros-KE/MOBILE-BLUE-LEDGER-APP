@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Minus, Plus, Search, Store, Trash2 } from "lucide-react";
-import { formatCents } from "@/lib/money";
+import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeCartLineTaxResults, naturalUnitPriceCents } from "@/lib/cart-totals";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileSupplier, ProductListItem } from "@/lib/types";
@@ -219,7 +219,7 @@ export function CartItemsEditor({
                   {line.isLocallySourced && (
                     <div className="mt-2 space-y-2 rounded-md bg-cream-dark/60 p-2.5">
                       <label className="block">
-                        <span className="text-[11px] font-semibold text-navy/50">Cost paid</span>
+                        <span className="text-[11px] font-semibold text-navy/50">Unit Cost</span>
                         <input
                           type="number"
                           min={0}
@@ -230,6 +230,11 @@ export function CartItemsEditor({
                           className="mt-1 w-full rounded-md border border-navy/15 px-2.5 py-1.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
                         />
                       </label>
+                      {line.localCost.trim() && (
+                        <p className="text-[10px] font-semibold text-navy/40">
+                          Total for {line.quantity}: {formatCents(unitCostToTotalCents(line.localCost, line.quantity), currency)}
+                        </p>
+                      )}
                       <div>
                         <span className="text-[11px] font-semibold text-navy/50">Local Supplier</span>
                         <div className="mt-1 flex gap-1.5">
