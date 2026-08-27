@@ -30,6 +30,9 @@ export function ProductCard({ product, currency }: { product: ProductListItem; c
           {product.sku}
           {product.categoryName && ` · ${product.categoryName}`}
         </p>
+        <p className={`mt-1 font-display text-2xl font-black leading-none ${product.totalQuantity > 0 ? "text-green" : "text-red"}`}>
+          STOCK: {product.totalQuantity}
+        </p>
         <div className="mt-1.5 space-y-0.5 text-[11px] text-navy/70">
           <p>
             Main Store: <span className="font-bold text-navy">{product.mainStoreQuantity ?? "—"}</span>
