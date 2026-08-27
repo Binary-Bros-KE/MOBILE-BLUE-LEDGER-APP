@@ -17,38 +17,42 @@ export function ProductCard({ product, currency }: { product: ProductListItem; c
   const flagLabel = product.outOfStock ? "Out of Stock" : product.lowStock ? "Low Stock" : null;
 
   return (
-    <div className="flex w-full items-start gap-3 rounded-lg bg-white p-4 shadow-sm">
-      <div className="grid size-11 flex-none place-items-center rounded-full bg-navy text-white">
-        <Package className="size-5" aria-hidden="true" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="break-words font-bold text-navy">{product.name}</p>
-          <p className="flex-none font-display text-sm text-navy">{formatCents(product.sellingPriceCents, currency)}</p>
+    <div className="flex w-full flex-col gap-1.5 rounded-lg bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="grid size-11 flex-none place-items-center rounded-full bg-navy text-white">
+          <Package className="size-5" aria-hidden="true" />
         </div>
-        <p className="text-xs text-navy/50">
-          {product.sku}
-          {product.categoryName && ` · ${product.categoryName}`}
-        </p>
-        <div className="mt-1.5 space-y-0.5 text-[11px] text-navy/70">
-          <p>
-            Main Store: <span className="font-bold text-navy">{product.mainStoreQuantity ?? "—"}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="break-words font-bold text-navy">{product.name}</p>
+            <p className="flex-none font-display text-sm text-navy">{formatCents(product.sellingPriceCents, currency)}</p>
+          </div>
+          <p className="text-xs text-navy/50">
+            {product.sku}
+            {product.categoryName && ` · ${product.categoryName}`}
           </p>
-          {(product.storefrontBreakdown ?? []).map((entry) => (
-            <p key={entry.locationId}>
-              {entry.locationName}: <span className="font-bold text-navy">{entry.quantity}</span>
+          <div className="mt-1.5 space-y-0.5 text-[11px] text-navy/70">
+            <p>
+              Main Store: <span className="font-bold text-navy">{product.mainStoreQuantity ?? "—"}</span>
             </p>
-          ))}
+            {(product.storefrontBreakdown ?? []).map((entry) => (
+              <p key={entry.locationId}>
+                {entry.locationName}: <span className="font-bold text-navy">{entry.quantity}</span>
+              </p>
+            ))}
+          </div>
         </div>
-        <p className={`mt-1 font-display text-xs font-black leading-none ${product.totalQuantity > 0 ? "text-green" : "text-red"}`}>
+      </div>
+      <div className="flex items-center justify-between gap-2 pl-14">
+        <p className={`font-display text-xs font-black leading-none ${product.totalQuantity > 0 ? "text-green" : "text-red"}`}>
           STOCK: {product.totalQuantity}
         </p>
+        {flagLabel && (
+          <span className={`flex-none rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${flagTone}`}>
+            {flagLabel}
+          </span>
+        )}
       </div>
-      {flagLabel && (
-        <span className={`flex-none rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${flagTone}`}>
-          {flagLabel}
-        </span>
-      )}
     </div>
   );
 }
