@@ -462,6 +462,29 @@ export function DocumentDetailModal({
                 </>
               )}
 
+              {doc.documentKind === "invoice" && doc.payments.length > 0 && (
+                <>
+                  <div className="my-3 border-t border-dashed border-navy/15" />
+                  <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wide text-navy/50">Payment History</p>
+                  <div className="space-y-1.5">
+                    {doc.payments.map((payment, index) => (
+                      <div key={index} className="flex items-center justify-between gap-2 rounded-lg border border-navy/10 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-bold text-navy">
+                            {payment.paymentMethodName}
+                            {payment.reference ? ` · ${payment.reference}` : ""}
+                          </p>
+                          <p className="text-[10px] text-navy/50">
+                            {new Date(payment.receivedAt).toLocaleString()} · {payment.receivedByName}
+                          </p>
+                        </div>
+                        <p className="flex-none text-xs font-bold text-green">{money(payment.amountCents)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {(doc.paymentMethodName || doc.paymentReference) && (
                 <>
                   <div className="my-3 border-t border-dashed border-navy/15" />
