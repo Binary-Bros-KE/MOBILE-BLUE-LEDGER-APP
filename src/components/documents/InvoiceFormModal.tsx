@@ -355,6 +355,7 @@ export function InvoiceFormModal({
             onSuppliersChange={setSuppliers}
             currency={currency}
             tenantTaxConfig={tenantTaxConfig}
+            locationId={branchId}
           />
 
           <label className="mt-3 block">

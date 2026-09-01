@@ -81,6 +81,18 @@ export function CheckoutTab({
   const [storefrontId, setStorefrontId] = useState("");
   const effectiveLocationId = branchId ?? (storefrontId || null);
 
+  // Checkout only ever sells from the cashier's own branch (mobile-checkout-service.ts rejects any
+  // other locationId server-side — see this component's own doc comment), so the stock shown here
+  // must be that ONE location's own quantity, never product.totalQuantity (Main Store + every
+  // storefront combined) — a real field bug: a cashier at Branch A was seeing Branch A's stock
+  // inflated by however much sat at Branch B and Main Store, with no way to tell the difference.
+  // Falls back to 0 (not totalQuantity) when effectiveLocationId is still unresolved (a branch-less
+  // employee who hasn't picked a storefront yet) or the product has no row at all for this location.
+  function stockAtEffectiveLocation(product: ProductListItem): number {
+    if (!effectiveLocationId) return 0;
+    return product.storefrontBreakdown.find((row) => row.locationId === effectiveLocationId)?.quantity ?? 0;
+  }
+
   // Minted ONCE per checkout attempt, resent unchanged on any retry — this is the whole idempotency
   // mechanism (see mobile-checkout-service.ts). Only regenerated after a sale actually completes or
   // the cart is cleared, never on every render.
@@ -458,7 +470,7 @@ export function CheckoutTab({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-navy">{product.name}</p>
                   <p className="text-[11px] text-navy/50">
-                    {product.sku} · {product.totalQuantity} in stock
+                    {product.sku} · {stockAtEffectiveLocation(product)} in stock
                   </p>
                 </div>
                 <p className="flex-none text-sm font-bold text-navy">{formatCents(product.sellingPriceCents, currency)}</p>

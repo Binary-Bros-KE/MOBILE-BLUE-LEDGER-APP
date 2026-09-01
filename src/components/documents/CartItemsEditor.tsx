@@ -23,6 +23,7 @@ export function CartItemsEditor({
   onSuppliersChange,
   currency,
   tenantTaxConfig,
+  locationId,
 }: {
   products: ProductListItem[] | null;
   cart: CheckoutCartLine[];
@@ -31,9 +32,19 @@ export function CartItemsEditor({
   onSuppliersChange: (suppliers: MobileSupplier[]) => void;
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
+  /** The storefront this document is actually for (InvoiceFormModal/QuotationFormModal's own
+   * branchId) — the stock shown per product must be THIS location's own quantity, never
+   * product.totalQuantity (Main Store + every storefront combined). Same bug, same fix as
+   * CheckoutTab's own stockAtEffectiveLocation — this component just never had the prop to do it. */
+  locationId: string | null;
 }) {
   const [search, setSearch] = useState("");
   const [quickCreateSupplierFor, setQuickCreateSupplierFor] = useState<string | null>(null);
+
+  function stockAtLocation(product: ProductListItem): number {
+    if (!locationId) return 0;
+    return product.storefrontBreakdown.find((row) => row.locationId === locationId)?.quantity ?? 0;
+  }
 
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -117,7 +128,7 @@ export function CartItemsEditor({
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-navy">{product.name}</p>
                 <p className="text-[11px] text-navy/50">
-                  {product.sku} · {product.totalQuantity} in stock
+                  {product.sku} · {stockAtLocation(product)} in stock
                 </p>
               </div>
               <p className="flex-none text-sm font-bold text-navy">{formatCents(product.sellingPriceCents, currency)}</p>
