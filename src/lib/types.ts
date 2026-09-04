@@ -187,6 +187,17 @@ export type SharedLineItem = {
   discountAmountCents: number;
   taxAmountCents: number;
   lineTotalCents: number;
+  /** Client request: groups this line under a named section (e.g. "Lighting") on the document —
+   * null for every service-charge/delivery-fee line and for any product line that never opted
+   * into a section. Mirrors SERVER's SharedLineItem["sectionLabel"]. */
+  sectionLabel: string | null;
+};
+
+/** One titled free-text block below an invoice/quotation's items (e.g. "Installation
+ * Instructions") — mirrors SERVER's SharedNotesSection. */
+export type SharedNotesSection = {
+  title: string;
+  body: string;
 };
 
 export type SharedPayment = {
@@ -258,6 +269,9 @@ export type SharedDocument = Partial<SaleStatusFlags> & {
   payments: SharedPayment[];
   transactionType: string | null;
   notes: string | null;
+  /** Client request: any number of additional titled note blocks below notes — see
+   * SharedNotesSection's own doc comment. Defaults to []. */
+  notesSections: SharedNotesSection[];
   dueDate: string | null;
   balanceDueCents: number | null;
   paymentStatus: string | null;

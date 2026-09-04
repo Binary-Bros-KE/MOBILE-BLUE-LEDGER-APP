@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Copy, Download, Loader2, Package, Share2, Trash2, Undo2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
+import { groupItemsBySections } from "@/lib/document-sections";
 import { formatCents } from "@/lib/money";
 import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/share-preferences";
 import { taxBreakdownLabel } from "@/lib/tax";
@@ -418,9 +419,35 @@ export function DocumentDetailModal({
               </div>
 
               <div className="my-3 border-t border-dashed border-navy/15" />
-              <div className="space-y-2">
-                {[...doc.items, ...doc.extraLines].map((item, index) => (
-                  <div key={index} className="flex items-start justify-between gap-2 text-xs">
+              <div className="space-y-3">
+                {groupItemsBySections(doc.items).map((group) => (
+                  <div key={group.label ?? "__ungrouped"}>
+                    {group.label && (
+                      <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-navy/50">{group.label}</p>
+                    )}
+                    <div className="space-y-2">
+                      {group.items.map((item, index) => (
+                        <div key={index} className="flex items-start justify-between gap-2 text-xs">
+                          <div className="min-w-0">
+                            <p className="truncate font-bold text-navy">{item.name}</p>
+                            <p className="text-navy/40">
+                              {item.quantity} x {money(item.unitPriceCents)}
+                            </p>
+                          </div>
+                          <p className="flex-none font-bold text-navy">{money(item.lineTotalCents)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {group.label && (
+                      <div className="mt-1 flex justify-between text-xs font-bold text-navy">
+                        <span>{group.label} Subtotal</span>
+                        <span>{money(group.subtotalCents)}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {doc.extraLines.map((item, index) => (
+                  <div key={`extra-${index}`} className="flex items-start justify-between gap-2 text-xs">
                     <div className="min-w-0">
                       <p className="truncate font-bold text-navy">{item.name}</p>
                       <p className="text-navy/40">
@@ -494,6 +521,22 @@ export function DocumentDetailModal({
                   </div>
                 </>
               )}
+
+              {doc.notes && (
+                <>
+                  <div className="my-3 border-t border-dashed border-navy/15" />
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-navy/50">Notes</p>
+                  <p className="whitespace-pre-line text-xs text-navy">{doc.notes}</p>
+                </>
+              )}
+
+              {doc.notesSections.map((section, index) => (
+                <div key={index}>
+                  <div className="my-3 border-t border-dashed border-navy/15" />
+                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-navy/50">{section.title}</p>
+                  <p className="whitespace-pre-line text-xs text-navy">{section.body}</p>
+                </div>
+              ))}
 
               {doc.receiptFooter && (
                 <>
