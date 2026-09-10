@@ -93,7 +93,7 @@ export function QuotationFormModal({
       .getQuotationEditData(editId)
       .then((data) => {
         setCustomerId(data.customerId);
-        setValidUntil(data.validUntil);
+        setValidUntil(data.validUntil ?? "");
         setNotes(data.notes ?? "");
         setCart(buildCartFromEditableItems(data.items, products));
         setDelivery(data.delivery ? deliveryDraftFromEditable(data.delivery) : null);
@@ -120,17 +120,14 @@ export function QuotationFormModal({
       setSubmitError("Add at least one item first.");
       return;
     }
-    if (!validUntil) {
-      setSubmitError("Choose a valid-until date.");
-      return;
-    }
 
     setSubmitting(true);
     setSubmitError(null);
     try {
       const body = {
         customerId: customerId ?? undefined,
-        validUntil,
+        // Blank = no expiry; the quotation never goes "expired" on its own (client request).
+        validUntil: validUntil.trim() ? validUntil : null,
         notes: notes.trim() || undefined,
         includeTaxBreakdown,
         includeBusinessInfo,
@@ -208,12 +205,26 @@ export function QuotationFormModal({
 
           <label className="mb-2 block">
             <span className="text-[11px] font-semibold text-navy/50">Valid Until</span>
-            <input
-              type="date"
-              value={validUntil}
-              onChange={(e) => setValidUntil(e.target.value)}
-              className="mt-1 h-9 w-full max-w-[160px] rounded-lg border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
-            />
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="date"
+                value={validUntil}
+                onChange={(e) => setValidUntil(e.target.value)}
+                className="h-9 w-full max-w-[160px] rounded-lg border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+              />
+              {validUntil && (
+                <button
+                  type="button"
+                  onClick={() => setValidUntil("")}
+                  className="text-[11px] font-bold uppercase tracking-wide text-blue"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <span className="mt-1 block text-[11px] text-navy/40">
+              {validUntil ? "Shows as expired after this date." : "Leave blank and this quotation never expires."}
+            </span>
           </label>
 
           {delivery ? (

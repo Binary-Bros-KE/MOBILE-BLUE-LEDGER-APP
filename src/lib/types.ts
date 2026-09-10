@@ -369,7 +369,8 @@ export type QuotationListItem = {
   locationName: string;
   locationId: string;
   grandTotalCents: number;
-  validUntil: string;
+  /** Null means the quotation never expires — see computeQuotationStatus. */
+  validUntil: string | null;
   status: string;
   createdAt: string;
   currency: string;
@@ -613,7 +614,8 @@ export type MarkPaidRequest = { paymentMethodId: string; reference?: string; not
 
 export type CreateQuotationRequest = {
   customerId?: string;
-  validUntil: string;
+  /** Omit or null for a quotation that never expires (client set no expiry date). */
+  validUntil?: string | null;
   notes?: string;
   includeTaxBreakdown?: boolean;
   includeBusinessInfo?: boolean;
@@ -682,7 +684,8 @@ export type MobileInvoiceEditData = {
 
 export type MobileQuotationEditData = {
   customerId: string | null;
-  validUntil: string;
+  /** Null means the quotation never expires (client set no expiry date). */
+  validUntil: string | null;
   notes: string | null;
   includeTaxBreakdown: boolean;
   includeBusinessInfo: boolean;

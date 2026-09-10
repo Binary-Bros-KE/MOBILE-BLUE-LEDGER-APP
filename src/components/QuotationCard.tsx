@@ -34,7 +34,11 @@ export function QuotationCard({ quotation, onSelect }: { quotation: QuotationLis
             <p className="whitespace-nowrap font-bold text-navy">{quotation.quotationNumber}</p>
             <p className="flex-none whitespace-nowrap font-display text-sm text-navy">{formatCents(quotation.grandTotalCents, quotation.currency)}</p>
           </div>
-          <p className="text-xs text-navy/50">Valid until {new Date(quotation.validUntil).toLocaleDateString()}</p>
+          <p className="text-xs text-navy/50">
+            {quotation.validUntil
+              ? `Valid until ${new Date(quotation.validUntil).toLocaleDateString()}`
+              : "No expiry"}
+          </p>
           <p className="text-xs text-navy/50">{quotation.employeeName}</p>
           <p className="mt-0.5 flex items-center gap-1 text-xs font-bold text-blue">
             <Store className="size-3.5 flex-none" aria-hidden="true" />
