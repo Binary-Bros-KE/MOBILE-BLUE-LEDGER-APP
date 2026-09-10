@@ -6,7 +6,9 @@
  * tracks (mobile always shares through the OS's native share sheet, not a WhatsApp deep link). */
 const STORAGE_KEY = "blueledger.share.preferences";
 
-const DEFAULT_INCLUDE_WHATSAPP_PREVIEW = false;
+// Defaults ON — most shares go out over WhatsApp and the link preview is what makes them look
+// legit; a user who doesn't want it unchecks it once and that choice is remembered.
+const DEFAULT_INCLUDE_WHATSAPP_PREVIEW = true;
 
 export function getIncludeWhatsappPreview(): boolean {
   try {
