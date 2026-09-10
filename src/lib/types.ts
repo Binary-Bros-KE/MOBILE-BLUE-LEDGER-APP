@@ -377,7 +377,7 @@ export type QuotationListItem = {
 };
 
 export type TransactionDirection = "in" | "out";
-export type TransactionSourceType = "sale" | "purchase" | "expense" | "salary";
+export type TransactionSourceType = "sale" | "sale_return" | "purchase" | "expense" | "salary";
 export type TransactionPartyLabel = "Customer" | "Supplier" | "Employee" | "For";
 
 export type TransactionRow = {
