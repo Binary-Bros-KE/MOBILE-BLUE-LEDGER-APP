@@ -18,11 +18,15 @@ export function TransactionsTab() {
   const [transactions, setTransactions] = useState<TransactionRowType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
+  // Non-Super-Admins get an actor-scoped ledger from the server (only their own money movements —
+  // see mobile-transactions-service.ts); this drives the "you're seeing a filtered view" note.
+  const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
     api.listLocations().then(setLocations).catch(() => {
       // Filter chips just fall back to "All only" — not worth failing the whole tab over.
     });
+    api.getMe().then((me) => setIsSuperAdmin(me.isSuperAdmin)).catch(() => setIsSuperAdmin(null));
   }, []);
 
   useEffect(() => {
@@ -51,6 +55,11 @@ export function TransactionsTab() {
       )}
 
       <div className="px-4 py-4">
+        {isSuperAdmin === false && (
+          <p className="mb-3 rounded border border-navy/15 bg-navy/[0.03] px-4 py-2.5 text-xs font-semibold text-navy/60">
+            You&apos;re seeing only transactions you handled. A Super Admin sees the full business ledger.
+          </p>
+        )}
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
         {!transactions && !error && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
         {transactions && transactions.length === 0 && <p className="py-10 text-center text-sm text-navy/50">No transactions yet.</p>}
