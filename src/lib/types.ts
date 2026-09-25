@@ -101,6 +101,9 @@ export type MobileSessionInfo = {
    * enforces authoritatively at submit time. */
   vatRatePercent: number;
   pricesTaxInclusive: boolean;
+  /** Business Profile "Editing existing invoices: Disabled" — hides the Edit Invoice button; SERVER
+   * rejects the edit call regardless. */
+  invoiceEditsDisabled: boolean;
   /** Server-authoritative — see SERVER's Role.isSuperAdmin doc comment. Gates the Working Hours tab
    * (view AND edit are Super-Admin-exclusive, not a delegable module/action permission). */
   isSuperAdmin: boolean;

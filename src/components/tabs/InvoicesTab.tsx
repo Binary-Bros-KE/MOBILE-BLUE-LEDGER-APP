@@ -24,6 +24,7 @@ export function InvoicesTab({
   tenantTaxConfig,
   canApprove,
   canManageDelivery = false,
+  invoiceEditsDisabled = false,
   defaultIncludeBusinessInfo,
 }: {
   branchId: string | null;
@@ -35,6 +36,8 @@ export function InvoicesTab({
   canApprove: boolean;
   /** sales:edit — gates the "Mark as Delivered" button, passed straight through. */
   canManageDelivery?: boolean;
+  /** Tenant setting — when true the Edit Invoice button is not offered. */
+  invoiceEditsDisabled?: boolean;
   /** See InvoiceFormModal's identical prop for the same reasoning. */
   defaultIncludeBusinessInfo?: boolean | null;
 }) {
@@ -186,11 +189,15 @@ export function InvoicesTab({
           onChanged={refreshInvoices}
           canApprove={canApprove}
           canManageDelivery={canManageDelivery}
-          onEdit={() => {
-            const id = selectedInvoiceId;
-            setSelectedInvoiceId(null);
-            setFormTarget(id);
-          }}
+          onEdit={
+            invoiceEditsDisabled
+              ? undefined
+              : () => {
+                  const id = selectedInvoiceId;
+                  setSelectedInvoiceId(null);
+                  setFormTarget(id);
+                }
+          }
         />
       )}
 

@@ -137,6 +137,7 @@ export function AppShell() {
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
               canApprove={session?.permissions?.["approvals"]?.includes("approve") ?? false}
               canManageDelivery={session?.permissions?.["sales"]?.includes("edit") ?? false}
+              invoiceEditsDisabled={session?.invoiceEditsDisabled ?? false}
               defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}
