@@ -58,7 +58,7 @@ export function QuickCreateCustomerModal({ onClose, onCreated }: { onClose: () =
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Jane Wanjiru"
+              placeholder="Customer's full name"
               required
               className="mt-1 w-full rounded-lg border border-navy/15 px-3 py-2 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
             />

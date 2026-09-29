@@ -58,7 +58,7 @@ export function QuickCreateRiderModal({ onClose, onCreated }: { onClose: () => v
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. James Otieno"
+              placeholder="Rider's full name"
               required
               className="mt-1 w-full rounded-lg border border-navy/15 px-3 py-2 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
             />
