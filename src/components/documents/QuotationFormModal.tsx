@@ -133,6 +133,8 @@ export function QuotationFormModal({
         includeBusinessInfo,
         items: cart.map((line) => ({
           productId: line.productId,
+          variantKey: line.variantKey,
+          sectionLabel: line.sectionLabel,
           quantity: line.quantity,
           discountAmountCents: line.discountAmountCents,
           unitPriceCents: line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : undefined,

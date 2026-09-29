@@ -503,6 +503,21 @@ export type ProductListItem = {
   totalQuantity: number;
   lowStock: boolean;
   outOfStock: boolean;
+  /** Variants (see lib/variants.ts) — null/absent when the product has none. */
+  variants?: MobileProductVariants | null;
+};
+
+export type MobileProductVariants = {
+  mode: "shared" | "separate";
+  /** separate stock: the group every sibling shares */
+  groupId: string | null;
+  title: string | null;
+  options: { name: string; values: string[] }[];
+  /** shared stock: the sellable variants (priceCents null = the product's own price) */
+  shared: { key: string; values: Record<string, string>; label: string; priceCents: number | null }[];
+  /** separate stock: this product's own option values + label */
+  values: Record<string, string>;
+  label: string | null;
 };
 
 export type PaymentMethodOption = { id: string; name: string; requiresReference: boolean };
@@ -511,7 +526,14 @@ export type PaymentMethodOption = { id: string; name: string; requiresReference:
  * only fields that actually reach SERVER (see CheckoutRequest below); unitPriceCents/lineTotalCents
  * here exist purely to show the cashier a running total before they submit. */
 export type CheckoutCartLine = {
+  /** Line identity — the product id, or product id + variant key (lib/variants.ts cartLineId), so
+   * the same product in two colours is two lines. Every per-line handler matches on this. */
+  lineId: string;
   productId: string;
+  /** shared-stock variant on this line — sent with the document; SERVER prices it */
+  variantKey: string | null;
+  /** a DESKTOP invoice/quotation section, carried through untouched when editing on the phone */
+  sectionLabel: string | null;
   name: string;
   sku: string;
   unitPriceCents: number;
@@ -654,6 +676,9 @@ export type ConvertToInvoiceRequest = { dueDate: string; quantityOverrides?: Qua
  * GET /mobile/quotations/:id/edit, same shape items[] already sends on create/update. */
 export type MobileEditableItem = {
   productId: string;
+  variantKey?: string | null;
+  variantLabel?: string | null;
+  sectionLabel?: string | null;
   quantity: number;
   unitPriceCents: number;
   discountAmountCents: number;

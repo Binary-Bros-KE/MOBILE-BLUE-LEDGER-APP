@@ -1,6 +1,7 @@
 import { totalCentsToUnitCostText } from "./money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "./tax";
 import type { CheckoutCartLine, MobileEditableItem, ProductListItem, ServiceChargeDraft, ServiceChargeInput } from "./types";
+import { cartLineId } from "./variants";
 
 export type CartLineTaxResult = { grossCents: number; netCents: number; taxCents: number };
 
@@ -86,12 +87,19 @@ export function buildCartFromEditableItems(items: MobileEditableItem[], products
     const wholesalePriceCents = product?.wholesalePriceCents ?? null;
     const wholesaleMinQuantity = product?.wholesaleMinQuantity ?? 0;
     const useWholesale = wholesalePriceCents !== null && wholesaleMinQuantity > 0 && item.quantity >= wholesaleMinQuantity;
-    const naturalPriceCents = (useWholesale ? wholesalePriceCents : product?.sellingPriceCents) ?? item.unitPriceCents;
+    // A shared-stock variant's own price is its natural price (same as SERVER's prepareMobileCart).
+    const variant = item.variantKey && product?.variants?.mode === "shared" ? product.variants.shared.find((v) => v.key === item.variantKey) : undefined;
+    const basePriceCents = variant?.priceCents ?? product?.sellingPriceCents;
+    const naturalPriceCents = (useWholesale ? wholesalePriceCents : basePriceCents) ?? item.unitPriceCents;
+    const label = variant?.label ?? item.variantLabel ?? null;
     return {
+      lineId: cartLineId(item.productId, item.variantKey),
       productId: item.productId,
-      name: product?.name ?? "Unknown product",
+      variantKey: item.variantKey ?? null,
+      sectionLabel: item.sectionLabel ?? null,
+      name: label ? `${product?.name ?? "Unknown product"} — ${label}` : (product?.name ?? "Unknown product"),
       sku: product?.sku ?? "",
-      unitPriceCents: product?.sellingPriceCents ?? item.unitPriceCents,
+      unitPriceCents: basePriceCents ?? item.unitPriceCents,
       quantity: item.quantity,
       discountAmountCents: item.discountAmountCents,
       taxType: product?.taxType ?? "vat",

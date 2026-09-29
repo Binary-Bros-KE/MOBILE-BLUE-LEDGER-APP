@@ -6,6 +6,8 @@ import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeCartLineTaxResults, naturalUnitPriceCents } from "@/lib/cart-totals";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileSupplier, ProductListItem } from "@/lib/types";
+import { addPickToCart, needsVariantPicker, plainPick, type VariantPick } from "@/lib/variants";
+import { VariantPickerSheet } from "../VariantPickerSheet";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 
 /** The product-search-and-add + cart-line-list UI shared by the Invoice and Quotation create/edit
@@ -55,53 +57,41 @@ export function CartItemsEditor({
 
   const lineTaxResults = computeCartLineTaxResults(cart, tenantTaxConfig);
 
+  const [variantPickerFor, setVariantPickerFor] = useState<ProductListItem | null>(null);
+
+  /** A product with variants asks which one first (VariantPickerSheet). */
   function addToCart(product: ProductListItem): void {
-    const existing = cart.find((line) => line.productId === product.id);
-    if (existing) {
-      onCartChange(cart.map((line) => (line.productId === product.id ? { ...line, quantity: line.quantity + 1 } : line)));
-    } else {
-      onCartChange([
-        ...cart,
-        {
-          productId: product.id,
-          name: product.name,
-          sku: product.sku,
-          unitPriceCents: product.sellingPriceCents,
-          quantity: 1,
-          discountAmountCents: 0,
-          taxType: product.taxType,
-          pricesTaxInclusive: product.pricesTaxInclusive,
-          minimumPriceCents: product.minimumPriceCents,
-          wholesalePriceCents: product.wholesalePriceCents,
-          wholesaleMinQuantity: product.wholesaleMinQuantity,
-          priceOverride: "",
-          isLocallySourced: false,
-          localCost: "",
-          localSupplierId: null,
-        },
-      ]);
-    }
     setSearch("");
+    if (needsVariantPicker(product, products ?? [])) {
+      setVariantPickerFor(product);
+      return;
+    }
+    onCartChange(addPickToCart(cart, plainPick(product)));
   }
 
-  function updateLine(productId: string, patch: Partial<CheckoutCartLine>): void {
-    onCartChange(cart.map((line) => (line.productId === productId ? { ...line, ...patch } : line)));
+  function addPick(pick: VariantPick): void {
+    setVariantPickerFor(null);
+    onCartChange(addPickToCart(cart, pick));
   }
 
-  function updateQuantity(productId: string, quantity: number): void {
+  function updateLine(lineId: string, patch: Partial<CheckoutCartLine>): void {
+    onCartChange(cart.map((line) => (line.lineId === lineId ? { ...line, ...patch } : line)));
+  }
+
+  function updateQuantity(lineId: string, quantity: number): void {
     if (quantity < 1) return;
-    updateLine(productId, { quantity });
+    updateLine(lineId, { quantity });
   }
 
   function toggleLocallySourced(line: CheckoutCartLine): void {
-    updateLine(line.productId, {
+    updateLine(line.lineId, {
       isLocallySourced: !line.isLocallySourced,
       ...(line.isLocallySourced ? { localCost: "", localSupplierId: null } : {}),
     });
   }
 
-  function removeLine(productId: string): void {
-    onCartChange(cart.filter((line) => line.productId !== productId));
+  function removeLine(lineId: string): void {
+    onCartChange(cart.filter((line) => line.lineId !== lineId));
   }
 
   return (
@@ -150,7 +140,7 @@ export function CartItemsEditor({
               const naturalPriceCents = naturalUnitPriceCents(line);
               const wholesaleActive = naturalPriceCents !== line.unitPriceCents;
               return (
-                <div key={line.productId} className="rounded-lg border border-navy/10 bg-white p-3">
+                <div key={line.lineId} className="rounded-lg border border-navy/10 bg-white p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-navy">{line.name}</p>
@@ -159,7 +149,7 @@ export function CartItemsEditor({
                         {wholesaleActive && <span className="ml-1 font-bold text-blue">Wholesale</span>}
                       </p>
                     </div>
-                    <button type="button" onClick={() => removeLine(line.productId)} aria-label={`Remove ${line.name}`} className="flex-none text-navy/30 hover:text-red">
+                    <button type="button" onClick={() => removeLine(line.lineId)} aria-label={`Remove ${line.name}`} className="flex-none text-navy/30 hover:text-red">
                       <Trash2 className="size-4" aria-hidden="true" />
                     </button>
                   </div>
@@ -168,7 +158,7 @@ export function CartItemsEditor({
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => updateQuantity(line.productId, line.quantity - 1)}
+                        onClick={() => updateQuantity(line.lineId, line.quantity - 1)}
                         disabled={line.quantity <= 1}
                         className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60 disabled:opacity-30"
                       >
@@ -177,7 +167,7 @@ export function CartItemsEditor({
                       <span className="w-8 text-center text-sm font-bold text-navy">{line.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => updateQuantity(line.productId, line.quantity + 1)}
+                        onClick={() => updateQuantity(line.lineId, line.quantity + 1)}
                         className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60"
                       >
                         <Plus className="size-3" aria-hidden="true" />
@@ -190,7 +180,7 @@ export function CartItemsEditor({
                         min={0}
                         step="0.01"
                         value={line.priceOverride}
-                        onChange={(e) => updateLine(line.productId, { priceOverride: e.target.value })}
+                        onChange={(e) => updateLine(line.lineId, { priceOverride: e.target.value })}
                         placeholder={(naturalPriceCents / 100).toFixed(2)}
                         className={`w-full min-w-0 rounded-md border px-1.5 py-1 text-right text-xs font-semibold focus:outline-none ${
                           priceBelowMinimum ? "border-red text-red" : "border-navy/15 text-navy focus:border-blue"
@@ -213,7 +203,7 @@ export function CartItemsEditor({
                         step="0.01"
                         value={line.discountAmountCents ? (line.discountAmountCents / 100).toString() : ""}
                         onChange={(e) =>
-                          updateLine(line.productId, { discountAmountCents: e.target.value.trim() ? Math.round(Number(e.target.value) * 100) : 0 })
+                          updateLine(line.lineId, { discountAmountCents: e.target.value.trim() ? Math.round(Number(e.target.value) * 100) : 0 })
                         }
                         placeholder="0.00"
                         className="w-16 rounded-md border border-navy/15 px-1.5 py-1 text-right text-xs font-semibold text-navy focus:border-blue focus:outline-none"
@@ -237,7 +227,7 @@ export function CartItemsEditor({
                           min={0}
                           step="0.01"
                           value={line.localCost}
-                          onChange={(e) => updateLine(line.productId, { localCost: e.target.value })}
+                          onChange={(e) => updateLine(line.lineId, { localCost: e.target.value })}
                           placeholder="0.00"
                           className="mt-1 w-full rounded-md border border-navy/15 px-2.5 py-1.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
                         />
@@ -252,7 +242,7 @@ export function CartItemsEditor({
                         <div className="mt-1 flex gap-1.5">
                           <select
                             value={line.localSupplierId ?? ""}
-                            onChange={(e) => updateLine(line.productId, { localSupplierId: e.target.value || null })}
+                            onChange={(e) => updateLine(line.lineId, { localSupplierId: e.target.value || null })}
                             className="h-9 w-full rounded-md border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
                           >
                             <option value="">Select a supplier…</option>
@@ -264,7 +254,7 @@ export function CartItemsEditor({
                           </select>
                           <button
                             type="button"
-                            onClick={() => setQuickCreateSupplierFor(line.productId)}
+                            onClick={() => setQuickCreateSupplierFor(line.lineId)}
                             className="grid h-9 w-9 flex-none place-items-center rounded-md border border-navy/15 text-navy/60"
                           >
                             <Plus className="size-3.5" aria-hidden="true" />
@@ -279,6 +269,17 @@ export function CartItemsEditor({
           </div>
         )}
       </div>
+
+      {variantPickerFor && (
+        <VariantPickerSheet
+          product={variantPickerFor}
+          products={products ?? []}
+          currency={currency}
+          stockOf={stockAtLocation}
+          onPick={addPick}
+          onClose={() => setVariantPickerFor(null)}
+        />
+      )}
 
       {quickCreateSupplierFor && (
         <QuickCreateSupplierModal

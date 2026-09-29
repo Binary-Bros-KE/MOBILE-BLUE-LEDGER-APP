@@ -7,7 +7,9 @@ import { effectiveUnitPriceCents, naturalUnitPriceCents, serviceChargeDraftsToIn
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import { addPickToCart, needsVariantPicker, plainPick, type VariantPick } from "@/lib/variants";
 import { DocumentDetailModal } from "../DocumentDetailModal";
+import { VariantPickerSheet } from "../VariantPickerSheet";
 import { ServiceChargesModal } from "../ServiceChargesModal";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 import { CheckoutCustomerPickerModal } from "./CheckoutCustomerPickerModal";
@@ -57,6 +59,7 @@ export function CheckoutTab({
   const [quickCreateSupplierFor, setQuickCreateSupplierFor] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [variantPickerFor, setVariantPickerFor] = useState<ProductListItem | null>(null);
   const [cart, setCart] = useState<CheckoutCartLine[]>([]);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
@@ -167,54 +170,39 @@ export function CheckoutTab({
     setSubmitError(null);
   }, [cart, paymentMethodId, paymentReference, amountReceived, customerId, delivery, serviceCharges]);
 
+  /** A product with variants asks which one first (VariantPickerSheet). */
   function addToCart(product: ProductListItem): void {
-    setCart((prev) => {
-      const existing = prev.find((line) => line.productId === product.id);
-      if (existing) {
-        return prev.map((line) => (line.productId === product.id ? { ...line, quantity: line.quantity + 1 } : line));
-      }
-      return [
-        ...prev,
-        {
-          productId: product.id,
-          name: product.name,
-          sku: product.sku,
-          unitPriceCents: product.sellingPriceCents,
-          quantity: 1,
-          discountAmountCents: 0,
-          taxType: product.taxType,
-          pricesTaxInclusive: product.pricesTaxInclusive,
-          minimumPriceCents: product.minimumPriceCents,
-          wholesalePriceCents: product.wholesalePriceCents,
-          wholesaleMinQuantity: product.wholesaleMinQuantity,
-          priceOverride: "",
-          isLocallySourced: false,
-          localCost: "",
-          localSupplierId: null,
-        },
-      ];
-    });
     setSearch("");
+    if (needsVariantPicker(product, products ?? [])) {
+      setVariantPickerFor(product);
+      return;
+    }
+    setCart((prev) => addPickToCart(prev, plainPick(product)));
   }
 
-  function updateQuantity(productId: string, quantity: number): void {
+  function addPick(pick: VariantPick): void {
+    setVariantPickerFor(null);
+    setCart((prev) => addPickToCart(prev, pick));
+  }
+
+  function updateQuantity(lineId: string, quantity: number): void {
     if (quantity < 1) return;
-    setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, quantity } : line)));
+    setCart((prev) => prev.map((line) => (line.lineId === lineId ? { ...line, quantity } : line)));
   }
 
-  function updateDiscount(productId: string, discountText: string): void {
+  function updateDiscount(lineId: string, discountText: string): void {
     const discountAmountCents = discountText.trim() ? Math.round(Number(discountText) * 100) : 0;
-    setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, discountAmountCents } : line)));
+    setCart((prev) => prev.map((line) => (line.lineId === lineId ? { ...line, discountAmountCents } : line)));
   }
 
-  function updatePriceOverride(productId: string, value: string): void {
-    setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, priceOverride: value } : line)));
+  function updatePriceOverride(lineId: string, value: string): void {
+    setCart((prev) => prev.map((line) => (line.lineId === lineId ? { ...line, priceOverride: value } : line)));
   }
 
-  function toggleLocallySourced(productId: string): void {
+  function toggleLocallySourced(lineId: string): void {
     setCart((prev) =>
       prev.map((line) =>
-        line.productId === productId
+        line.lineId === lineId
           ? {
               ...line,
               isLocallySourced: !line.isLocallySourced,
@@ -227,16 +215,16 @@ export function CheckoutTab({
     );
   }
 
-  function updateLocalCost(productId: string, value: string): void {
-    setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, localCost: value } : line)));
+  function updateLocalCost(lineId: string, value: string): void {
+    setCart((prev) => prev.map((line) => (line.lineId === lineId ? { ...line, localCost: value } : line)));
   }
 
-  function updateLocalSupplier(productId: string, supplierId: string | null): void {
-    setCart((prev) => prev.map((line) => (line.productId === productId ? { ...line, localSupplierId: supplierId } : line)));
+  function updateLocalSupplier(lineId: string, supplierId: string | null): void {
+    setCart((prev) => prev.map((line) => (line.lineId === lineId ? { ...line, localSupplierId: supplierId } : line)));
   }
 
-  function removeLine(productId: string): void {
-    setCart((prev) => prev.filter((line) => line.productId !== productId));
+  function removeLine(lineId: string): void {
+    setCart((prev) => prev.filter((line) => line.lineId !== lineId));
   }
 
   function resetForNextSale(): void {
@@ -280,6 +268,7 @@ export function CheckoutTab({
         locationId: effectiveLocationId,
         items: cart.map((line) => ({
           productId: line.productId,
+          variantKey: line.variantKey,
           quantity: line.quantity,
           discountAmountCents: line.discountAmountCents,
           unitPriceCents: line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : undefined,
@@ -496,7 +485,7 @@ export function CheckoutTab({
               const naturalPriceCents = naturalUnitPriceCents(line);
               const wholesaleActive = naturalPriceCents !== line.unitPriceCents;
               return (
-                <div key={line.productId} className="rounded-lg border border-navy/10 bg-white p-3">
+                <div key={line.lineId} className="rounded-lg border border-navy/10 bg-white p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-navy">{line.name}</p>
@@ -505,7 +494,7 @@ export function CheckoutTab({
                         {wholesaleActive && <span className="ml-1 font-bold text-blue">Wholesale</span>}
                       </p>
                     </div>
-                    <button type="button" onClick={() => removeLine(line.productId)} aria-label={`Remove ${line.name}`} className="flex-none text-navy/30 hover:text-red">
+                    <button type="button" onClick={() => removeLine(line.lineId)} aria-label={`Remove ${line.name}`} className="flex-none text-navy/30 hover:text-red">
                       <Trash2 className="size-4" aria-hidden="true" />
                     </button>
                   </div>
@@ -514,7 +503,7 @@ export function CheckoutTab({
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => updateQuantity(line.productId, line.quantity - 1)}
+                        onClick={() => updateQuantity(line.lineId, line.quantity - 1)}
                         disabled={line.quantity <= 1}
                         className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60 disabled:opacity-30"
                       >
@@ -523,7 +512,7 @@ export function CheckoutTab({
                       <span className="w-8 text-center text-sm font-bold text-navy">{line.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => updateQuantity(line.productId, line.quantity + 1)}
+                        onClick={() => updateQuantity(line.lineId, line.quantity + 1)}
                         className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60"
                       >
                         <Plus className="size-3" aria-hidden="true" />
@@ -536,7 +525,7 @@ export function CheckoutTab({
                         min={0}
                         step="0.01"
                         value={line.priceOverride}
-                        onChange={(e) => updatePriceOverride(line.productId, e.target.value)}
+                        onChange={(e) => updatePriceOverride(line.lineId, e.target.value)}
                         placeholder={(naturalPriceCents / 100).toFixed(2)}
                         className={`w-full min-w-0 rounded-md border px-1.5 py-1 text-right text-xs font-semibold focus:outline-none ${
                           priceBelowMinimum ? "border-red text-red" : "border-navy/15 text-navy focus:border-blue"
@@ -558,7 +547,7 @@ export function CheckoutTab({
                         min={0}
                         step="0.01"
                         value={line.discountAmountCents ? (line.discountAmountCents / 100).toString() : ""}
-                        onChange={(e) => updateDiscount(line.productId, e.target.value)}
+                        onChange={(e) => updateDiscount(line.lineId, e.target.value)}
                         placeholder="0.00"
                         className="w-16 rounded-md border border-navy/15 px-1.5 py-1 text-right text-xs font-semibold text-navy focus:border-blue focus:outline-none"
                       />
@@ -570,7 +559,7 @@ export function CheckoutTab({
                     <input
                       type="checkbox"
                       checked={line.isLocallySourced}
-                      onChange={() => toggleLocallySourced(line.productId)}
+                      onChange={() => toggleLocallySourced(line.lineId)}
                       className="size-3.5 accent-blue"
                     />
                     <Store className="size-3 flex-none" aria-hidden="true" />
@@ -586,7 +575,7 @@ export function CheckoutTab({
                           min={0}
                           step="0.01"
                           value={line.localCost}
-                          onChange={(e) => updateLocalCost(line.productId, e.target.value)}
+                          onChange={(e) => updateLocalCost(line.lineId, e.target.value)}
                           placeholder="0.00"
                           className="mt-1 w-full rounded-md border border-navy/15 px-2.5 py-1.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
                         />
@@ -601,7 +590,7 @@ export function CheckoutTab({
                         <div className="mt-1 flex gap-1.5">
                           <select
                             value={line.localSupplierId ?? ""}
-                            onChange={(e) => updateLocalSupplier(line.productId, e.target.value || null)}
+                            onChange={(e) => updateLocalSupplier(line.lineId, e.target.value || null)}
                             className="h-9 w-full rounded-md border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
                           >
                             <option value="">Select a supplier…</option>
@@ -613,7 +602,7 @@ export function CheckoutTab({
                           </select>
                           <button
                             type="button"
-                            onClick={() => setQuickCreateSupplierFor(line.productId)}
+                            onClick={() => setQuickCreateSupplierFor(line.lineId)}
                             className="grid h-9 w-9 flex-none place-items-center rounded-md border border-navy/15 text-navy/60"
                           >
                             <Plus className="size-3.5" aria-hidden="true" />
@@ -779,6 +768,17 @@ export function CheckoutTab({
             setServiceChargesModalOpen(false);
           }}
           onClose={() => setServiceChargesModalOpen(false)}
+        />
+      )}
+
+      {variantPickerFor && (
+        <VariantPickerSheet
+          product={variantPickerFor}
+          products={products ?? []}
+          currency={currency}
+          stockOf={stockAtEffectiveLocation}
+          onPick={addPick}
+          onClose={() => setVariantPickerFor(null)}
         />
       )}
 
