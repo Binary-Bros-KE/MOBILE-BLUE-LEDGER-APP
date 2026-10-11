@@ -113,6 +113,7 @@ export function buildCartFromEditableItems(items: MobileEditableItem[], products
       // figure this field shows (see money.ts's own doc comment on the pair).
       localCost: totalCentsToUnitCostText(item.localCostCents, item.quantity),
       localSupplierId: item.localSupplierId,
+      stockSource: item.stockSource,
     };
   });
 }

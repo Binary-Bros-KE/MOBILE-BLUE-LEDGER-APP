@@ -26,6 +26,7 @@ export function CartItemsEditor({
   currency,
   tenantTaxConfig,
   locationId,
+  allowMainStoreStock = false,
 }: {
   products: ProductListItem[] | null;
   cart: CheckoutCartLine[];
@@ -39,6 +40,9 @@ export function CartItemsEditor({
    * product.totalQuantity (Main Store + every storefront combined). Same bug, same fix as
    * CheckoutTab's own stockAtEffectiveLocation — this component just never had the prop to do it. */
   locationId: string | null;
+  /** Invoices only — the admin's "Invoice stock from Main Store" toggle: each line then gets a Stock
+   * select (Storefront / Main Store). */
+  allowMainStoreStock?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [quickCreateSupplierFor, setQuickCreateSupplierFor] = useState<string | null>(null);
@@ -217,6 +221,20 @@ export function CartItemsEditor({
                     <Store className="size-3 flex-none" aria-hidden="true" />
                     Sourced from another shop
                   </label>
+
+                  {allowMainStoreStock && !line.isLocallySourced && (
+                    <label className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-navy/50">
+                      Stock from
+                      <select
+                        value={line.stockSource ?? "storefront"}
+                        onChange={(e) => updateLine(line.lineId, { stockSource: e.target.value as "storefront" | "main_store" })}
+                        className="h-7 rounded-md border border-navy/15 bg-white px-1.5 text-[11px] font-semibold text-navy focus:border-blue focus:outline-none"
+                      >
+                        <option value="storefront">Storefront</option>
+                        <option value="main_store">Main Store</option>
+                      </select>
+                    </label>
+                  )}
 
                   {line.isLocallySourced && (
                     <div className="mt-2 space-y-2 rounded-md bg-cream-dark/60 p-2.5">

@@ -563,6 +563,9 @@ export type CheckoutCartLine = {
   isLocallySourced: boolean;
   localCost: string;
   localSupplierId: string | null;
+  /** Invoices only: where THIS line's stock comes from (chosen per line when the admin's "Invoice
+   * stock from Main Store" toggle is on). Undefined = storefront. */
+  stockSource?: InvoiceStockSource;
 };
 
 /** Mirrors DESKTOP's own ExtraChargesSection DeliveryDraft — see SERVER's
@@ -632,13 +635,12 @@ export type CreateInvoiceRequest = {
   invoiceNotes?: string;
   includeTaxBreakdown?: boolean;
   includeBusinessInfo?: boolean;
-  items: CheckoutItemInput[];
+  /** stockSource per line: omitted = storefront on create, the line's current source on edit. */
+  items: Array<CheckoutItemInput & { stockSource?: InvoiceStockSource }>;
   initialPayment?: { paymentMethodId: string; amountCents: number; reference?: string } | null;
   delivery?: CheckoutDeliveryInput;
   serviceCharges?: ServiceChargeInput[];
   locationId: string;
-  /** Omitted = storefront on create, "keep current" on edit. */
-  stockSource?: InvoiceStockSource;
 };
 
 export type RecordPaymentRequest = { paymentMethodId: string; amountCents: number; reference?: string; notes?: string };
@@ -666,6 +668,9 @@ export type QuotationStockCheckItem = {
   requestedQuantity: number;
   availableQuantity: number;
   sufficient: boolean;
+  /** What the Main Store could supply this storefront (earmark + unallocated); null unless the
+   * admin's "Invoice stock from Main Store" toggle is on. */
+  mainStoreAvailableQuantity: number | null;
 };
 
 export type QuantityOverride = { productId: string; quantity: number };
@@ -677,7 +682,12 @@ export type ConvertToSaleRequest = {
   quantityOverrides?: QuantityOverride[];
 };
 
-export type ConvertToInvoiceRequest = { dueDate: string; quantityOverrides?: QuantityOverride[]; stockSource?: InvoiceStockSource };
+export type ConvertToInvoiceRequest = {
+  dueDate: string;
+  quantityOverrides?: QuantityOverride[];
+  /** Per-line stock source, keyed by productId; a line not listed takes the storefront. */
+  stockSources?: Array<{ productId: string; stockSource: InvoiceStockSource }>;
+};
 
 /** Raw, re-editable line item shape — deliberately NOT SharedLineItem (that's a display-only shape
  * with no productId/taxType/isLocallySourced). Returned by GET /mobile/invoices/:id/edit and
@@ -693,6 +703,8 @@ export type MobileEditableItem = {
   isLocallySourced: boolean;
   localCostCents: number | null;
   localSupplierId: string | null;
+  /** Invoices only — this line's current stock source. */
+  stockSource?: InvoiceStockSource;
 };
 
 export type MobileEditableDelivery = {
@@ -713,7 +725,6 @@ export type MobileInvoiceEditData = {
   invoiceNotes: string | null;
   includeTaxBreakdown: boolean;
   includeBusinessInfo: boolean;
-  stockSource: InvoiceStockSource;
   items: MobileEditableItem[];
   delivery: MobileEditableDelivery | null;
   serviceCharges: ServiceChargeInput[];

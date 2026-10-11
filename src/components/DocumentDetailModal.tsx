@@ -116,7 +116,18 @@ export function DocumentDetailModal({
   const [deliveryNoteOpen, setDeliveryNoteOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockCheck, setStockCheck] = useState<QuotationStockCheckItem[] | null>(null);
-  const [convertStockSource, setConvertStockSource] = useState<InvoiceStockSource>("storefront");
+  /** Convert to Invoice's per-line stock source, keyed by productId. */
+  const [convertLineSources, setConvertLineSources] = useState<Record<string, InvoiceStockSource>>({});
+
+  // Convert to Invoice with the Main Store toggle on needs the line list (with both availabilities)
+  // to offer a per-line source — fetch it as the sheet opens if Check Stock hasn't been run yet.
+  useEffect(() => {
+    if (!convertInvoiceOpen || !allowMainStoreStock || stockCheck) return;
+    void api
+      .checkQuotationStock(saleId)
+      .then(setStockCheck)
+      .catch(() => undefined);
+  }, [convertInvoiceOpen, allowMainStoreStock, stockCheck, saleId]);
 
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethodId, setPaymentMethodId] = useState("");
@@ -248,7 +259,9 @@ export function DocumentDetailModal({
     await runAction("convertInvoice", async () => {
       const result = await api.convertQuotationToInvoice(saleId, {
         dueDate: convertDueDate,
-        stockSource: allowMainStoreStock ? convertStockSource : undefined,
+        stockSources: allowMainStoreStock
+          ? Object.entries(convertLineSources).map(([productId, stockSource]) => ({ productId, stockSource }))
+          : undefined,
       });
       setConvertInvoiceOpen(false);
       setNotice("Converted to an invoice — find it in your Invoices list.");
@@ -1070,22 +1083,34 @@ export function DocumentDetailModal({
                 />
               </label>
               {allowMainStoreStock && (
-                <label className="block">
-              <span className="text-[11px] font-semibold text-navy/50">Stock From</span>
-              <select
-                value={convertStockSource}
-                onChange={(e) => setConvertStockSource(e.target.value as InvoiceStockSource)}
-                className="mt-1 h-9 w-full rounded-lg border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
-              >
-                <option value="storefront">Storefront</option>
-                <option value="main_store">Main Store</option>
-              </select>
-              {convertStockSource === "main_store" && (
-                <span className="mt-1 block text-[11px] font-semibold text-navy/50">
-                  Taken straight from the Main Store — this storefront's earmarked stock first, then unallocated. No transfer needed.
-                </span>
-              )}
-            </label>
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-semibold text-navy/50">Stock from (per line)</span>
+                  {!stockCheck && <p className="text-xs text-navy/50">Loading lines…</p>}
+                  {stockCheck?.map((item) => {
+                    const source = convertLineSources[item.productId] ?? "storefront";
+                    const available = source === "main_store" ? (item.mainStoreAvailableQuantity ?? 0) : item.availableQuantity;
+                    return (
+                      <div key={item.productId} className="flex items-center justify-between gap-2 rounded-lg bg-cream-dark/60 px-2.5 py-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-navy">{item.productName}</p>
+                          <p className={available >= item.requestedQuantity ? "text-green" : "font-bold text-red"}>
+                            {available} / {item.requestedQuantity} available
+                          </p>
+                        </div>
+                        <select
+                          value={source}
+                          onChange={(e) => setConvertLineSources((prev) => ({ ...prev, [item.productId]: e.target.value as InvoiceStockSource }))}
+                          aria-label={`Stock source for ${item.productName}`}
+                          className="h-8 flex-none rounded-md border border-navy/15 bg-white px-1.5 text-[11px] font-semibold text-navy focus:border-blue focus:outline-none"
+                        >
+                          <option value="storefront">Storefront ({item.availableQuantity})</option>
+                          <option value="main_store">Main Store ({item.mainStoreAvailableQuantity ?? 0})</option>
+                        </select>
+                      </div>
+                    );
+                  })}
+                  <p className="text-[11px] text-navy/50">Taken straight from the Main Store — this storefront's earmarked stock first, then unallocated. No transfer needed.</p>
+                </div>
               )}
               {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
               <button
