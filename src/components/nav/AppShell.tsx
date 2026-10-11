@@ -138,11 +138,13 @@ export function AppShell() {
               canApprove={session?.permissions?.["approvals"]?.includes("approve") ?? false}
               canManageDelivery={session?.permissions?.["sales"]?.includes("edit") ?? false}
               invoiceEditsDisabled={session?.invoiceEditsDisabled ?? false}
+              invoiceStockFromMainStore={session?.invoiceStockFromMainStore ?? false}
               defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}
           {activeTab === "quotations" && (
             <QuotationsTab
+              invoiceStockFromMainStore={session?.invoiceStockFromMainStore ?? false}
               branchId={session?.branchId ?? null}
               branchName={session?.branchName ?? null}
               currency={session?.currency ?? "KES"}

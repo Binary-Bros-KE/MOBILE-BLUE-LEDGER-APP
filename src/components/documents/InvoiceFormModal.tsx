@@ -7,7 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import { buildCartFromEditableItems, computeCartTotals, serviceChargeDraftsToInputs, serviceChargeInputsToDrafts, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import type { CheckoutCartLine, InvoiceStockSource, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
 import { CheckboxField } from "../CheckboxField";
 import { ServiceChargesModal } from "../ServiceChargesModal";
 import { CheckoutCustomerPickerModal } from "../tabs/CheckoutCustomerPickerModal";
@@ -46,6 +46,7 @@ export function InvoiceFormModal({
   tenantTaxConfig,
   editId,
   defaultIncludeBusinessInfo,
+  allowMainStoreStock = false,
   onClose,
   onCreated,
 }: {
@@ -58,6 +59,8 @@ export function InvoiceFormModal({
    * always reads the document's own already-saved includeBusinessInfo instead (see the edit-data
    * fetch below). Null/undefined (no storefront default, or none assigned yet) falls back to true. */
   defaultIncludeBusinessInfo?: boolean | null;
+  /** Admin "Invoice stock from Main Store" toggle — shows the Stock From picker. */
+  allowMainStoreStock?: boolean;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
@@ -81,6 +84,7 @@ export function InvoiceFormModal({
   const [serviceChargesModalOpen, setServiceChargesModalOpen] = useState(false);
   const [includeTaxBreakdown, setIncludeTaxBreakdown] = useState(true);
   const [includeBusinessInfo, setIncludeBusinessInfo] = useState(defaultIncludeBusinessInfo ?? true);
+  const [stockSource, setStockSource] = useState<InvoiceStockSource>("storefront");
 
   const [collectInitialPayment, setCollectInitialPayment] = useState(false);
   const [paymentMethodId, setPaymentMethodId] = useState("");
@@ -120,6 +124,7 @@ export function InvoiceFormModal({
         setServiceCharges(serviceChargeInputsToDrafts(data.serviceCharges));
         setIncludeTaxBreakdown(data.includeTaxBreakdown);
         setIncludeBusinessInfo(data.includeBusinessInfo);
+        setStockSource(data.stockSource ?? "storefront");
         setPrefilled(true);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this invoice for editing."));
@@ -170,6 +175,8 @@ export function InvoiceFormModal({
         invoiceNotes: invoiceNotes.trim() || undefined,
         includeTaxBreakdown,
         includeBusinessInfo,
+        // Only sent when the picker is shown — omitted keeps an edited invoice's current source.
+        stockSource: allowMainStoreStock ? stockSource : undefined,
         items: cart.map((line) => ({
           productId: line.productId,
           variantKey: line.variantKey,
@@ -270,6 +277,25 @@ export function InvoiceFormModal({
               />
             </label>
           </div>
+
+          {allowMainStoreStock && (
+            <label className="block mt-2.5">
+              <span className="text-[11px] font-semibold text-navy/50">Stock From</span>
+              <select
+                value={stockSource}
+                onChange={(e) => setStockSource(e.target.value as InvoiceStockSource)}
+                className="mt-1 h-9 w-full rounded-lg border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+              >
+                <option value="storefront">Storefront</option>
+                <option value="main_store">Main Store</option>
+              </select>
+              {stockSource === "main_store" && (
+                <span className="mt-1 block text-[11px] font-semibold text-navy/50">
+                  Taken straight from the Main Store — this storefront's earmarked stock first, then unallocated. No transfer needed.
+                </span>
+              )}
+            </label>
+          )}
 
           {delivery ? (
             <div

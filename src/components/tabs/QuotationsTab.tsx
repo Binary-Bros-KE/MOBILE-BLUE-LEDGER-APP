@@ -23,6 +23,7 @@ export function QuotationsTab({
   tenantTaxConfig,
   canManageDelivery = false,
   defaultIncludeBusinessInfo,
+  invoiceStockFromMainStore = false,
 }: {
   branchId: string | null;
   branchName: string | null;
@@ -32,6 +33,8 @@ export function QuotationsTab({
   canManageDelivery?: boolean;
   /** See InvoiceFormModal's identical prop for the same reasoning. */
   defaultIncludeBusinessInfo?: boolean | null;
+  /** Admin setting — Convert to Invoice then offers Stock From: Storefront / Main Store. */
+  invoiceStockFromMainStore?: boolean;
 }) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [quotations, setQuotations] = useState<QuotationListItem[] | null>(null);
@@ -149,6 +152,7 @@ export function QuotationsTab({
           onClose={() => setSelectedQuotationId(null)}
           onChanged={refreshQuotations}
           canManageDelivery={canManageDelivery}
+          allowMainStoreStock={invoiceStockFromMainStore}
           onEdit={() => {
             const id = selectedQuotationId;
             setSelectedQuotationId(null);

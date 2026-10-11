@@ -8,7 +8,7 @@ import { groupItemsBySections } from "@/lib/document-sections";
 import { formatCents } from "@/lib/money";
 import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/share-preferences";
 import { taxBreakdownLabel } from "@/lib/tax";
-import type { PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
+import type { InvoiceStockSource, PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
 import { CheckboxField } from "./CheckboxField";
 import { DeliveryNoteModal } from "./DeliveryNoteModal";
 import { RequestReturnModal } from "./RequestReturnModal";
@@ -67,6 +67,7 @@ export function DocumentDetailModal({
   onEdit,
   canApprove = false,
   canManageDelivery = false,
+  allowMainStoreStock = false,
 }: {
   saleId: string;
   kind?: "sale" | "quotation";
@@ -88,6 +89,8 @@ export function DocumentDetailModal({
   /** sales:edit — gates the "Mark as Delivered" button inside DeliveryNoteModal, mirroring DESKTOP's
    * own single permission gate for a delivery regardless of sale/quotation ownership. */
   canManageDelivery?: boolean;
+  /** Admin "Invoice stock from Main Store" toggle — Convert to Invoice then offers Stock From. */
+  allowMainStoreStock?: boolean;
 }) {
   const [doc, setDoc] = useState<SharedDocument | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -113,6 +116,7 @@ export function DocumentDetailModal({
   const [deliveryNoteOpen, setDeliveryNoteOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockCheck, setStockCheck] = useState<QuotationStockCheckItem[] | null>(null);
+  const [convertStockSource, setConvertStockSource] = useState<InvoiceStockSource>("storefront");
 
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethodId, setPaymentMethodId] = useState("");
@@ -242,7 +246,10 @@ export function DocumentDetailModal({
       return;
     }
     await runAction("convertInvoice", async () => {
-      const result = await api.convertQuotationToInvoice(saleId, { dueDate: convertDueDate });
+      const result = await api.convertQuotationToInvoice(saleId, {
+        dueDate: convertDueDate,
+        stockSource: allowMainStoreStock ? convertStockSource : undefined,
+      });
       setConvertInvoiceOpen(false);
       setNotice("Converted to an invoice — find it in your Invoices list.");
       void result;
@@ -1062,6 +1069,24 @@ export function DocumentDetailModal({
                   className="mt-1 h-10 w-full rounded-lg border border-navy/15 bg-white px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
                 />
               </label>
+              {allowMainStoreStock && (
+                <label className="block">
+              <span className="text-[11px] font-semibold text-navy/50">Stock From</span>
+              <select
+                value={convertStockSource}
+                onChange={(e) => setConvertStockSource(e.target.value as InvoiceStockSource)}
+                className="mt-1 h-9 w-full rounded-lg border border-navy/15 bg-white px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+              >
+                <option value="storefront">Storefront</option>
+                <option value="main_store">Main Store</option>
+              </select>
+              {convertStockSource === "main_store" && (
+                <span className="mt-1 block text-[11px] font-semibold text-navy/50">
+                  Taken straight from the Main Store — this storefront's earmarked stock first, then unallocated. No transfer needed.
+                </span>
+              )}
+            </label>
+              )}
               {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
               <button
                 type="button"

@@ -104,6 +104,9 @@ export type MobileSessionInfo = {
   /** Business Profile "Editing existing invoices: Disabled" — hides the Edit Invoice button; SERVER
    * rejects the edit call regardless. */
   invoiceEditsDisabled: boolean;
+  /** Admin "Invoice stock from Main Store" toggle — shows the Stock From picker on invoices and on
+   * Convert to Invoice; SERVER refuses a Main Store invoice regardless when it's off. */
+  invoiceStockFromMainStore: boolean;
   /** Server-authoritative — see SERVER's Role.isSuperAdmin doc comment. Gates the Working Hours tab
    * (view AND edit are Super-Admin-exclusive, not a delegable module/action permission). */
   isSuperAdmin: boolean;
@@ -619,6 +622,9 @@ export type CheckoutResult = { id: string; receiptNumber: string; grandTotalCent
 
 export type DocumentIdResult = { id: string };
 
+/** Where an invoice's stock is deducted from — "main_store" only when invoiceStockFromMainStore. */
+export type InvoiceStockSource = "storefront" | "main_store";
+
 export type CreateInvoiceRequest = {
   customerId: string;
   transactionType: "invoice" | "wholesale_sale";
@@ -631,6 +637,8 @@ export type CreateInvoiceRequest = {
   delivery?: CheckoutDeliveryInput;
   serviceCharges?: ServiceChargeInput[];
   locationId: string;
+  /** Omitted = storefront on create, "keep current" on edit. */
+  stockSource?: InvoiceStockSource;
 };
 
 export type RecordPaymentRequest = { paymentMethodId: string; amountCents: number; reference?: string; notes?: string };
@@ -669,7 +677,7 @@ export type ConvertToSaleRequest = {
   quantityOverrides?: QuantityOverride[];
 };
 
-export type ConvertToInvoiceRequest = { dueDate: string; quantityOverrides?: QuantityOverride[] };
+export type ConvertToInvoiceRequest = { dueDate: string; quantityOverrides?: QuantityOverride[]; stockSource?: InvoiceStockSource };
 
 /** Raw, re-editable line item shape — deliberately NOT SharedLineItem (that's a display-only shape
  * with no productId/taxType/isLocallySourced). Returned by GET /mobile/invoices/:id/edit and
@@ -705,6 +713,7 @@ export type MobileInvoiceEditData = {
   invoiceNotes: string | null;
   includeTaxBreakdown: boolean;
   includeBusinessInfo: boolean;
+  stockSource: InvoiceStockSource;
   items: MobileEditableItem[];
   delivery: MobileEditableDelivery | null;
   serviceCharges: ServiceChargeInput[];

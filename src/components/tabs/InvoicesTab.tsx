@@ -25,6 +25,7 @@ export function InvoicesTab({
   canApprove,
   canManageDelivery = false,
   invoiceEditsDisabled = false,
+  invoiceStockFromMainStore = false,
   defaultIncludeBusinessInfo,
 }: {
   branchId: string | null;
@@ -38,6 +39,8 @@ export function InvoicesTab({
   canManageDelivery?: boolean;
   /** Tenant setting — when true the Edit Invoice button is not offered. */
   invoiceEditsDisabled?: boolean;
+  /** Admin setting — when true the invoice form offers Stock From: Storefront / Main Store. */
+  invoiceStockFromMainStore?: boolean;
   /** See InvoiceFormModal's identical prop for the same reasoning. */
   defaultIncludeBusinessInfo?: boolean | null;
 }) {
@@ -209,6 +212,7 @@ export function InvoicesTab({
           tenantTaxConfig={tenantTaxConfig}
           editId={formTarget === "new" ? undefined : formTarget}
           defaultIncludeBusinessInfo={defaultIncludeBusinessInfo}
+          allowMainStoreStock={invoiceStockFromMainStore}
           onClose={() => setFormTarget(null)}
           onCreated={(id) => {
             setFormTarget(null);
