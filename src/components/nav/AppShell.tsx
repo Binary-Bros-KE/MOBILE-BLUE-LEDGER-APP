@@ -59,6 +59,9 @@ export function AppShell() {
   // Only Dashboard shows until real permissions arrive — no flash of tabs this employee doesn't
   // actually have access to while /mobile/me is still loading.
   const groups = visibleNavGroups(session?.permissions, session?.isSuperAdmin ?? false);
+  // Super Admin passes every check by definition — see visibleNavGroups.
+  const can = (module: string, action: string): boolean =>
+    (session?.isSuperAdmin ?? false) || (session?.permissions?.[module]?.includes(action) ?? false);
 
   // A tab restored from localStorage (see setActiveTab below) can outlive the permission that made
   // it visible — a role edited since the last visit, or a different employee's saved tab surviving
@@ -127,7 +130,7 @@ export function AppShell() {
           )}
           {activeTab === "employees" && <EmployeesTab currency={session?.currency ?? "KES"} />}
           {activeTab === "sales" && (
-            <SalesTab canManageDelivery={session?.permissions?.["sales"]?.includes("edit") ?? false} />
+            <SalesTab canManageDelivery={can("sales", "edit")} />
           )}
           {activeTab === "invoices" && (
             <InvoicesTab
@@ -135,8 +138,8 @@ export function AppShell() {
               branchName={session?.branchName ?? null}
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
-              canApprove={session?.permissions?.["approvals"]?.includes("approve") ?? false}
-              canManageDelivery={session?.permissions?.["sales"]?.includes("edit") ?? false}
+              canApprove={can("approvals", "approve")}
+              canManageDelivery={can("sales", "edit")}
               invoiceEditsDisabled={session?.invoiceEditsDisabled ?? false}
               invoiceStockFromMainStore={session?.invoiceStockFromMainStore ?? false}
               defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
@@ -149,7 +152,7 @@ export function AppShell() {
               branchName={session?.branchName ?? null}
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
-              canManageDelivery={session?.permissions?.["sales"]?.includes("edit") ?? false}
+              canManageDelivery={can("sales", "edit")}
               defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}

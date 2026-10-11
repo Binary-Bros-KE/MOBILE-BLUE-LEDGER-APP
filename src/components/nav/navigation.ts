@@ -109,6 +109,9 @@ export function visibleNavGroups(permissions: Record<string, string[]> | null | 
       ...group,
       items: group.items.filter((item) => {
         if (item.superAdminOnly) return isSuperAdmin;
+        // A Super Admin has every permission by definition — never limited by the role's stored JSON
+        // (same rule as SERVER's requireMobilePermission and DESKTOP's auth-service).
+        if (isSuperAdmin) return true;
         return !item.permission || (perms[item.permission.module]?.includes(item.permission.action) ?? false);
       }),
     }))
