@@ -35,6 +35,8 @@ import type {
   MobileRole,
   MobileSessionInfo,
   MobileSupplier,
+  MobileSupplierBalanceEntry,
+  MobileSupplierWithBalance,
   MobileTaxReport,
   OwnerDashboard,
   PaymentMethodOption,
@@ -250,6 +252,11 @@ export const api = {
   listRiders: () => request<MobileRider[]>("/mobile/riders"),
   createRider: (body: CreateRiderInput) => request<MobileRider>("/mobile/riders", { method: "POST", body: JSON.stringify(body) }),
   listSuppliers: () => request<MobileSupplier[]>("/mobile/suppliers"),
+  listSupplierBalances: () => request<MobileSupplierWithBalance[]>("/mobile/suppliers/balances"),
+  listSupplierBalanceEntries: (supplierId: string) => request<MobileSupplierBalanceEntry[]>(`/mobile/suppliers/${supplierId}/balance-entries`),
+  /** `id` minted client-side, resent unchanged on retry. amountCents signed (negative = reduce). */
+  adjustSupplierBalance: (supplierId: string, body: { id: string; amountCents: number; notes: string | null }) =>
+    request<{ id: string; balanceCents: number }>(`/mobile/suppliers/${supplierId}/balance-adjustments`, { method: "POST", body: JSON.stringify(body) }),
   createSupplier: (body: CreateSupplierInput) =>
     request<MobileSupplier>("/mobile/suppliers", { method: "POST", body: JSON.stringify(body) }),
   listQuotations: (locationId?: string) =>

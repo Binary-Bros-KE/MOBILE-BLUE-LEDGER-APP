@@ -739,6 +739,21 @@ export type CheckoutRequest = {
 
 export type MobileSupplier = { id: string; businessName: string; phone1: string };
 
+/** Suppliers tab list item. balanceCents is signed: positive = we owe them. */
+export type MobileSupplierWithBalance = MobileSupplier & { supplierCode: string; balanceCents: number };
+
+export type MobileSupplierBalanceEntry = {
+  id: string;
+  entryType: string;
+  /** Signed: positive grew what we owe, negative reduced it. */
+  amountCents: number;
+  notes: string | null;
+  /** The purchase number when the entry came from a purchase. */
+  reference: string | null;
+  performedByName: string | null;
+  createdAt: string;
+};
+
 export type CreateSupplierInput = { businessName: string; contactPerson?: string; phone1: string };
 
 export type CheckoutResult = { id: string; receiptNumber: string; grandTotalCents: number };

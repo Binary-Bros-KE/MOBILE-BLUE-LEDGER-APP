@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Package,
   ShoppingCart,
+  Store,
   Truck,
   UserRound,
   Users,
@@ -26,6 +27,7 @@ export type TabKey =
   | "transactions"
   | "products"
   | "purchases"
+  | "suppliers"
   | "expenses"
   | "stockLedger"
   | "employees"
@@ -87,6 +89,9 @@ export const navGroups: NavGroup[] = [
     items: [
       { key: "products", label: "Products", icon: Package, ready: true, permission: { module: "products", action: "view" } },
       { key: "purchases", label: "Purchases", icon: Truck, ready: true, permission: { module: "purchases", action: "view" } },
+      // Same module DESKTOP's own Suppliers screen requires — a Cashier deliberately doesn't have it
+      // (see DESKTOP's role-service.ts), so they never see supplier balances here either.
+      { key: "suppliers", label: "Suppliers", icon: Store, ready: true, permission: { module: "suppliers", action: "view" } },
       { key: "expenses", label: "Expenses", icon: Wallet, ready: true, permission: { module: "expenses", action: "view" } },
       { key: "stockLedger", label: "Stock Ledger", icon: Warehouse, ready: true, permission: { module: "inventory", action: "view" } },
     ],

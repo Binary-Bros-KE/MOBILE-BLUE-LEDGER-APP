@@ -20,6 +20,7 @@ import { QuotationsTab } from "../tabs/QuotationsTab";
 import { RidersTab } from "../tabs/RidersTab";
 import { SalesTab } from "../tabs/SalesTab";
 import { StockLedgerTab } from "../tabs/StockLedgerTab";
+import { SuppliersTab } from "../tabs/SuppliersTab";
 import { TransactionsTab } from "../tabs/TransactionsTab";
 import { WorkingHoursTab } from "../tabs/WorkingHoursTab";
 import { navGroups, visibleNavGroups, type TabKey } from "./navigation";
@@ -178,6 +179,9 @@ export function AppShell() {
               viewerBranchId={session?.branchId ?? null}
               vatRatePercent={session?.vatRatePercent ?? 0}
             />
+          )}
+          {activeTab === "suppliers" && (
+            <SuppliersTab currency={session?.currency ?? "KES"} canCreate={can("suppliers", "create")} canAdjust={can("suppliers", "edit")} />
           )}
           {activeTab === "purchases" && (
             <PurchasesTab
