@@ -944,6 +944,27 @@ export type ExpenseListItem = {
   description: string | null;
   status: string;
   currency: string;
+  /** Raw ids — pre-fill the Edit Expense sheet. */
+  categoryId: string;
+  paymentMethodId: string;
+  storefrontId: string | null;
+  paidBy: string | null;
+  /** Set for an expense another action created (a purchase's shipping cost, a delivery cost). */
+  sourceType: string | null;
+};
+
+export type MobileExpenseCategory = { id: string; name: string };
+
+/** Mirrors SERVER's mobileExpenseInputSchema — expenseDate is a plain YYYY-MM-DD string. */
+export type ExpenseInput = {
+  expenseDate: string;
+  categoryId: string;
+  amountCents: number;
+  paidBy: string | null;
+  paymentMethodId: string;
+  storefrontId: string;
+  reference: string | null;
+  description: string | null;
 };
 
 export type StockMovementType = "purchase" | "sale" | "transfer_in" | "transfer_out" | "return" | "damage" | "adjustment" | "opening_stock";

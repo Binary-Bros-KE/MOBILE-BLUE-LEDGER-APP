@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { X } from "lucide-react";
+import { Archive, Loader2, Pencil, X } from "lucide-react";
+import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import type { ExpenseListItem } from "@/lib/types";
 import { Row } from "./DocumentDetailModal";
@@ -9,9 +11,42 @@ import { Row } from "./DocumentDetailModal";
 /** Unlike every other detail modal in this app, this one takes the ALREADY-LOADED row directly
  * (no fetch, no loading state) — Expense is a flat single-payment record with nothing more to fetch
  * beyond what the list already returns (see mobile-expenses-service.ts's own note). No Download/
- * Share either — no PDF/share capability exists for Expenses. */
-export function ExpenseDetailModal({ expense, onClose }: { expense: ExpenseListItem; onClose: () => void }) {
+ * Share either — no PDF/share capability exists for Expenses. `onEdit`/`canArchive` add DESKTOP's
+ * Edit and Archive actions (expenses.edit / expenses.delete); archiving is the only removal once an
+ * expense exists in the cloud, so it takes two taps. */
+export function ExpenseDetailModal({
+  expense,
+  onClose,
+  onEdit,
+  canArchive = false,
+  onArchived,
+}: {
+  expense: ExpenseListItem;
+  onClose: () => void;
+  onEdit?: () => void;
+  canArchive?: boolean;
+  onArchived?: () => void;
+}) {
   const money = (cents: number) => formatCents(cents, expense.currency);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function handleArchive(): Promise<void> {
+    if (!confirmArchive) {
+      setConfirmArchive(true);
+      return;
+    }
+    setArchiving(true);
+    setActionError(null);
+    try {
+      await api.archiveExpense(expense.id);
+      onArchived?.();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not archive this expense.");
+      setArchiving(false);
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-deep/60 sm:items-center" onClick={onClose}>
@@ -56,6 +91,37 @@ export function ExpenseDetailModal({ expense, onClose }: { expense: ExpenseListI
           <div className="my-3 border-t border-dashed border-navy/15" />
           <Row label="Amount" value={money(expense.amountCents)} strong />
         </div>
+
+        {(onEdit || canArchive) && (
+          <div className="mt-3 space-y-2">
+            {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-navy/15 py-2.5 text-xs font-bold text-navy"
+                >
+                  <Pencil className="size-3.5" aria-hidden="true" />
+                  Edit
+                </button>
+              )}
+              {canArchive && (
+                <button
+                  type="button"
+                  disabled={archiving}
+                  onClick={() => void handleArchive()}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border py-2.5 text-xs font-bold disabled:opacity-50 ${
+                    confirmArchive ? "border-red bg-red text-white" : "border-red/40 text-red"
+                  }`}
+                >
+                  {archiving ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Archive className="size-3.5" aria-hidden="true" />}
+                  {confirmArchive ? "Tap again to archive" : "Archive"}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </motion.div>
     </div>
   );

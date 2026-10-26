@@ -188,7 +188,16 @@ export function AppShell() {
               viewerBranchId={session?.branchId ?? null}
             />
           )}
-          {activeTab === "expenses" && <ExpensesTab />}
+          {activeTab === "expenses" && (
+            <ExpensesTab
+              canCreate={can("expenses", "create")}
+              canEdit={can("expenses", "edit")}
+              canArchive={can("expenses", "delete")}
+              canCreateCategory={can("expense_categories", "create")}
+              viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
+              viewerBranchId={session?.branchId ?? null}
+            />
+          )}
           {activeTab === "stockLedger" && <StockLedgerTab />}
           {activeTab === "approvals" && <ApprovalsTab />}
           {activeTab === "workingHours" && <WorkingHoursTab />}

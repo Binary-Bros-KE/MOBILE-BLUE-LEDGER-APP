@@ -13,12 +13,14 @@ import type {
   CreateSupplierInput,
   DocumentIdResult,
   Employee,
+  ExpenseInput,
   ExpenseListItem,
   InvoiceCancellationApprovalItem,
   InvoiceListItem,
   MarkPaidRequest,
   MobileCategory,
   MobileCustomer,
+  MobileExpenseCategory,
   MobileDeliveryNote,
   MobileInvoiceEditData,
   MobileLocation,
@@ -288,6 +290,14 @@ export const api = {
     request<DocumentIdResult>(`/mobile/purchases/${id}/receive`, { method: "POST", body: JSON.stringify({ items }) }),
   recordPurchasePayment: (id: string, body: PurchasePaymentInput) =>
     request<DocumentIdResult>(`/mobile/purchases/${id}/payments`, { method: "POST", body: JSON.stringify(body) }),
+  listExpenseCategories: () => request<MobileExpenseCategory[]>("/mobile/expense-categories"),
+  createExpenseCategory: (name: string) =>
+    request<MobileExpenseCategory>("/mobile/expense-categories", { method: "POST", body: JSON.stringify({ name }) }),
+  /** `id` minted client-side and resent unchanged on retry — SERVER treats a repeat as a no-op. */
+  createExpense: (body: ExpenseInput & { id: string }) =>
+    request<{ id: string; expenseNumber: string }>("/mobile/expenses", { method: "POST", body: JSON.stringify(body) }),
+  updateExpense: (id: string, body: ExpenseInput) => request<DocumentIdResult>(`/mobile/expenses/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  archiveExpense: (id: string) => request<DocumentIdResult>(`/mobile/expenses/${id}/archive`, { method: "POST" }),
   listExpenses: (locationId?: string) =>
     request<ExpenseListItem[]>(`/mobile/expenses${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   listStockMovements: (locationId?: string) =>
