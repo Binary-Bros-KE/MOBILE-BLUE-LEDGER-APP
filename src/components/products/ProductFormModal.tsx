@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, Loader2, Plus } from "lucide-react";
+import { ChevronDown, Loader2, Plus, ScanLine } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { centsToPriceText, priceTextToCents } from "@/lib/money";
 import type { MobileCategory, ProductInput, ProductTaxTypeValue } from "@/lib/types";
+import { BarcodeScannerSheet, cameraScanSupported } from "../BarcodeScannerSheet";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
 import { type ProductManageOptions, stockLocations, storefrontLocations, UNIT_OF_MEASURE_OPTIONS } from "./manage-options";
 
@@ -88,6 +89,7 @@ export function ProductFormModal({
   const [hasVariants, setHasVariants] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -196,6 +198,18 @@ export function ProductFormModal({
   const storefronts = storefrontLocations(options);
   const openingLocations = stockLocations(options);
 
+  if (scannerOpen) {
+    return (
+      <BarcodeScannerSheet
+        onDetected={(code) => {
+          set("barcode", code);
+          setScannerOpen(false);
+        }}
+        onClose={() => setScannerOpen(false)}
+      />
+    );
+  }
+
   return (
     <BottomSheet title={isEdit ? "Edit Product" : "Add Product"} subtitle={isEdit ? form.sku : "Leave SKU blank to auto-number it."} onClose={onClose}>
       {loading ? (
@@ -227,7 +241,19 @@ export function ProductFormModal({
               <input value={form.sku} onChange={(e) => set("sku", e.target.value.toUpperCase())} placeholder="Auto" className={sheetInputClass} />
             </SheetField>
             <SheetField label="Barcode (optional)">
-              <input inputMode="numeric" value={form.barcode} onChange={(e) => set("barcode", e.target.value)} className={sheetInputClass} />
+              <div className="flex gap-1.5">
+                <input inputMode="numeric" value={form.barcode} onChange={(e) => set("barcode", e.target.value)} className={sheetInputClass} />
+                {cameraScanSupported() && (
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen(true)}
+                    aria-label="Scan the barcode"
+                    className="mt-1 grid w-10 flex-none place-items-center rounded-lg border border-navy/15 text-navy/60"
+                  >
+                    <ScanLine className="size-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             </SheetField>
           </div>
 

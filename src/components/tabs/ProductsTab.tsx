@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PackagePlus, Search } from "lucide-react";
+import { PackagePlus, ScanLine, Search } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { ProductListItem } from "@/lib/types";
+import { BarcodeScannerSheet, cameraScanSupported } from "../BarcodeScannerSheet";
 import { FilterChip } from "../FilterChip";
 import { ProductCard } from "../ProductCard";
 import type { ProductManageOptions } from "../products/manage-options";
@@ -51,6 +52,7 @@ export function ProductsTab({
   const [formFor, setFormFor] = useState<{ productId: string | null } | null>(null);
   const [stockFor, setStockFor] = useState<ProductListItem | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const canManage = canCreate || canEdit || canAdjustStock;
 
@@ -107,7 +109,7 @@ export function ProductsTab({
       if (lowStockOnly && !p.lowStock) return false;
       if (outOfStockOnly && !p.outOfStock) return false;
       if (categoryFilter !== ALL_CATEGORY && p.categoryName !== categoryFilter) return false;
-      if (term && !`${p.name} ${p.sku}`.toLowerCase().includes(term)) return false;
+      if (term && !`${p.name} ${p.sku} ${p.barcode ?? ""}`.toLowerCase().includes(term)) return false;
       return true;
     });
   }, [products, archivedOnly, lowStockOnly, outOfStockOnly, categoryFilter, searchTerm]);
@@ -118,17 +120,27 @@ export function ProductsTab({
   return (
     <div className="pb-10">
       <div className="sticky top-[60px] z-10 border-b border-navy/10 bg-cream-dark/95 backdrop-blur">
-        <div className="px-4 pt-3">
-          <div className="relative">
+        <div className="flex gap-2 px-4 pt-3">
+          <div className="relative flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-navy/30" aria-hidden="true" />
             <input
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search products by name or SKU..."
+              placeholder="Search by name, SKU or barcode..."
               className="h-10 w-full rounded-lg border border-navy/15 bg-white pr-3 pl-9 text-sm outline-none focus:border-blue"
             />
           </div>
+          {cameraScanSupported() && (
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              aria-label="Scan a barcode to find a product"
+              className="grid size-10 flex-none place-items-center rounded-lg bg-navy text-white"
+            >
+              <ScanLine className="size-5" aria-hidden="true" />
+            </button>
+          )}
         </div>
         <div className="flex gap-1.5 px-4 py-3">
           <FilterChip label="Low Stock" active={lowStockOnly} onClick={() => setLowStockOnly((v) => !v)} />
@@ -187,6 +199,15 @@ export function ProductsTab({
         )}
       </div>
 
+      {scannerOpen && (
+        <BarcodeScannerSheet
+          onDetected={(code) => {
+            setScannerOpen(false);
+            setSearchTerm(code);
+          }}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
       {formFor && manageOptions && (
         <ProductFormModal
           productId={formFor.productId}

@@ -548,6 +548,8 @@ export type ProductListItem = {
   id: string;
   name: string;
   sku: string;
+  /** Matched by a scan (camera or hardware scanner) at Checkout — null when the product has none. */
+  barcode: string | null;
   categoryName: string | null;
   /** Preview only for the Checkout cart — SERVER always recomputes the real total from the actual
    * Product row at checkout time, never trusts what this list showed. */
@@ -677,7 +679,7 @@ export type MobileProductVariants = {
   title: string | null;
   options: { name: string; values: string[] }[];
   /** shared stock: the sellable variants (priceCents null = the product's own price) */
-  shared: { key: string; values: Record<string, string>; label: string; priceCents: number | null }[];
+  shared: { key: string; values: Record<string, string>; label: string; priceCents: number | null; sku: string | null; barcode: string | null }[];
   /** separate stock: this product's own option values + label */
   values: Record<string, string>;
   label: string | null;

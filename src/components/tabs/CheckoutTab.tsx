@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Minus, PauseCircle, Plus, Receipt, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
+import { ChevronRight, Minus, PauseCircle, Plus, Receipt, ScanLine, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { effectiveUnitPriceCents, naturalUnitPriceCents, serviceChargeDraftsToInputs, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import { findPickByCode } from "@/lib/barcode";
 import { discardParkedSale, listParkedSales, parkSale, takeParkedSale, type ParkedSale } from "@/lib/parked-sales";
 import { addPickToCart, needsVariantPicker, plainPick, type VariantPick } from "@/lib/variants";
 import { CheckoutPaymentSheet, type CheckoutPaymentEntry } from "../checkout/CheckoutPaymentSheet";
 import { ParkedSalesSheet } from "../checkout/ParkedSalesSheet";
+import { BarcodeScannerSheet, cameraScanSupported } from "../BarcodeScannerSheet";
 import { DocumentDetailModal } from "../DocumentDetailModal";
 import { VariantPickerSheet } from "../VariantPickerSheet";
 import { ServiceChargesModal } from "../ServiceChargesModal";
@@ -70,6 +72,8 @@ export function CheckoutTab({
   // Bumped after every park/resume/discard so the derived list below re-reads storage.
   const [parkedVersion, setParkedVersion] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanMiss, setScanMiss] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [completedSaleId, setCompletedSaleId] = useState<string | null>(null);
@@ -130,7 +134,9 @@ export function CheckoutTab({
     if (!products) return [];
     const term = search.trim().toLowerCase();
     if (!term) return [];
-    return products.filter((p) => p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term)).slice(0, 12);
+    return products
+      .filter((p) => p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term) || (p.barcode?.toLowerCase().includes(term) ?? false))
+      .slice(0, 12);
   }, [products, search]);
 
   // grossCents (per line) is what actually gets charged — already includes tax whether it's baked
@@ -189,6 +195,38 @@ export function CheckoutTab({
   function addPick(pick: VariantPick): void {
     setVariantPickerFor(null);
     setCart((prev) => addPickToCart(prev, pick));
+  }
+
+  /** A scanned or typed code: an exact barcode/SKU (product or shared variant) goes straight into the
+   * cart — scanning the same item again just bumps its quantity. */
+  function addByCode(code: string): boolean {
+    const pick = findPickByCode(products ?? [], code);
+    if (!pick) {
+      setScanMiss(code.trim());
+      return false;
+    }
+    setScanMiss(null);
+    setSearch("");
+    if (pick.variantKey === null && needsVariantPicker(pick.product, products ?? [])) {
+      setVariantPickerFor(pick.product);
+    } else {
+      setCart((prev) => addPickToCart(prev, pick));
+    }
+    return true;
+  }
+
+  /** Bluetooth/USB scanners type the code and press Enter — so does a person typing a SKU. Enter adds
+   * an exact code match, or the only search result when there's just one. */
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+    if (e.key !== "Enter" || !search.trim()) return;
+    e.preventDefault();
+    if (findPickByCode(products ?? [], search)) {
+      addByCode(search);
+    } else if (filteredProducts.length === 1) {
+      addToCart(filteredProducts[0]!);
+    } else {
+      setScanMiss(search.trim());
+    }
   }
 
   function updateQuantity(lineId: string, quantity: number): void {
@@ -530,16 +568,34 @@ export function CheckoutTab({
       {loadError && <p className="mx-4 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{loadError}</p>}
 
       <div className="px-4 py-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-navy/30" aria-hidden="true" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products to add…"
-            className="w-full rounded-lg border border-navy/15 bg-white py-2.5 pl-9 pr-3 text-sm text-navy placeholder:text-navy/30 focus:border-blue focus:outline-none"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-navy/30" aria-hidden="true" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setScanMiss(null);
+              }}
+              onKeyDown={handleSearchKeyDown}
+              enterKeyHint="search"
+              placeholder="Search or scan products…"
+              className="w-full rounded-lg border border-navy/15 bg-white py-2.5 pl-9 pr-3 text-sm text-navy placeholder:text-navy/30 focus:border-blue focus:outline-none"
+            />
+          </div>
+          {cameraScanSupported() && (
+            <button
+              type="button"
+              onClick={() => setScannerOpen(true)}
+              aria-label="Scan a barcode with the camera"
+              className="grid size-[42px] flex-none place-items-center rounded-lg bg-navy text-white"
+            >
+              <ScanLine className="size-5" aria-hidden="true" />
+            </button>
+          )}
         </div>
+        {scanMiss && <p className="mt-1.5 text-xs font-semibold text-red">No product with code &ldquo;{scanMiss}&rdquo;.</p>}
         {filteredProducts.length > 0 && (
           <div className="mt-2 space-y-1 rounded-lg border border-navy/10 bg-white p-1.5 shadow-sm">
             {filteredProducts.map((product) => (
@@ -857,6 +913,16 @@ export function CheckoutTab({
             updateLocalSupplier(quickCreateSupplierFor, supplier.id);
             setQuickCreateSupplierFor(null);
           }}
+        />
+      )}
+
+      {scannerOpen && (
+        <BarcodeScannerSheet
+          onDetected={(code) => {
+            setScannerOpen(false);
+            addByCode(code);
+          }}
+          onClose={() => setScannerOpen(false)}
         />
       )}
 
