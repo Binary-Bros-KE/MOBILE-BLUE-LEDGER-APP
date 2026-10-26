@@ -1,0 +1,55 @@
+import type { MobileCategory, MobileLocation } from "@/lib/types";
+
+/** What the product forms and stock sheet need for their pickers — loaded once by ProductsTab.
+ * `branchScope` is the viewer's own storefront when they're branch-scoped (non-Super-Admin with a
+ * branch) — same rule SERVER's mobile-products-service.ts enforces. */
+export type ProductManageOptions = {
+  categories: MobileCategory[];
+  /** Every location, with locationType ("distribution_center" = Main Store). */
+  locations: MobileLocation[];
+  branchScope: string | null;
+  vatRatePercent: number;
+};
+
+export const MAIN_STORE_TYPE = "distribution_center";
+
+/** Mirrors DESKTOP's isStorefrontType — the Main Store/warehouse never sells directly. */
+export function storefrontLocations(options: ProductManageOptions): MobileLocation[] {
+  return options.locations.filter((l) => l.locationType !== MAIN_STORE_TYPE && l.locationType !== "warehouse");
+}
+
+/** Where this viewer may change stock: their own storefront + the Main Store when branch-scoped
+ * (DESKTOP's assertOpeningStockLocationsAllowed), everywhere otherwise. */
+export function stockLocations(options: ProductManageOptions): MobileLocation[] {
+  if (!options.branchScope) return options.locations;
+  return options.locations.filter((l) => l.id === options.branchScope || l.locationType === MAIN_STORE_TYPE);
+}
+
+/** Mirrors DESKTOP's UNIT_OF_MEASURE_OPTIONS (shared/types/product.ts). */
+export const UNIT_OF_MEASURE_OPTIONS = [
+  { value: "piece", label: "Piece" },
+  { value: "pack", label: "Pack" },
+  { value: "box", label: "Box" },
+  { value: "carton", label: "Carton" },
+  { value: "set", label: "Set" },
+  { value: "kg", label: "Kilogram (kg)" },
+  { value: "g", label: "Gram (g)" },
+  { value: "L", label: "Litre (L)" },
+  { value: "mL", label: "Millilitre (mL)" },
+  { value: "m", label: "Metre (m)" },
+  { value: "cm", label: "Centimetre (cm)" },
+  { value: "dozen", label: "Dozen" },
+  { value: "pair", label: "Pair" },
+  { value: "roll", label: "Roll" },
+  { value: "bottle", label: "Bottle" },
+  { value: "can", label: "Can" },
+  { value: "bag", label: "Bag" },
+  { value: "sack", label: "Sack" },
+  { value: "bundle", label: "Bundle" },
+  { value: "tray", label: "Tray" },
+  { value: "tube", label: "Tube" },
+  { value: "jar", label: "Jar" },
+  { value: "bucket", label: "Bucket" },
+  { value: "plate", label: "Plate" },
+  { value: "sheet", label: "Sheet" },
+] as const;

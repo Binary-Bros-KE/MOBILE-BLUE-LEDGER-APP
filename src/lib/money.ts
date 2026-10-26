@@ -27,3 +27,16 @@ export function formatCents(cents: number, currency: string): string {
     return `${currency} ${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   }
 }
+
+/** Price form fields are typed in whole currency units ("1250" or "1250.50") but stored as cents —
+ * same convention DESKTOP's own product form uses. Blank/invalid → null so an optional price (e.g.
+ * wholesale) can stay unset. */
+export function priceTextToCents(text: string): number | null {
+  const parsed = Number.parseFloat(text.replace(/,/g, ""));
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : null;
+}
+
+export function centsToPriceText(cents: number | null): string {
+  if (cents === null) return "";
+  return cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
+}

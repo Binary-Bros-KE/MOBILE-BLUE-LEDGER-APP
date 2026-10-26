@@ -4,6 +4,8 @@ import type {
   ConvertToInvoiceRequest,
   ConvertToSaleRequest,
   CreateCustomerInput,
+  CreateEmployeeInput,
+  CreateProductInput,
   CreateInvoiceRequest,
   CreateQuotationRequest,
   CreateRiderInput,
@@ -14,6 +16,7 @@ import type {
   InvoiceCancellationApprovalItem,
   InvoiceListItem,
   MarkPaidRequest,
+  MobileCategory,
   MobileCustomer,
   MobileDeliveryNote,
   MobileInvoiceEditData,
@@ -22,11 +25,14 @@ import type {
   MobileQuotationEditData,
   MobileReturnableItem,
   MobileRider,
+  MobileRole,
   MobileSessionInfo,
   MobileSupplier,
   MobileTaxReport,
   OwnerDashboard,
   PaymentMethodOption,
+  ProductEditData,
+  ProductInput,
   ProductListItem,
   PurchaseDetail,
   PurchaseListItem,
@@ -44,9 +50,12 @@ import type {
   ShareDocumentEntity,
   SharedDocument,
   SharedStatement,
+  StockAdjustmentInput,
+  StockAdjustmentResult,
   ShareLinkResult,
   StockMovementRow,
   TransactionRow,
+  UpdateEmployeeAccessInput,
   WorkingHoursListItem,
   WorkingHoursConfig,
   WorkingHoursUpsertInput,
@@ -166,6 +175,12 @@ export const api = {
   getMe: () => request<MobileSessionInfo>("/mobile/me"),
   listEmployees: () => request<Employee[]>("/mobile/employees"),
   getEmployeeSalaries: (employeeId: string) => request<Salary[]>(`/mobile/employees/${employeeId}/salaries`),
+  listRoles: () => request<MobileRole[]>("/mobile/roles"),
+  createEmployee: (body: CreateEmployeeInput) => request<DocumentIdResult>("/mobile/employees", { method: "POST", body: JSON.stringify(body) }),
+  updateEmployeeAccess: (employeeId: string, body: UpdateEmployeeAccessInput) =>
+    request<DocumentIdResult>(`/mobile/employees/${employeeId}/access`, { method: "PATCH", body: JSON.stringify(body) }),
+  resetEmployeePin: (employeeId: string, pin: string) =>
+    request<DocumentIdResult>(`/mobile/employees/${employeeId}/pin`, { method: "POST", body: JSON.stringify({ pin }) }),
   listLocations: () => request<MobileLocation[]>("/mobile/locations"),
   /** Active, storefront-type locations only — backs Checkout's StorefrontPicker for a branch-less
    * employee, unlike listLocations above (which includes every location, for report filter chips). */
@@ -243,7 +258,17 @@ export const api = {
     request<DocumentIdResult>(`/mobile/quotations/${id}/convert-to-invoice`, { method: "POST", body: JSON.stringify(body) }),
   listTransactions: (locationId?: string) =>
     request<TransactionRow[]>(`/mobile/transactions${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
-  listProducts: () => request<ProductListItem[]>("/mobile/products"),
+  listProducts: (options?: { includeAll?: boolean }) =>
+    request<ProductListItem[]>(`/mobile/products${options?.includeAll ? "?includeAll=1" : ""}`),
+  listCategories: () => request<MobileCategory[]>("/mobile/categories"),
+  createCategory: (name: string) => request<MobileCategory>("/mobile/categories", { method: "POST", body: JSON.stringify({ name }) }),
+  createProduct: (body: CreateProductInput) => request<{ id: string; sku: string }>("/mobile/products", { method: "POST", body: JSON.stringify(body) }),
+  getProductEditData: (id: string) => request<ProductEditData>(`/mobile/products/${id}/edit`),
+  updateProduct: (id: string, body: ProductInput) => request<DocumentIdResult>(`/mobile/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  setProductStatus: (id: string, status: "active" | "inactive") =>
+    request<DocumentIdResult>(`/mobile/products/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
+  recordStockAdjustment: (body: StockAdjustmentInput) =>
+    request<StockAdjustmentResult>("/mobile/stock-adjustments", { method: "POST", body: JSON.stringify(body) }),
   listPaymentMethods: () => request<PaymentMethodOption[]>("/mobile/payment-methods"),
   /** Real, from-scratch checkout — SERVER recomputes every figure itself (see
    * mobile-checkout-service.ts), this body is a proposal, not a trusted total. `body.id` must be

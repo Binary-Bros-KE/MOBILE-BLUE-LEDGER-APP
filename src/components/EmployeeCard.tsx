@@ -2,24 +2,73 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Mail, Phone, Store } from "lucide-react";
+import { ChevronDown, KeyRound, Loader2, Mail, Phone, ShieldCheck, Store, UserCheck, UserX } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import type { Employee, Salary } from "@/lib/types";
 import { PayslipModal } from "./PayslipModal";
+import type { EmployeeAccessOptions } from "./employees/access-options";
+import { ChangePinModal } from "./employees/ChangePinModal";
+import { ManageAccessModal } from "./employees/ManageAccessModal";
 
 const STATUS_TONE: Record<string, string> = {
   active: "border-green text-green",
   suspended: "border-red text-red",
+  terminated: "border-navy/30 text-navy/50",
   inactive: "border-navy/30 text-navy/50",
 };
 
-export function EmployeeCard({ employee, currency }: { employee: Employee; currency: string }) {
+/** `accessOptions` is null when the viewer can't manage this employee's access at all (no
+ * employees.edit, or the target is a Super Admin and the viewer isn't) — the card then only offers
+ * "Change My PIN" on the viewer's own card. SERVER enforces the same rules regardless. */
+export function EmployeeCard({
+  employee,
+  currency,
+  isSelf,
+  accessOptions,
+  onChanged,
+}: {
+  employee: Employee;
+  currency: string;
+  isSelf: boolean;
+  accessOptions: EmployeeAccessOptions | null;
+  onChanged: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [salaries, setSalaries] = useState<Salary[] | null>(null);
   const [loadingSalaries, setLoadingSalaries] = useState(false);
   const [salariesError, setSalariesError] = useState<string | null>(null);
   const [selectedSalary, setSelectedSalary] = useState<Salary | null>(null);
+  const [sheet, setSheet] = useState<"pin" | "access" | null>(null);
+  const [confirmingToggle, setConfirmingToggle] = useState(false);
+  const [toggling, setToggling] = useState(false);
+  const [accessNotice, setAccessNotice] = useState<string | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
+
+  // Own card: PIN only (SERVER blocks changing your own status/role — no self-lockout from a phone).
+  const canManageAccess = accessOptions !== null && !isSelf;
+  const canChangePin = isSelf || canManageAccess;
+  const isActive = employee.status === "active";
+
+  /** Two taps (arm, then confirm) rather than a native confirm() — a suspension is instant and the
+   * whole point of the button is speed, but a single stray tap shouldn't lock someone out. */
+  async function handleQuickToggle(): Promise<void> {
+    if (!confirmingToggle) {
+      setConfirmingToggle(true);
+      return;
+    }
+    setToggling(true);
+    setAccessError(null);
+    try {
+      await api.updateEmployeeAccess(employee.id, { status: isActive ? "suspended" : "active" });
+      setConfirmingToggle(false);
+      onChanged();
+    } catch (err) {
+      setAccessError(err instanceof ApiError ? err.message : "Could not update access.");
+    } finally {
+      setToggling(false);
+    }
+  }
 
   const fullName = [employee.firstName, employee.middleName, employee.lastName].filter(Boolean).join(" ");
   const statusTone = STATUS_TONE[employee.status] ?? "border-navy/30 text-navy/50";
@@ -90,6 +139,44 @@ export function EmployeeCard({ employee, currency }: { employee: Employee; curre
                 <InfoRow label="Alternative phone" value={employee.alternativePhone} />
               </div>
 
+              {canChangePin && (
+                <div className="border-t border-dashed border-navy/15 pt-3">
+                  <p className="mb-2 text-[11px] font-extrabold tracking-wide text-navy/40 uppercase">System Access</p>
+                  {accessError && <p className="mb-2 text-xs font-semibold text-red">{accessError}</p>}
+                  {accessNotice && <p className="mb-2 text-xs font-semibold text-green">{accessNotice}</p>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <AccessButton icon={KeyRound} label={isSelf ? "Change My PIN" : "Reset PIN"} onClick={() => setSheet("pin")} />
+                    {canManageAccess && <AccessButton icon={ShieldCheck} label="Manage Access" onClick={() => setSheet("access")} />}
+                    {canManageAccess && (
+                      <button
+                        type="button"
+                        disabled={toggling}
+                        onClick={() => void handleQuickToggle()}
+                        onBlur={() => setConfirmingToggle(false)}
+                        className={`col-span-2 flex items-center justify-center gap-1.5 rounded-lg border py-2.5 text-xs font-bold disabled:opacity-50 ${
+                          confirmingToggle
+                            ? isActive
+                              ? "border-red bg-red text-white"
+                              : "border-green bg-green text-white"
+                            : isActive
+                              ? "border-red/40 text-red"
+                              : "border-green/50 text-green"
+                        }`}
+                      >
+                        {toggling ? (
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                        ) : isActive ? (
+                          <UserX className="size-3.5" aria-hidden="true" />
+                        ) : (
+                          <UserCheck className="size-3.5" aria-hidden="true" />
+                        )}
+                        {confirmingToggle ? "Tap again to confirm" : isActive ? "Suspend Access" : "Reactivate Access"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="border-t border-dashed border-navy/15 pt-3">
                 <p className="mb-2 text-[11px] font-extrabold tracking-wide text-navy/40 uppercase">Salary History</p>
 
@@ -124,10 +211,46 @@ export function EmployeeCard({ employee, currency }: { employee: Employee; curre
         )}
       </AnimatePresence>
 
+      {sheet === "pin" && (
+        <ChangePinModal
+          employee={employee}
+          isSelf={isSelf}
+          onClose={() => setSheet(null)}
+          onSaved={() => {
+            setSheet(null);
+            setAccessNotice(isSelf ? "Your PIN was changed." : "PIN reset — share the new PIN with them privately.");
+          }}
+        />
+      )}
+      {sheet === "access" && accessOptions && (
+        <ManageAccessModal
+          employee={employee}
+          options={accessOptions}
+          onClose={() => setSheet(null)}
+          onSaved={() => {
+            setSheet(null);
+            onChanged();
+          }}
+        />
+      )}
+
       {selectedSalary && (
         <PayslipModal salary={selectedSalary} currency={currency} onClose={() => setSelectedSalary(null)} />
       )}
     </section>
+  );
+}
+
+function AccessButton({ icon: Icon, label, onClick }: { icon: typeof Phone; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center justify-center gap-1.5 rounded-lg border border-navy/15 py-2.5 text-xs font-bold text-navy hover:bg-cream-dark"
+    >
+      <Icon className="size-3.5 text-navy/50" aria-hidden="true" />
+      {label}
+    </button>
   );
 }
 

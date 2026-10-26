@@ -81,6 +81,9 @@ export type MyRecentSale = {
 };
 
 export type MobileSessionInfo = {
+  /** Lets the Employees tab tell "this is you" apart — own PIN change allowed, own status/role
+   * change blocked (SERVER enforces the same in mobile-employees-service.ts). */
+  employeeId: string;
   employeeName: string;
   roleName: string | null;
   currency: string;
@@ -127,8 +130,34 @@ export type Employee = {
   jobTitle: string | null;
   hireDate: string | null;
   status: string;
+  roleId: string | null;
+  branchId: string | null;
   roleName: string | null;
+  /** This employee's role is THE Super Admin role — only another Super Admin may change their access. */
+  isSuperAdmin: boolean;
   branchName: string | null;
+};
+
+/** Mirrors DESKTOP's EMPLOYEE_STATUS_OPTIONS. */
+export type EmployeeStatusValue = "active" | "suspended" | "terminated";
+
+export type MobileRole = { id: string; roleName: string; isSuperAdmin: boolean };
+
+export type CreateEmployeeInput = {
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  roleId: string;
+  branchId: string | null;
+  pin: string;
+};
+
+/** Every field optional — Suspend/Reactivate sends just `status`, Edit Access sends role + branch. */
+export type UpdateEmployeeAccessInput = {
+  roleId?: string;
+  branchId?: string | null;
+  status?: EmployeeStatusValue;
 };
 
 export type SalaryLineItem = { name: string; amountCents: number };
@@ -150,7 +179,8 @@ export type Salary = {
   createdAt: string;
 };
 
-export type MobileLocation = { id: string; locationName: string };
+/** `locationType` comes back from /mobile/locations only ("distribution_center" = the Main Store). */
+export type MobileLocation = { id: string; locationName: string; locationType?: string };
 
 /** Mirrors SERVER's SaleStatusFlags (mobile-sales-service.ts) exactly — a completed sale can
  * independently have a void request and a return request, each with its own approved/pending/
@@ -508,7 +538,63 @@ export type ProductListItem = {
   outOfStock: boolean;
   /** Variants (see lib/variants.ts) — null/absent when the product has none. */
   variants?: MobileProductVariants | null;
+  /** "active" | "inactive" (archived). Only the Products tab's includeAll list ever has inactive ones. */
+  status: string;
+  /** False for a non-stock item (e.g. a service) — again only in the includeAll list. */
+  trackStock: boolean;
 };
+
+export type MobileCategory = { id: string; name: string };
+
+export type ProductTaxTypeValue = "vat" | "exempted" | "zero_rated";
+
+/** Body for creating/updating a product — the day-to-day subset of DESKTOP's own Product form.
+ * Blank sku on create = SERVER mints one ("PROD-M3-000012"). */
+export type ProductInput = {
+  name: string;
+  sku?: string;
+  barcode: string | null;
+  categoryId: string | null;
+  storefrontId: string | null;
+  unitOfMeasure: string | null;
+  description: string | null;
+  buyingPriceCents: number;
+  sellingPriceCents: number;
+  wholesalePriceCents: number | null;
+  wholesaleMinQuantity: number;
+  minimumPriceCents: number | null;
+  taxType: ProductTaxTypeValue;
+  pricesTaxInclusive: boolean | null;
+  reorderLevel: number;
+  trackStock: boolean;
+  allowNegativeStock: boolean;
+};
+
+export type CreateProductInput = ProductInput & { openingStock: { locationId: string; quantity: number } | null };
+
+export type ProductEditData = Omit<ProductInput, "sku" | "taxType"> & {
+  id: string;
+  sku: string;
+  status: string;
+  taxType: string;
+  hasVariants: boolean;
+};
+
+export type StockAdjustmentMode = "add" | "remove" | "count";
+
+export type StockAdjustmentInput = {
+  /** Minted client-side, resent unchanged on retry — SERVER treats a repeat as a no-op. */
+  id: string;
+  productId: string;
+  locationId: string;
+  mode: StockAdjustmentMode;
+  addReason?: "purchase" | "return" | "opening_stock";
+  /** add/remove: how many; count: the physical count itself. */
+  quantity: number;
+  notes: string | null;
+};
+
+export type StockAdjustmentResult = { id: string; previousQuantity: number; newQuantity: number };
 
 export type MobileProductVariants = {
   mode: "shared" | "separate";

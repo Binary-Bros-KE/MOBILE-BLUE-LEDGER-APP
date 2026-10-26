@@ -128,7 +128,16 @@ export function AppShell() {
               defaultIncludeBusinessInfo={session?.defaultIncludeBusinessInfo}
             />
           )}
-          {activeTab === "employees" && <EmployeesTab currency={session?.currency ?? "KES"} />}
+          {activeTab === "employees" && (
+            <EmployeesTab
+              currency={session?.currency ?? "KES"}
+              currentEmployeeId={session?.employeeId ?? null}
+              viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
+              viewerBranchId={session?.branchId ?? null}
+              canCreate={can("employees", "create")}
+              canEdit={can("employees", "edit")}
+            />
+          )}
           {activeTab === "sales" && (
             <SalesTab canManageDelivery={can("sales", "edit")} />
           )}
@@ -159,7 +168,17 @@ export function AppShell() {
           {activeTab === "transactions" && <TransactionsTab />}
           {activeTab === "customers" && <CustomersTab />}
           {activeTab === "riders" && <RidersTab />}
-          {activeTab === "products" && <ProductsTab currency={session?.currency ?? "KES"} />}
+          {activeTab === "products" && (
+            <ProductsTab
+              currency={session?.currency ?? "KES"}
+              canCreate={can("products", "create")}
+              canEdit={can("products", "edit")}
+              canAdjustStock={can("inventory", "edit")}
+              viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
+              viewerBranchId={session?.branchId ?? null}
+              vatRatePercent={session?.vatRatePercent ?? 0}
+            />
+          )}
           {activeTab === "purchases" && <PurchasesTab />}
           {activeTab === "expenses" && <ExpensesTab />}
           {activeTab === "stockLedger" && <StockLedgerTab />}
