@@ -6,6 +6,7 @@ import type {
   CreateCustomerInput,
   CreateEmployeeInput,
   CreateProductInput,
+  CreatePurchaseInput,
   CreateInvoiceRequest,
   CreateQuotationRequest,
   CreateRiderInput,
@@ -35,6 +36,7 @@ import type {
   ProductInput,
   ProductListItem,
   PurchaseDetail,
+  PurchasePaymentInput,
   PurchaseListItem,
   QuotationListItem,
   QuotationStatusValue,
@@ -278,6 +280,14 @@ export const api = {
   listPurchases: (locationId?: string) =>
     request<PurchaseListItem[]>(`/mobile/purchases${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getPurchase: (id: string) => request<PurchaseDetail>(`/mobile/purchases/${id}`),
+  createPurchase: (body: CreatePurchaseInput) =>
+    request<{ id: string; purchaseNumber: string }>("/mobile/purchases", { method: "POST", body: JSON.stringify(body) }),
+  markPurchaseOrdered: (id: string) => request<DocumentIdResult>(`/mobile/purchases/${id}/order`, { method: "POST" }),
+  cancelPurchase: (id: string) => request<DocumentIdResult>(`/mobile/purchases/${id}/cancel`, { method: "POST" }),
+  receivePurchaseGoods: (id: string, items: Array<{ purchaseItemId: string; receivingQuantity: number }>) =>
+    request<DocumentIdResult>(`/mobile/purchases/${id}/receive`, { method: "POST", body: JSON.stringify({ items }) }),
+  recordPurchasePayment: (id: string, body: PurchasePaymentInput) =>
+    request<DocumentIdResult>(`/mobile/purchases/${id}/payments`, { method: "POST", body: JSON.stringify(body) }),
   listExpenses: (locationId?: string) =>
     request<ExpenseListItem[]>(`/mobile/expenses${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   listStockMovements: (locationId?: string) =>

@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { X } from "lucide-react";
+import { Ban, Loader2, PackageCheck, Send, Wallet, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { taxBreakdownLabel } from "@/lib/tax";
 import type { PurchaseDetail } from "@/lib/types";
 import { Row } from "./DocumentDetailModal";
+import { PaySupplierModal } from "./purchases/PaySupplierModal";
+import { ReceiveGoodsModal } from "./purchases/ReceiveGoodsModal";
 
 const STATUS_TONE: Record<string, string> = {
   draft: "border-navy/30 text-navy/50",
@@ -23,26 +25,67 @@ function formatStatus(status: string): string {
 
 /** No Download/Share buttons — confirmed no PDF/share capability exists for Purchases anywhere in
  * this app (a Purchase's only "document" on DESKTOP is a locally-attached file, not a generated
- * one), so this is view-only, same bottom-sheet shell as DocumentDetailModal/StatementDetailModal
- * but purpose-built sections (line items table, supplier payments) instead of a receipt layout. */
-export function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: string; onClose: () => void }) {
+ * one). Same bottom-sheet shell as DocumentDetailModal/StatementDetailModal but purpose-built
+ * sections (line items, supplier payments). With purchases.edit (`canEdit`) it also carries the
+ * lifecycle actions DESKTOP has: Place Order / Cancel on a draft, Receive Goods while anything is
+ * outstanding, Pay Supplier while something received is unpaid. `onChanged` lets the list refresh. */
+export function PurchaseDetailModal({
+  purchaseId,
+  canEdit = false,
+  onClose,
+  onChanged,
+}: {
+  purchaseId: string;
+  canEdit?: boolean;
+  onClose: () => void;
+  onChanged?: () => void;
+}) {
   const [doc, setDoc] = useState<PurchaseDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<"receive" | "pay" | null>(null);
+  const [busy, setBusy] = useState<"order" | "cancel" | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(() => {
     api
       .getPurchase(purchaseId)
-      .then((result) => {
-        if (!cancelled) setDoc(result);
-      })
-      .catch((err) => {
-        if (!cancelled) setLoadError(err instanceof ApiError ? err.message : "Could not load this purchase.");
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then(setDoc)
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load this purchase."));
   }, [purchaseId]);
+
+  useEffect(load, [load]);
+
+  function afterChange(): void {
+    setSheet(null);
+    load();
+    onChanged?.();
+  }
+
+  /** Cancel takes two taps (arm, then confirm) — same pattern as the Employees tab's Suspend. */
+  async function runAction(action: "order" | "cancel"): Promise<void> {
+    if (action === "cancel" && !confirmCancel) {
+      setConfirmCancel(true);
+      return;
+    }
+    setBusy(action);
+    setActionError(null);
+    try {
+      if (action === "order") await api.markPurchaseOrdered(purchaseId);
+      else await api.cancelPurchase(purchaseId);
+      setConfirmCancel(false);
+      afterChange();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not update this purchase.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const canOrder = canEdit && doc?.status === "draft";
+  const canCancel = canEdit && (doc?.status === "draft" || doc?.status === "ordered");
+  const canReceive = canEdit && (doc?.status === "ordered" || doc?.status === "partially_received");
+  const canPay = canEdit && doc !== null && doc.status !== "cancelled" && doc.balanceDueCents > 0;
 
   const money = (cents: number) => (doc ? formatCents(cents, doc.currency) : "-");
 
@@ -83,6 +126,28 @@ export function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: strin
         {loadError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{loadError}</p>}
         {!doc && !loadError && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
 
+        {doc && (canOrder || canReceive || canPay || canCancel) && (
+          <div className="mb-3 space-y-2">
+            {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
+            <div className="grid grid-cols-2 gap-2">
+              {canOrder && (
+                <ActionButton icon={busy === "order" ? Loader2 : Send} label="Place Order" onClick={() => void runAction("order")} primary spinning={busy === "order"} />
+              )}
+              {canReceive && <ActionButton icon={PackageCheck} label="Receive Goods" onClick={() => setSheet("receive")} primary />}
+              {canPay && <ActionButton icon={Wallet} label="Pay Supplier" onClick={() => setSheet("pay")} primary={!canReceive} />}
+              {canCancel && (
+                <ActionButton
+                  icon={busy === "cancel" ? Loader2 : Ban}
+                  label={confirmCancel ? "Tap again to cancel" : "Cancel Purchase"}
+                  onClick={() => void runAction("cancel")}
+                  danger
+                  spinning={busy === "cancel"}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
         {doc && (
           <div className="rounded-lg border border-dashed border-navy/15 bg-cream-dark/40 p-4 text-sm">
             <div className="space-y-0.5 text-xs text-navy/70">
@@ -119,8 +184,11 @@ export function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: strin
             <div className="space-y-1 text-xs">
               <Row label="Subtotal" value={money(doc.subtotalCents)} />
               {doc.discountAmountCents > 0 && <Row label="Discount" value={`-${money(doc.discountAmountCents)}`} />}
+              {doc.shippingCostCents > 0 && <Row label="Shipping Fee" value={money(doc.shippingCostCents)} />}
               <Row label="Total" value={money(doc.grandTotalCents)} strong />
+              {doc.receivedValueCents > 0 && doc.status !== "received" && <Row label="Received so far" value={money(doc.receivedValueCents)} />}
               <Row label="Paid" value={money(doc.amountPaidCents)} />
+              {doc.balanceDueCents > 0 && <Row label="Due now" value={money(doc.balanceDueCents)} strong />}
             </div>
 
             {doc.taxBreakdown.length > 0 && (
@@ -165,6 +233,38 @@ export function PurchaseDetailModal({ purchaseId, onClose }: { purchaseId: strin
           </div>
         )}
       </motion.div>
+
+      {/* Siblings of the animated panel, not children — a fixed-position sheet inside a transformed
+          parent would be positioned relative to it. stopPropagation keeps a tap on a sheet's own
+          backdrop from also closing this purchase underneath. */}
+      <div onClick={(e) => e.stopPropagation()}>
+        {sheet === "receive" && doc && <ReceiveGoodsModal purchase={doc} onClose={() => setSheet(null)} onSaved={afterChange} />}
+        {sheet === "pay" && doc && <PaySupplierModal purchase={doc} onClose={() => setSheet(null)} onSaved={afterChange} />}
+      </div>
     </div>
+  );
+}
+
+function ActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  primary,
+  danger,
+  spinning,
+}: {
+  icon: typeof X;
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+  danger?: boolean;
+  spinning?: boolean;
+}) {
+  const tone = danger ? "border-red/40 text-red" : primary ? "border-blue bg-blue text-white" : "border-navy/15 text-navy";
+  return (
+    <button type="button" onClick={onClick} className={`flex items-center justify-center gap-1.5 rounded-lg border py-2.5 text-xs font-bold ${tone}`}>
+      <Icon className={`size-3.5 ${spinning ? "animate-spin" : ""}`} aria-hidden="true" />
+      {label}
+    </button>
   );
 }

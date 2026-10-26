@@ -179,7 +179,15 @@ export function AppShell() {
               vatRatePercent={session?.vatRatePercent ?? 0}
             />
           )}
-          {activeTab === "purchases" && <PurchasesTab />}
+          {activeTab === "purchases" && (
+            <PurchasesTab
+              currency={session?.currency ?? "KES"}
+              canCreate={can("purchases", "create")}
+              canEdit={can("purchases", "edit")}
+              viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
+              viewerBranchId={session?.branchId ?? null}
+            />
+          )}
           {activeTab === "expenses" && <ExpensesTab />}
           {activeTab === "stockLedger" && <StockLedgerTab />}
           {activeTab === "approvals" && <ApprovalsTab />}

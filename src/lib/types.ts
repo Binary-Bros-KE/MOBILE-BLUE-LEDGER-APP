@@ -845,6 +845,9 @@ export type PurchaseListItem = {
 };
 
 export type PurchaseItemLine = {
+  /** purchase_items id — what Receive Goods sends back per line. */
+  id: string;
+  productId: string;
   productName: string;
   sku: string | null;
   orderedQuantity: number;
@@ -867,6 +870,16 @@ export type PurchasePaymentLine = {
 export type PurchaseDetail = {
   id: string;
   purchaseNumber: string;
+  supplierId: string;
+  locationId: string;
+  /** "Shipping Fee" — owed to the supplier once anything is received. */
+  shippingCostCents: number;
+  /** "Shipping Cost" — the business's own expense, never owed. */
+  shippingExpenseCents: number;
+  /** Item value received so far — payments are made against this. */
+  receivedValueCents: number;
+  /** What can be paid right now (received value + shipping fee once anything arrived − paid). */
+  balanceDueCents: number;
   supplierName: string;
   supplierPhone: string | null;
   locationName: string;
@@ -887,6 +900,36 @@ export type PurchaseDetail = {
   amountPaidCents: number;
   payments: PurchasePaymentLine[];
   currency: string;
+};
+
+export type CreatePurchaseLine = {
+  productId: string;
+  orderedQuantity: number;
+  unitCostCents: number;
+  /** Optional new selling price — set on the product when the order is placed. */
+  sellingPriceCents: number | null;
+  taxType: string;
+};
+
+export type CreatePurchaseInput = {
+  /** Minted client-side, resent unchanged on retry — SERVER treats a repeat as a no-op. */
+  id: string;
+  supplierId: string;
+  supplierInvoiceNumber: string | null;
+  locationId: string;
+  shippingCostCents: number;
+  shippingExpenseCents: number;
+  notes: string | null;
+  items: CreatePurchaseLine[];
+  intent: "draft" | "ordered";
+};
+
+export type PurchasePaymentInput = {
+  paymentMethodId: string;
+  /** Omitted = pay off the full balance currently due. */
+  amountCents?: number;
+  reference: string | null;
+  notes: string | null;
 };
 
 export type ExpenseListItem = {
