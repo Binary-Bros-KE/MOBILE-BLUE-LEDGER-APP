@@ -42,6 +42,7 @@ import type {
   MobileSupplierBalanceEntry,
   MobileSupplierWithBalance,
   MobileTaxReport,
+  MpesaStatusResult,
   OwnerDashboard,
   PaymentMethodOption,
   ProductEditData,
@@ -293,6 +294,14 @@ export const api = {
   recordStockAdjustment: (body: StockAdjustmentInput) =>
     request<StockAdjustmentResult>("/mobile/stock-adjustments", { method: "POST", body: JSON.stringify(body) }),
   listPaymentMethods: () => request<PaymentMethodOption[]>("/mobile/payment-methods"),
+  isMpesaConfigured: (locationId: string) =>
+    request<{ configured: boolean }>(`/mobile/mpesa/configured?locationId=${encodeURIComponent(locationId)}`),
+  sendMpesaPrompt: (body: { locationId: string; phone: string; amountCents: number }) =>
+    request<{ checkoutRequestId: string; merchantRequestId: string }>("/mobile/mpesa/stk-push", { method: "POST", body: JSON.stringify(body) }),
+  getMpesaStatus: (checkoutRequestId: string) =>
+    request<MpesaStatusResult>("/mobile/mpesa/status", { method: "POST", body: JSON.stringify({ checkoutRequestId }) }),
+  checkMpesaStatusNow: (checkoutRequestId: string) =>
+    request<MpesaStatusResult>("/mobile/mpesa/status/check", { method: "POST", body: JSON.stringify({ checkoutRequestId }) }),
   getSettings: () => request<MobileSettings>("/mobile/settings"),
   updateBusinessProfile: (body: MobileBusinessProfile) =>
     request<{ success: true }>("/mobile/settings/business-profile", { method: "PUT", body: JSON.stringify(body) }),

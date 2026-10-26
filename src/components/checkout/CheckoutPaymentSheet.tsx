@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BookUser, Loader2, Plus, Trash2 } from "lucide-react";
+import { api } from "@/lib/api";
 import { centsToPriceText, formatCents, priceTextToCents } from "@/lib/money";
 import type { PaymentMethodOption } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
+import { MpesaPromptPanel } from "./MpesaPromptPanel";
+
+/** DESKTOP's own seeded M-Pesa payment method code. */
+const MPESA_CODE = "MPESA";
 
 export type CheckoutPaymentEntry = { paymentMethodId: string; amountCents: number; reference: string };
 
@@ -34,13 +39,16 @@ function quickCashAmounts(totalCents: number): number[] {
  * DESKTOP's buildSplitPayments): together they must cover the total, and any change can only come
  * back out of a method that needs no reference (cash). With a customer on the sale, "Put on account"
  * turns the cart into an invoice instead — DESKTOP's way of selling on credit — collected later from
- * the Customers tab.
+ * the Customers tab. An M-Pesa row can send an STK prompt straight to the customer's phone when the
+ * storefront has a Till set up; the receipt number then fills the row's reference by itself.
  */
 export function CheckoutPaymentSheet({
   grandTotalCents,
   currency,
   paymentMethods,
   customerName,
+  customerPhone,
+  locationId,
   canPutOnAccount,
   submitting,
   error,
@@ -53,6 +61,9 @@ export function CheckoutPaymentSheet({
   paymentMethods: PaymentMethodOption[];
   /** null for a walk-in sale — "Put on account" needs a real customer. */
   customerName: string | null;
+  /** Pre-fills the M-Pesa prompt's phone number. */
+  customerPhone: string | null;
+  locationId: string;
   canPutOnAccount: boolean;
   submitting: boolean;
   error: string | null;
@@ -65,6 +76,14 @@ export function CheckoutPaymentSheet({
   const [onAccount, setOnAccount] = useState(false);
   const [dueDate, setDueDate] = useState(localDatePlus(30));
   const money = (cents: number) => formatCents(cents, currency);
+  const [mpesaConfigured, setMpesaConfigured] = useState(false);
+
+  useEffect(() => {
+    api
+      .isMpesaConfigured(locationId)
+      .then((r) => setMpesaConfigured(r.configured))
+      .catch(() => setMpesaConfigured(false));
+  }, [locationId]);
 
   const methodOf = (id: string) => paymentMethods.find((m) => m.id === id) ?? null;
   const tenderedCents = rows.reduce((sum, r) => sum + (priceTextToCents(r.amount) ?? 0), 0);
@@ -164,6 +183,15 @@ export function CheckoutPaymentSheet({
                     </button>
                   )}
                 </div>
+                {method?.code === MPESA_CODE && mpesaConfigured && (
+                  <MpesaPromptPanel
+                    amountCents={priceTextToCents(row.amount) ?? 0}
+                    currency={currency}
+                    locationId={locationId}
+                    defaultPhone={customerPhone ?? ""}
+                    onPaid={(receipt) => updateRow(index, { reference: receipt })}
+                  />
+                )}
                 {method?.requiresReference && (
                   <input
                     value={row.reference}

@@ -932,6 +932,8 @@ export function CheckoutTab({
           currency={currency}
           paymentMethods={paymentMethods ?? []}
           customerName={customerId ? customerLabel : null}
+          customerPhone={customerId ? (customers.find((c) => c.id === customerId)?.phone ?? null) : null}
+          locationId={effectiveLocationId ?? ""}
           canPutOnAccount
           submitting={submitting}
           error={submitError}

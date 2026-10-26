@@ -685,7 +685,10 @@ export type MobileProductVariants = {
   label: string | null;
 };
 
-export type PaymentMethodOption = { id: string; name: string; requiresReference: boolean };
+/** `code` "MPESA" (DESKTOP's own seeded code) is what Checkout offers an STK prompt for. */
+export type PaymentMethodOption = { id: string; name: string; code: string; requiresReference: boolean };
+
+export type MpesaStatusResult = { status: string; message: string; mpesaReceiptNumber: string | null; amountCents: number; phone: string };
 
 /** One line in the Checkout cart — a client-side PREVIEW only. quantity/discountAmountCents are the
  * only fields that actually reach SERVER (see CheckoutRequest below); unitPriceCents/lineTotalCents
