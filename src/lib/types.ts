@@ -380,6 +380,42 @@ export type InvoiceListItem = {
 
 export type MobileCustomer = { id: string; name: string; phone: string; customerCode: string };
 
+/** Customers tab list item — what they currently owe across unpaid invoices (SERVER computes it the
+ * same way DESKTOP's own debtor balance does: total − paid − approved returns, voided excluded). */
+export type MobileCustomerWithBalance = MobileCustomer & { balanceDueCents: number; unpaidInvoiceCount: number };
+
+export type MobileOutstandingInvoice = {
+  id: string;
+  invoiceNumber: string;
+  issuedAt: string;
+  dueDate: string | null;
+  grandTotalCents: number;
+  amountPaidCents: number;
+  outstandingCents: number;
+  paymentStatus: string;
+};
+
+export type MobileCustomerDebt = {
+  customerId: string;
+  customerName: string;
+  totalDueCents: number;
+  invoices: MobileOutstandingInvoice[];
+};
+
+export type CollectCustomerPaymentInput = {
+  /** Minted client-side, resent unchanged on retry — SERVER never applies the same payment twice. */
+  id: string;
+  paymentMethodId: string;
+  amountCents: number;
+  reference: string | null;
+  notes: string | null;
+};
+
+export type CollectCustomerPaymentResult = {
+  allocations: Array<{ saleId: string; invoiceNumber: string; amountCents: number }>;
+  remainingDueCents: number;
+};
+
 export type CreateCustomerInput = { name: string; phone: string };
 
 export type MobileRider = { id: string; name: string; phone: string; vehicleDescription: string | null };

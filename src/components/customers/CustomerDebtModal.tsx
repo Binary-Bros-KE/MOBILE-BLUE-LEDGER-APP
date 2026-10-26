@@ -1,0 +1,192 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, Loader2, Wallet } from "lucide-react";
+import { api, ApiError } from "@/lib/api";
+import { centsToPriceText, formatCents, priceTextToCents } from "@/lib/money";
+import type { CollectCustomerPaymentResult, MobileCustomerDebt, MobileCustomerWithBalance, PaymentMethodOption } from "@/lib/types";
+import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
+
+/**
+ * What a customer owes — their unpaid invoices, oldest first — and, with sales.edit, Collect
+ * Payment: one amount that SERVER applies across those invoices oldest first, each slice recorded as
+ * an ordinary invoice payment (exactly what DESKTOP would show had each invoice been paid one by
+ * one). The payment id is minted once per sheet, so a retry after a dropped connection can never
+ * charge the customer twice. After saving, the sheet shows which invoices the money went to.
+ */
+export function CustomerDebtModal({
+  customer,
+  currency,
+  canCollect,
+  onClose,
+  onPaid,
+}: {
+  customer: MobileCustomerWithBalance;
+  currency: string;
+  canCollect: boolean;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [debt, setDebt] = useState<MobileCustomerDebt | null>(null);
+  const [methods, setMethods] = useState<PaymentMethodOption[] | null>(null);
+  const [collecting, setCollecting] = useState(false);
+  const [methodId, setMethodId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [reference, setReference] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<CollectCustomerPaymentResult | null>(null);
+  const paymentId = useRef(`payment_${crypto.randomUUID()}`);
+  const money = (cents: number) => formatCents(cents, currency);
+
+  useEffect(() => {
+    api
+      .getCustomerDebt(customer.id)
+      .then((d) => {
+        setDebt(d);
+        setAmount(centsToPriceText(d.totalDueCents));
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load what this customer owes."));
+  }, [customer.id]);
+
+  function startCollecting(): void {
+    setCollecting(true);
+    if (!methods) {
+      api
+        .listPaymentMethods()
+        .then(setMethods)
+        .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load payment methods."));
+    }
+  }
+
+  const method = methods?.find((m) => m.id === methodId) ?? null;
+
+  async function handleCollect(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    if (!debt) return;
+    const amountCents = priceTextToCents(amount);
+    if (!methodId) return setError("Choose how they paid.");
+    if (!amountCents || amountCents <= 0) return setError("Enter an amount.");
+    if (amountCents > debt.totalDueCents) return setError(`That's more than the ${money(debt.totalDueCents)} they owe.`);
+    if (method?.requiresReference && !reference.trim()) return setError(`${method.name} needs a reference.`);
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await api.collectCustomerPayment(customer.id, {
+        id: paymentId.current,
+        paymentMethodId: methodId,
+        amountCents,
+        reference: reference.trim() || null,
+        notes: null,
+      });
+      setResult(res);
+      onPaid();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to record payment.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <BottomSheet title={customer.name} subtitle={debt ? `Owes ${money(debt.totalDueCents)}` : customer.phone} onClose={onClose}>
+      {result ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 rounded-lg bg-green/10 px-3 py-2.5 text-sm font-bold text-green">
+            <CheckCircle2 className="size-4 flex-none" aria-hidden="true" />
+            Payment recorded
+          </div>
+          <div className="space-y-1.5 text-xs">
+            {result.allocations.map((a) => (
+              <div key={a.saleId} className="flex justify-between gap-2">
+                <span className="text-navy/70">{a.invoiceNumber}</span>
+                <span className="font-bold text-navy">{money(a.amountCents)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between border-t border-dashed border-navy/15 pt-2 text-sm">
+            <span className="text-navy/60">Still owing</span>
+            <span className="font-display text-navy">{money(result.remainingDueCents)}</span>
+          </div>
+          <button type="button" onClick={onClose} className="w-full rounded-lg bg-navy py-3 text-sm font-bold text-white">
+            Done
+          </button>
+        </div>
+      ) : !debt ? (
+        error ? <SheetError message={error} /> : <p className="py-10 text-center text-sm text-navy/50">Loading…</p>
+      ) : (
+        <div className="space-y-3">
+          <SheetError message={error} />
+          {debt.invoices.length === 0 && <p className="py-6 text-center text-sm text-navy/50">Nothing owed right now.</p>}
+          <div className="space-y-2">
+            {debt.invoices.map((invoice) => {
+              const overdue = invoice.dueDate !== null && new Date(invoice.dueDate) < new Date();
+              return (
+                <div key={invoice.id} className="flex items-start justify-between gap-2 rounded-lg border border-navy/10 px-3 py-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-bold text-navy">{invoice.invoiceNumber}</p>
+                    <p className={overdue ? "font-semibold text-red" : "text-navy/50"}>
+                      {new Date(invoice.issuedAt).toLocaleDateString()}
+                      {invoice.dueDate ? ` · due ${new Date(invoice.dueDate).toLocaleDateString()}` : ""}
+                      {overdue ? " · overdue" : ""}
+                    </p>
+                  </div>
+                  <div className="flex-none text-right">
+                    <p className="font-bold text-navy">{money(invoice.outstandingCents)}</p>
+                    {invoice.amountPaidCents > 0 && <p className="text-navy/40">of {money(invoice.grandTotalCents)}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {canCollect && debt.totalDueCents > 0 && !collecting && (
+            <button
+              type="button"
+              onClick={startCollecting}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white"
+            >
+              <Wallet className="size-4" aria-hidden="true" />
+              Collect Payment
+            </button>
+          )}
+
+          {collecting && (
+            <form onSubmit={handleCollect} className="space-y-3 border-t border-dashed border-navy/15 pt-3">
+              <div className="grid grid-cols-2 gap-3">
+                <SheetField label="Amount received">
+                  <input autoFocus inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} className={sheetInputClass} />
+                </SheetField>
+                <SheetField label="Paid with">
+                  <select value={methodId} onChange={(e) => setMethodId(e.target.value)} className={sheetInputClass}>
+                    <option value="" disabled>
+                      Choose
+                    </option>
+                    {(methods ?? []).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </SheetField>
+              </div>
+              <SheetField label={method?.requiresReference ? "Reference" : "Reference (optional)"}>
+                <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. M-Pesa code" className={sheetInputClass} />
+              </SheetField>
+              <p className="text-[11px] text-navy/50">Applied to the oldest invoices first.</p>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {saving && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                {saving ? "Recording…" : "Record Payment"}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+    </BottomSheet>
+  );
+}

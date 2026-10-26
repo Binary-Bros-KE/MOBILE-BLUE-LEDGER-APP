@@ -1,30 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Phone, Plus, Search, UserRound } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { MobileCustomer } from "@/lib/types";
+import { formatCents } from "@/lib/money";
+import type { MobileCustomerWithBalance } from "@/lib/types";
+import { CustomerDebtModal } from "../customers/CustomerDebtModal";
+import { FilterChip } from "../FilterChip";
 import { QuickCreateCustomerModal } from "../QuickCreateCustomerModal";
 
-export function CustomersTab() {
-  const [customers, setCustomers] = useState<MobileCustomer[] | null>(null);
+/** Customer directory with what each one owes — debtors first. Tapping a customer who owes opens
+ * their unpaid invoices and (with sales.edit, the same grant as paying a single invoice) Collect
+ * Payment, which SERVER spreads across those invoices oldest first. */
+export function CustomersTab({ currency, canCollect }: { currency: string; canCollect: boolean }) {
+  const [customers, setCustomers] = useState<MobileCustomerWithBalance[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [owingOnly, setOwingOnly] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [debtFor, setDebtFor] = useState<MobileCustomerWithBalance | null>(null);
 
-  useEffect(() => {
+  const loadCustomers = useCallback(() => {
     api
-      .listCustomers()
+      .listCustomerBalances()
       .then(setCustomers)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load customers."));
   }, []);
 
+  useEffect(loadCustomers, [loadCustomers]);
+
+  const totalOwedCents = useMemo(() => (customers ?? []).reduce((sum, c) => sum + c.balanceDueCents, 0), [customers]);
+
   const filtered = useMemo(() => {
     if (!customers) return null;
     const term = search.trim().toLowerCase();
-    if (!term) return customers;
-    return customers.filter((c) => `${c.name} ${c.phone} ${c.customerCode}`.toLowerCase().includes(term));
-  }, [customers, search]);
+    return customers.filter((c) => {
+      if (owingOnly && c.balanceDueCents <= 0) return false;
+      return !term || `${c.name} ${c.phone} ${c.customerCode}`.toLowerCase().includes(term);
+    });
+  }, [customers, search, owingOnly]);
 
   return (
     <div className="pb-10">
@@ -48,6 +62,14 @@ export function CustomersTab() {
           New
         </button>
       </div>
+      {totalOwedCents > 0 && (
+        <div className="flex items-center justify-between gap-2 px-4 pt-3">
+          <FilterChip label="Owing" active={owingOnly} onClick={() => setOwingOnly((v) => !v)} />
+          <p className="text-xs text-navy/60">
+            Customers owe <span className="font-bold text-red">{formatCents(totalOwedCents, currency)}</span>
+          </p>
+        </div>
+      )}
 
       <div className="px-4 py-4">
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
@@ -57,7 +79,13 @@ export function CustomersTab() {
         {filtered && filtered.length > 0 && (
           <div className="space-y-2">
             {filtered.map((customer) => (
-              <div key={customer.id} className="flex items-center gap-3 rounded-lg bg-white p-3 shadow-sm">
+              <button
+                key={customer.id}
+                type="button"
+                disabled={customer.balanceDueCents <= 0}
+                onClick={() => setDebtFor(customer)}
+                className="flex w-full items-center gap-3 rounded-lg bg-white p-3 text-left shadow-sm disabled:cursor-default"
+              >
                 <div className="grid size-10 flex-none place-items-center rounded-full bg-navy/10 text-navy">
                   <UserRound className="size-5" aria-hidden="true" />
                 </div>
@@ -68,10 +96,19 @@ export function CustomersTab() {
                     {customer.phone}
                   </p>
                 </div>
-                <span className="flex-none rounded-full border border-dashed border-navy/25 px-2 py-0.5 text-[10px] font-bold text-navy/60">
-                  {customer.customerCode}
-                </span>
-              </div>
+                {customer.balanceDueCents > 0 ? (
+                  <span className="flex-none text-right">
+                    <span className="block font-display text-sm text-red">{formatCents(customer.balanceDueCents, currency)}</span>
+                    <span className="block text-[10px] text-navy/50">
+                      {customer.unpaidInvoiceCount} unpaid {customer.unpaidInvoiceCount === 1 ? "invoice" : "invoices"}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="flex-none rounded-full border border-dashed border-navy/25 px-2 py-0.5 text-[10px] font-bold text-navy/60">
+                    {customer.customerCode}
+                  </span>
+                )}
+              </button>
             ))}
           </div>
         )}
@@ -80,10 +117,19 @@ export function CustomersTab() {
       {createOpen && (
         <QuickCreateCustomerModal
           onClose={() => setCreateOpen(false)}
-          onCreated={(customer) => {
-            setCustomers((prev) => [...(prev ?? []), customer].sort((a, b) => a.name.localeCompare(b.name)));
+          onCreated={() => {
             setCreateOpen(false);
+            loadCustomers();
           }}
+        />
+      )}
+      {debtFor && (
+        <CustomerDebtModal
+          customer={debtFor}
+          currency={currency}
+          canCollect={canCollect}
+          onClose={() => setDebtFor(null)}
+          onPaid={loadCustomers}
         />
       )}
     </div>

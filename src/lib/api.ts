@@ -1,5 +1,7 @@
 import type {
   CheckoutRequest,
+  CollectCustomerPaymentInput,
+  CollectCustomerPaymentResult,
   CheckoutResult,
   ConvertToInvoiceRequest,
   ConvertToSaleRequest,
@@ -20,6 +22,8 @@ import type {
   MarkPaidRequest,
   MobileCategory,
   MobileCustomer,
+  MobileCustomerDebt,
+  MobileCustomerWithBalance,
   MobileExpenseCategory,
   MobileDeliveryNote,
   MobileInvoiceEditData,
@@ -236,6 +240,10 @@ export const api = {
   rejectInvoiceCancellation: (id: string, notes?: string) =>
     request<DocumentIdResult>(`/mobile/approvals/invoice-cancellations/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
   listCustomers: () => request<MobileCustomer[]>("/mobile/customers"),
+  listCustomerBalances: () => request<MobileCustomerWithBalance[]>("/mobile/customers/balances"),
+  getCustomerDebt: (customerId: string) => request<MobileCustomerDebt>(`/mobile/customers/${customerId}/debt`),
+  collectCustomerPayment: (customerId: string, body: CollectCustomerPaymentInput) =>
+    request<CollectCustomerPaymentResult>(`/mobile/customers/${customerId}/payments`, { method: "POST", body: JSON.stringify(body) }),
   createCustomer: (body: CreateCustomerInput) =>
     request<MobileCustomer>("/mobile/customers", { method: "POST", body: JSON.stringify(body) }),
   getStatement: (customerId: string) => request<SharedStatement>(`/mobile/customers/${customerId}/statement`),
