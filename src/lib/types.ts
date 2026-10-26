@@ -796,6 +796,10 @@ export type CheckoutRequest = {
   notes?: string;
   includeTaxBreakdown?: boolean;
   includeBusinessInfo?: boolean;
+  /** Completed while offline and only being sent now (see lib/sales-outbox.ts). */
+  queuedOffline?: boolean;
+  /** When the sale actually happened on the phone (ISO). */
+  offlineCompletedAt?: string;
 };
 
 export type MobileSupplier = { id: string; businessName: string; phone1: string };
@@ -817,7 +821,9 @@ export type MobileSupplierBalanceEntry = {
 
 export type CreateSupplierInput = { businessName: string; contactPerson?: string; phone1: string };
 
-export type CheckoutResult = { id: string; receiptNumber: string; grandTotalCents: number };
+/** stockShortfalls: products a sale queued offline took below zero (SERVER accepts it anyway — the
+ * goods already left); always empty for a normal online sale. */
+export type CheckoutResult = { id: string; receiptNumber: string; grandTotalCents: number; stockShortfalls?: string[] };
 
 // --- Invoices & Quotations (Phase 2) ---
 

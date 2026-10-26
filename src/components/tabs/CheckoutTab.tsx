@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Minus, PauseCircle, Plus, Receipt, ScanLine, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, isOfflineError } from "@/lib/api";
 import { effectiveUnitPriceCents, naturalUnitPriceCents, serviceChargeDraftsToInputs, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import type { CheckoutCartLine, CheckoutRequest, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
 import { findPickByCode } from "@/lib/barcode";
+import { loadWithOfflineFallback } from "@/lib/offline-cache";
+import { enqueueSale } from "@/lib/sales-outbox";
 import { discardParkedSale, listParkedSales, parkSale, takeParkedSale, type ParkedSale } from "@/lib/parked-sales";
 import { addPickToCart, needsVariantPicker, plainPick, type VariantPick } from "@/lib/variants";
 import { CheckoutPaymentSheet, type CheckoutPaymentEntry } from "../checkout/CheckoutPaymentSheet";
@@ -72,6 +74,8 @@ export function CheckoutTab({
   // Bumped after every park/resume/discard so the derived list below re-reads storage.
   const [parkedVersion, setParkedVersion] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Set when the lists came from this phone's offline copy rather than the server. */
+  const [usingOfflineData, setUsingOfflineData] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanMiss, setScanMiss] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -112,20 +116,27 @@ export function CheckoutTab({
 
   useEffect(() => {
     if (branchId) return;
-    api
-      .listStorefronts()
-      .then(setStorefronts)
+    loadWithOfflineFallback("storefronts", () => api.listStorefronts(), isOfflineError)
+      .then((r) => setStorefronts(r.data))
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load storefronts."));
   }, [branchId]);
 
   useEffect(() => {
-    Promise.all([api.listProducts(), api.listPaymentMethods(), api.listCustomers(), api.listRiders(), api.listSuppliers()])
+    // Every list falls back to this phone's last saved copy when offline, so the till keeps selling.
+    Promise.all([
+      loadWithOfflineFallback("products", () => api.listProducts(), isOfflineError),
+      loadWithOfflineFallback("paymentMethods", () => api.listPaymentMethods(), isOfflineError),
+      loadWithOfflineFallback("customers", () => api.listCustomers(), isOfflineError),
+      loadWithOfflineFallback("riders", () => api.listRiders(), isOfflineError),
+      loadWithOfflineFallback("suppliers", () => api.listSuppliers(), isOfflineError),
+    ])
       .then(([productList, methods, customerList, riderList, supplierList]) => {
-        setProducts(productList);
-        setPaymentMethods(methods);
-        setCustomers(customerList);
-        setRiders(riderList);
-        setSuppliers(supplierList);
+        setProducts(productList.data);
+        setPaymentMethods(methods.data);
+        setCustomers(customerList.data);
+        setRiders(riderList.data);
+        setSuppliers(supplierList.data);
+        if (productList.fromCache) setUsingOfflineData("Offline — showing the products and prices saved on this phone.");
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load products or payment methods."));
   }, []);
@@ -364,36 +375,64 @@ export function CheckoutTab({
   async function handleCheckout(payments: CheckoutPaymentEntry[]): Promise<void> {
     if (!effectiveLocationId) return;
     const primary = payments[0]!;
+    const request: CheckoutRequest = {
+      id: checkoutIdRef.current,
+      locationId: effectiveLocationId,
+      items: cartItemsPayload(),
+      paymentMethodId: primary.paymentMethodId,
+      paymentReference: primary.reference || undefined,
+      customerId: customerId ?? undefined,
+      amountReceivedCents: payments.reduce((sum, p) => sum + p.amountCents, 0),
+      payments:
+        payments.length > 1
+          ? payments.map((p) => ({ paymentMethodId: p.paymentMethodId, amountCents: p.amountCents, reference: p.reference || undefined }))
+          : undefined,
+      notes: orderNotes.trim() || undefined,
+      includeTaxBreakdown,
+      includeBusinessInfo,
+      serviceCharges: serviceChargeDraftsToInputs(serviceCharges),
+      delivery: deliveryPayload(),
+    };
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const result = await api.checkout({
-        id: checkoutIdRef.current,
-        locationId: effectiveLocationId,
-        items: cartItemsPayload(),
-        paymentMethodId: primary.paymentMethodId,
-        paymentReference: primary.reference || undefined,
-        customerId: customerId ?? undefined,
-        amountReceivedCents: payments.reduce((sum, p) => sum + p.amountCents, 0),
-        payments:
-          payments.length > 1
-            ? payments.map((p) => ({ paymentMethodId: p.paymentMethodId, amountCents: p.amountCents, reference: p.reference || undefined }))
-            : undefined,
-        notes: orderNotes.trim() || undefined,
-        includeTaxBreakdown,
-        includeBusinessInfo,
-        serviceCharges: serviceChargeDraftsToInputs(serviceCharges),
-        delivery: deliveryPayload(),
-      });
+      const result = await api.checkout(request);
       setPaymentSheetOpen(false);
       setCompletedSaleId(result.id);
     } catch (err) {
+      if (isOfflineError(err)) {
+        saveSaleOffline(request);
+        return;
+      }
       // Deliberately NOT resetting checkoutIdRef here — a retry (network error, timeout) must reuse
       // the SAME id so SERVER treats it as the safe no-op it's designed to be, not a second sale.
       setSubmitError(err instanceof ApiError ? err.message : "Checkout failed — check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /**
+   * No connection: keep the sale on this phone (lib/sales-outbox.ts) and let the cashier carry on —
+   * OfflineStatusBar sends it once the phone is back online. Every line's price is pinned to what the
+   * customer was actually charged here, so SERVER can't re-price it later; SERVER also accepts it if
+   * stock ran short meanwhile (the goods already left) and dates it to now, the real sale time.
+   */
+  function saveSaleOffline(request: CheckoutRequest): void {
+    const pinned: CheckoutRequest = {
+      ...request,
+      items: request.items.map((item, index) => ({ ...item, unitPriceCents: effectiveUnitPriceCents(cart[index]!) })),
+      queuedOffline: true,
+      offlineCompletedAt: new Date().toISOString(),
+    };
+    const label = `${customerId ? customerLabel : "Walk-in"} · ${cart.reduce((sum, l) => sum + l.quantity, 0)} item(s)`;
+    if (!enqueueSale(pinned, { label, totalCents: grandTotalCents })) {
+      setSubmitError("You're offline and this phone couldn't save the sale — don't hand over the goods until it goes through.");
+      return;
+    }
+    setPaymentSheetOpen(false);
+    resetForNextSale();
+    setNotice(`Offline — sale of ${formatCents(grandTotalCents, currency)} saved on this phone. It will sync automatically.`);
   }
 
   /** "Put on account" — the cart becomes an invoice for the selected customer (DESKTOP's way of
@@ -419,7 +458,13 @@ export function CheckoutTab({
       setPaymentSheetOpen(false);
       setCompletedSaleId(result.id);
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : "Couldn't put this on account — check your connection and try again.");
+      setSubmitError(
+        isOfflineError(err)
+          ? "Putting a sale on account needs an internet connection — take payment now, or try again when back online."
+          : err instanceof ApiError
+            ? err.message
+            : "Couldn't put this on account — check your connection and try again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -565,6 +610,7 @@ export function CheckoutTab({
         )}
       </div>
 
+      {usingOfflineData && <p className="mx-4 mb-2 rounded border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold-text">{usingOfflineData}</p>}
       {loadError && <p className="mx-4 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{loadError}</p>}
 
       <div className="px-4 py-2">

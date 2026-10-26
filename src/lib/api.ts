@@ -103,6 +103,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Set on the ApiError a request throws when it never reached SERVER at all (no connection, DNS,
+ * airplane mode) — what Checkout's offline queue and the offline caches key off. */
+export const OFFLINE_ERROR_CODE = "OFFLINE";
+
+export function isOfflineError(err: unknown): boolean {
+  return err instanceof ApiError && err.code === OFFLINE_ERROR_CODE;
+}
+
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -138,14 +146,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const token = getToken();
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
+    });
+  } catch {
+    // fetch only rejects when the request never got a response — no connection, not an HTTP error.
+    throw new ApiError(0, "You're offline — check your internet connection.", OFFLINE_ERROR_CODE);
+  }
 
   const body = await res.json().catch(() => null);
 

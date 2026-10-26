@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, isOfflineError } from "@/lib/api";
+import { loadWithOfflineFallback } from "@/lib/offline-cache";
 import { useAuth } from "@/lib/auth-context";
 import type { MobileSessionInfo } from "@/lib/types";
+import { OfflineStatusBar } from "../OfflineStatusBar";
 import { ApprovalsTab } from "../tabs/ApprovalsTab";
 import { CashUpTab } from "../tabs/CashUpTab";
 import { CheckoutTab } from "../tabs/CheckoutTab";
@@ -53,8 +55,10 @@ export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [session, setSession] = useState<MobileSessionInfo | null>(null);
 
+  // Offline, the last known session keeps the menu and permissions working (OfflineStatusBar makes it
+  // obvious the phone is offline); SERVER re-checks everything once requests go through again.
   useEffect(() => {
-    api.getMe().then(setSession).catch(() => {
+    loadWithOfflineFallback("me", () => api.getMe(), isOfflineError).then((r) => setSession(r.data)).catch(() => {
       // The sidebar footer just falls back to a generic label — not worth failing the whole shell
       // over a display-only nicety.
     });
@@ -103,6 +107,7 @@ export function AppShell() {
         <img src="/BLUE_LEDGER.png" alt="" className="size-6" />
         <span className="font-display text-sm">{TAB_LABELS[activeTab]}</span>
       </header>
+      <OfflineStatusBar currency={session?.currency ?? "KES"} />
 
       <Sidebar
         open={drawerOpen}

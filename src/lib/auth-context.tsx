@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, LICENSE_KEY_STORAGE_KEY, TOKEN_STORAGE_KEY } from "./api";
+import { clearOfflineCache } from "./offline-cache";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -36,6 +37,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   function logout(): void {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    // The next person on this phone may be a different employee/branch. The unsynced-sales outbox is
+    // deliberately NOT cleared — those sales were paid for and must still reach the server.
+    clearOfflineCache();
     setStatus("unauthenticated");
   }
 
