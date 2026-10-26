@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { MobileSessionInfo } from "@/lib/types";
 import { ApprovalsTab } from "../tabs/ApprovalsTab";
+import { CashUpTab } from "../tabs/CashUpTab";
 import { CheckoutTab } from "../tabs/CheckoutTab";
 import { CustomersTab } from "../tabs/CustomersTab";
 import { DashboardTab } from "../tabs/DashboardTab";
@@ -179,6 +180,13 @@ export function AppShell() {
               viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               viewerBranchId={session?.branchId ?? null}
               vatRatePercent={session?.vatRatePercent ?? 0}
+            />
+          )}
+          {activeTab === "cashUp" && (
+            <CashUpTab
+              canSeeEveryone={can("reports", "view")}
+              viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
+              currentEmployeeId={session?.employeeId ?? null}
             />
           )}
           {activeTab === "settings" && (

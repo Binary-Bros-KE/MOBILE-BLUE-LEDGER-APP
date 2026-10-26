@@ -21,6 +21,7 @@ import type {
   InvoiceListItem,
   MarkPaidRequest,
   MobileBusinessProfile,
+  MobileCashUp,
   MobileCategory,
   MobileCustomer,
   MobileCustomerDebt,
@@ -294,6 +295,10 @@ export const api = {
   recordStockAdjustment: (body: StockAdjustmentInput) =>
     request<StockAdjustmentResult>("/mobile/stock-adjustments", { method: "POST", body: JSON.stringify(body) }),
   listPaymentMethods: () => request<PaymentMethodOption[]>("/mobile/payment-methods"),
+  getCashUp: (q: { date: string; timezoneOffsetMinutes: number; locationId?: string; employeeId?: string }) =>
+    request<MobileCashUp>(
+      `/mobile/cash-up?date=${q.date}&timezoneOffsetMinutes=${q.timezoneOffsetMinutes}${q.locationId ? `&locationId=${encodeURIComponent(q.locationId)}` : ""}${q.employeeId ? `&employeeId=${encodeURIComponent(q.employeeId)}` : ""}`,
+    ),
   isMpesaConfigured: (locationId: string) =>
     request<{ configured: boolean }>(`/mobile/mpesa/configured?locationId=${encodeURIComponent(locationId)}`),
   sendMpesaPrompt: (body: { locationId: string; phone: string; amountCents: number }) =>

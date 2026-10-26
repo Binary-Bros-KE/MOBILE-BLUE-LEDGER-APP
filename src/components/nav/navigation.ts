@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Banknote,
   Bike,
   CheckCircle2,
   Clock,
@@ -22,6 +23,7 @@ import {
 export type TabKey =
   | "dashboard"
   | "checkout"
+  | "cashUp"
   | "sales"
   | "invoices"
   | "quotations"
@@ -71,6 +73,8 @@ export const navGroups: NavGroup[] = [
       { key: "checkout", label: "Checkout", icon: CreditCard, ready: true, permission: { module: "sales", action: "create" } },
       // "Sales" covers what DESKTOP calls Receipts (a walk-in, non-invoice Sale) — no separate
       // Receipts tab, they're the same underlying document.
+      // Anyone who can sell gets their own cash-up; everyone's needs reports.view (see CashUpTab).
+      { key: "cashUp", label: "Cash Up", icon: Banknote, ready: true, permission: { module: "sales", action: "create" } },
       { key: "sales", label: "Sales", icon: ShoppingCart, ready: true, permission: { module: "sales", action: "view" } },
       // "Invoices" also carries the "Statement" action (see InvoicesTab.tsx) — same as DESKTOP's
       // own InvoicesRoute, no separate Statements nav entry. Invoices are just Sales with an

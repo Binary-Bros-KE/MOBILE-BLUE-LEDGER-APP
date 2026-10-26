@@ -688,6 +688,22 @@ export type MobileProductVariants = {
 /** `code` "MPESA" (DESKTOP's own seeded code) is what Checkout offers an STK prompt for. */
 export type PaymentMethodOption = { id: string; name: string; code: string; requiresReference: boolean };
 
+export type MobileCashUp = {
+  date: string;
+  locationId: string | null;
+  locationName: string | null;
+  employeeId: string | null;
+  currency: string;
+  byMethod: Array<{ paymentMethodId: string; name: string; isCash: boolean; amountCents: number; count: number }>;
+  totalCollectedCents: number;
+  salesCount: number;
+  voidedCount: number;
+  refundsCents: number;
+  cashExpensesCents: number;
+  expectedCashCents: number;
+  byCashier: Array<{ employeeId: string; name: string; amountCents: number; salesCount: number }> | null;
+};
+
 export type MpesaStatusResult = { status: string; message: string; mpesaReceiptNumber: string | null; amountCents: number; phone: string };
 
 /** One line in the Checkout cart — a client-side PREVIEW only. quantity/discountAmountCents are the
