@@ -25,6 +25,7 @@ import { StockLedgerTab } from "../tabs/StockLedgerTab";
 import { SuppliersTab } from "../tabs/SuppliersTab";
 import { TransactionsTab } from "../tabs/TransactionsTab";
 import { WorkingHoursTab } from "../tabs/WorkingHoursTab";
+import { BOTTOM_NAV_HEIGHT_PX, BottomNav } from "./BottomNav";
 import { navGroups, visibleNavGroups, type TabKey } from "./navigation";
 import { Sidebar } from "./Sidebar";
 
@@ -88,7 +89,8 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-cream-dark">
+    // --bottom-nav-h lets anything else pinned to the bottom (Checkout's cart bar) sit above BottomNav.
+    <div className="min-h-screen bg-cream-dark" style={{ "--bottom-nav-h": `${BOTTOM_NAV_HEIGHT_PX}px` } as React.CSSProperties}>
       <header className="sticky top-0 z-30 flex items-center gap-3 bg-navy px-4 py-4 text-white">
         <button
           type="button"
@@ -116,6 +118,7 @@ export function AppShell() {
       <AnimatePresence mode="wait">
         <motion.main
           key={activeTab}
+          className="pb-[calc(var(--bottom-nav-h)_+_env(safe-area-inset-bottom))]"
           initial={{ opacity: 0, x: 12 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -12 }}
@@ -224,6 +227,8 @@ export function AppShell() {
           {activeTab === "workingHours" && <WorkingHoursTab />}
         </motion.main>
       </AnimatePresence>
+
+      <BottomNav navGroups={groups} activeTab={activeTab} onSelect={setActiveTab} onMore={() => setDrawerOpen(true)} />
     </div>
   );
 }

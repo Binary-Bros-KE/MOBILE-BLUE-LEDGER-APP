@@ -783,7 +783,7 @@ export function CheckoutTab({
       )}
 
       {cart.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-navy/10 bg-white p-4 shadow-[0_-4px_16px_rgba(8,42,143,0.08)]">
+        <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-h,0px)_+_env(safe-area-inset-bottom))] z-20 border-t border-navy/10 bg-white p-4 shadow-[0_-4px_16px_rgba(8,42,143,0.08)]">
           {taxAmountCents > 0 && (
             <>
               <div className="mb-1 flex items-center justify-between">
