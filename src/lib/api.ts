@@ -49,6 +49,7 @@ import type {
   ProductEditData,
   ProductInput,
   ProductListItem,
+  ProductPerformanceReport,
   PurchaseDetail,
   PurchasePaymentInput,
   PurchaseListItem,
@@ -67,6 +68,7 @@ import type {
   SharedDocument,
   SharedStatement,
   StockAdjustmentInput,
+  StockValueReport,
   StockAdjustmentResult,
   ShareLinkResult,
   StockMovementRow,
@@ -312,6 +314,12 @@ export const api = {
   recordStockAdjustment: (body: StockAdjustmentInput) =>
     request<StockAdjustmentResult>("/mobile/stock-adjustments", { method: "POST", body: JSON.stringify(body) }),
   listPaymentMethods: () => request<PaymentMethodOption[]>("/mobile/payment-methods"),
+  getStockValueReport: (locationId?: string) =>
+    request<StockValueReport>(`/mobile/reports/stock-value${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
+  getProductPerformanceReport: (q: { startDate: string; endDate: string; timezoneOffsetMinutes: number; locationId?: string }) =>
+    request<ProductPerformanceReport>(
+      `/mobile/reports/product-performance?startDate=${q.startDate}&endDate=${q.endDate}&timezoneOffsetMinutes=${q.timezoneOffsetMinutes}${q.locationId ? `&locationId=${encodeURIComponent(q.locationId)}` : ""}`,
+    ),
   getCashUp: (q: { date: string; timezoneOffsetMinutes: number; locationId?: string; employeeId?: string }) =>
     request<MobileCashUp>(
       `/mobile/cash-up?date=${q.date}&timezoneOffsetMinutes=${q.timezoneOffsetMinutes}${q.locationId ? `&locationId=${encodeURIComponent(q.locationId)}` : ""}${q.employeeId ? `&employeeId=${encodeURIComponent(q.employeeId)}` : ""}`,

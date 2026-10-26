@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Banknote,
+  BarChart3,
   Bike,
   CheckCircle2,
   Clock,
@@ -38,7 +39,8 @@ export type TabKey =
   | "riders"
   | "approvals"
   | "workingHours"
-  | "settings";
+  | "settings"
+  | "reports";
 
 export type NavItem = {
   key: TabKey;
@@ -104,6 +106,11 @@ export const navGroups: NavGroup[] = [
       { key: "expenses", label: "Expenses", icon: Wallet, ready: true, permission: { module: "expenses", action: "view" } },
       { key: "stockLedger", label: "Stock Ledger", icon: Warehouse, ready: true, permission: { module: "inventory", action: "view" } },
     ],
+  },
+  {
+    title: "Insights",
+    // Same grant DESKTOP's own Inventory/Products reports require.
+    items: [{ key: "reports", label: "Reports", icon: BarChart3, ready: true, permission: { module: "reports", action: "view" } }],
   },
   {
     title: "Team",

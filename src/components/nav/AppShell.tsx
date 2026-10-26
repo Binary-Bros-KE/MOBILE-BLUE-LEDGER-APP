@@ -20,6 +20,7 @@ import { InvoicesTab } from "../tabs/InvoicesTab";
 import { ProductsTab } from "../tabs/ProductsTab";
 import { PurchasesTab } from "../tabs/PurchasesTab";
 import { QuotationsTab } from "../tabs/QuotationsTab";
+import { ReportsTab } from "../tabs/ReportsTab";
 import { RidersTab } from "../tabs/RidersTab";
 import { SalesTab } from "../tabs/SalesTab";
 import { SettingsTab } from "../tabs/SettingsTab";
@@ -191,6 +192,7 @@ export function AppShell() {
               vatRatePercent={session?.vatRatePercent ?? 0}
             />
           )}
+          {activeTab === "reports" && <ReportsTab viewerIsSuperAdmin={session?.isSuperAdmin ?? false} />}
           {activeTab === "cashUp" && (
             <CashUpTab
               canSeeEveryone={can("reports", "view")}

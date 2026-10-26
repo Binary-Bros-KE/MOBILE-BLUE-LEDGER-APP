@@ -688,6 +688,35 @@ export type MobileProductVariants = {
 /** `code` "MPESA" (DESKTOP's own seeded code) is what Checkout offers an STK prompt for. */
 export type PaymentMethodOption = { id: string; name: string; code: string; requiresReference: boolean };
 
+export type StockValueReport = {
+  currency: string;
+  totalUnits: number;
+  costValueCents: number;
+  retailValueCents: number;
+  locations: Array<{
+    locationId: string;
+    locationName: string;
+    isMainStore: boolean;
+    productCount: number;
+    totalUnits: number;
+    costValueCents: number;
+    retailValueCents: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+  }>;
+  topProducts: Array<{ productId: string; name: string; sku: string; units: number; costValueCents: number; retailValueCents: number }>;
+};
+
+export type ProductPerformanceReport = {
+  currency: string;
+  startDate: string;
+  endDate: string;
+  bestSelling: Array<{ productId: string; name: string; sku: string; quantitySold: number; revenueCents: number; costCents: number; profitCents: number }>;
+  /** daysSinceLastSale null = no sale within lookbackDays. */
+  slowMoving: Array<{ productId: string; name: string; sku: string; quantitySoldInPeriod: number; daysSinceLastSale: number | null }>;
+  lookbackDays: number;
+};
+
 export type MobileCashUp = {
   date: string;
   locationId: string | null;
