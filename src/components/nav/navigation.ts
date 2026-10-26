@@ -8,6 +8,7 @@ import {
   FileText,
   LayoutDashboard,
   Package,
+  Settings,
   ShoppingCart,
   Store,
   Truck,
@@ -34,7 +35,8 @@ export type TabKey =
   | "customers"
   | "riders"
   | "approvals"
-  | "workingHours";
+  | "workingHours"
+  | "settings";
 
 export type NavItem = {
   key: TabKey;
@@ -46,6 +48,9 @@ export type NavItem = {
    * filter navGroups against the signed-in employee's actual permissions from /mobile/me). Omit for
    * a tab visible to anyone who can open the app at all (just Dashboard today). */
   permission?: { module: string; action: string };
+  /** Visible when ANY of these is granted — for a tab that bundles several DESKTOP screens with their
+   * own separate permissions (Settings: business_profile / locations / payment_methods). */
+  permissionAnyOf?: Array<{ module: string; action: string }>;
   /** Gated by MobileSessionInfo.isSuperAdmin instead of `permission` above — for a feature that's
    * inherently Super-Admin-exclusive (not a delegable module/action), e.g. Working Hours. */
   superAdminOnly?: boolean;
@@ -100,6 +105,22 @@ export const navGroups: NavGroup[] = [
     title: "Team",
     items: [{ key: "employees", label: "Employees", icon: Users, ready: true, permission: { module: "employees", action: "view" } }],
   },
+  {
+    title: "Business",
+    items: [
+      {
+        key: "settings",
+        label: "Settings",
+        icon: Settings,
+        ready: true,
+        permissionAnyOf: [
+          { module: "business_profile", action: "edit" },
+          { module: "locations", action: "edit" },
+          { module: "payment_methods", action: "edit" },
+        ],
+      },
+    ],
+  },
 ];
 
 /** Filters navGroups against the signed-in employee's actual permissions (from /mobile/me) — a tab
@@ -117,6 +138,7 @@ export function visibleNavGroups(permissions: Record<string, string[]> | null | 
         // A Super Admin has every permission by definition — never limited by the role's stored JSON
         // (same rule as SERVER's requireMobilePermission and DESKTOP's auth-service).
         if (isSuperAdmin) return true;
+        if (item.permissionAnyOf) return item.permissionAnyOf.some((p) => perms[p.module]?.includes(p.action) ?? false);
         return !item.permission || (perms[item.permission.module]?.includes(item.permission.action) ?? false);
       }),
     }))

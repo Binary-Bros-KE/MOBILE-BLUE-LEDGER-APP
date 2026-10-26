@@ -582,6 +582,44 @@ export type ProductListItem = {
 
 export type MobileCategory = { id: string; name: string };
 
+export type MobileBusinessProfile = {
+  businessName: string;
+  contactPhone: string | null;
+  alternativePhone: string | null;
+  email: string | null;
+  website: string | null;
+  kraPin: string | null;
+  cityTown: string | null;
+  physicalAddress: string | null;
+  vatRatePercent: number;
+  pricesTaxInclusive: boolean;
+};
+
+export type MobileStorefrontDetails = {
+  id: string;
+  locationName: string;
+  phone: string | null;
+  email: string | null;
+  physicalAddress: string | null;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
+};
+
+export type MobilePaymentMethodAdmin = {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+  requiresReference: boolean;
+  isSystemMethod: boolean;
+};
+
+export type MobileSettings = {
+  profile: MobileBusinessProfile;
+  storefronts: MobileStorefrontDetails[];
+  paymentMethods: MobilePaymentMethodAdmin[];
+};
+
 export type ProductTaxTypeValue = "vat" | "exempted" | "zero_rated";
 
 /** Body for creating/updating a product — the day-to-day subset of DESKTOP's own Product form.

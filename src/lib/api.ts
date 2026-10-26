@@ -20,6 +20,7 @@ import type {
   InvoiceCancellationApprovalItem,
   InvoiceListItem,
   MarkPaidRequest,
+  MobileBusinessProfile,
   MobileCategory,
   MobileCustomer,
   MobileCustomerDebt,
@@ -33,6 +34,9 @@ import type {
   MobileReturnableItem,
   MobileRider,
   MobileRole,
+  MobilePaymentMethodAdmin,
+  MobileSettings,
+  MobileStorefrontDetails,
   MobileSessionInfo,
   MobileSupplier,
   MobileSupplierBalanceEntry,
@@ -289,6 +293,15 @@ export const api = {
   recordStockAdjustment: (body: StockAdjustmentInput) =>
     request<StockAdjustmentResult>("/mobile/stock-adjustments", { method: "POST", body: JSON.stringify(body) }),
   listPaymentMethods: () => request<PaymentMethodOption[]>("/mobile/payment-methods"),
+  getSettings: () => request<MobileSettings>("/mobile/settings"),
+  updateBusinessProfile: (body: MobileBusinessProfile) =>
+    request<{ success: true }>("/mobile/settings/business-profile", { method: "PUT", body: JSON.stringify(body) }),
+  updateStorefrontDetails: (locationId: string, body: Omit<MobileStorefrontDetails, "id" | "locationName">) =>
+    request<DocumentIdResult>(`/mobile/settings/storefronts/${locationId}`, { method: "PUT", body: JSON.stringify(body) }),
+  createPaymentMethod: (body: { name: string; requiresReference: boolean }) =>
+    request<MobilePaymentMethodAdmin>("/mobile/settings/payment-methods", { method: "POST", body: JSON.stringify(body) }),
+  updatePaymentMethod: (id: string, body: { name?: string; isActive?: boolean; requiresReference?: boolean }) =>
+    request<DocumentIdResult>(`/mobile/settings/payment-methods/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   /** Real, from-scratch checkout — SERVER recomputes every figure itself (see
    * mobile-checkout-service.ts), this body is a proposal, not a trusted total. `body.id` must be
    * minted client-side (crypto.randomUUID()) and resent UNCHANGED on any retry — that's the whole

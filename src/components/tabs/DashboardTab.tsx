@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, CreditCard, PackageX } from "lucide-react";
+import { AlertTriangle, ChevronRight, CreditCard, PackageX } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { getDashboardVariant } from "@/lib/dashboard-role";
 import { formatCents } from "@/lib/money";
@@ -27,10 +27,19 @@ export function DashboardTab({ session, onNavigate }: { session: MobileSessionIn
   if (variant === "storekeeper") {
     return <StorekeeperDashboardTab branchId={session?.branchId ?? null} branchName={session?.branchName ?? null} onNavigate={onNavigate} />;
   }
-  return <AdminDashboardTab />;
+  // Same rule as AppShell's own can(): a Super Admin passes every check.
+  const can = (module: string, action: string) => (session?.isSuperAdmin ?? false) || (session?.permissions?.[module]?.includes(action) ?? false);
+  return (
+    <AdminDashboardTab
+      onOpenProducts={can("products", "view") ? () => onNavigate("products") : undefined}
+      onOpenCustomers={can("customers", "view") ? () => onNavigate("customers") : undefined}
+    />
+  );
 }
 
-function AdminDashboardTab() {
+/** The alert cards link straight to where they're acted on (restock in Products, collect in
+ * Customers) — each link only when the viewer can open that tab. */
+function AdminDashboardTab({ onOpenProducts, onOpenCustomers }: { onOpenProducts?: () => void; onOpenCustomers?: () => void }) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);
@@ -75,8 +84,8 @@ function AdminDashboardTab() {
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
         {dashboard && (
           <>
-            <StockCard dashboard={dashboard} />
-            <CreditCard_ dashboard={dashboard} currency={dashboard.currency} />
+            <StockCard dashboard={dashboard} onOpen={onOpenProducts} />
+            <CreditCard_ dashboard={dashboard} currency={dashboard.currency} onOpen={onOpenCustomers} />
           </>
         )}
       </div>
@@ -96,7 +105,16 @@ function Card({ title, icon, accent, children }: { title: string; icon: React.Re
   );
 }
 
-function StockCard({ dashboard }: { dashboard: OwnerDashboard }) {
+function CardLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="mt-3 flex w-full items-center justify-between border-t border-navy/10 pt-3 text-xs font-bold text-blue">
+      {label}
+      <ChevronRight className="size-4" aria-hidden="true" />
+    </button>
+  );
+}
+
+function StockCard({ dashboard, onOpen }: { dashboard: OwnerDashboard; onOpen?: () => void }) {
   const { stock } = dashboard;
   const hasAlerts = stock.lowStockCount > 0 || stock.outOfStockCount > 0;
   return (
@@ -124,11 +142,12 @@ function StockCard({ dashboard }: { dashboard: OwnerDashboard }) {
           ))}
         </ul>
       )}
+      {hasAlerts && onOpen && <CardLink label="Restock in Products" onClick={onOpen} />}
     </Card>
   );
 }
 
-function CreditCard_({ dashboard, currency }: { dashboard: OwnerDashboard; currency: string }) {
+function CreditCard_({ dashboard, currency, onOpen }: { dashboard: OwnerDashboard; currency: string; onOpen?: () => void }) {
   const { credit } = dashboard;
   return (
     <Card
@@ -154,6 +173,7 @@ function CreditCard_({ dashboard, currency }: { dashboard: OwnerDashboard; curre
           ))}
         </div>
       )}
+      {credit.debtorCount > 0 && onOpen && <CardLink label="Collect from customers" onClick={onOpen} />}
     </Card>
   );
 }

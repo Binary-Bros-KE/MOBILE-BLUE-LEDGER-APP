@@ -19,6 +19,7 @@ import { PurchasesTab } from "../tabs/PurchasesTab";
 import { QuotationsTab } from "../tabs/QuotationsTab";
 import { RidersTab } from "../tabs/RidersTab";
 import { SalesTab } from "../tabs/SalesTab";
+import { SettingsTab } from "../tabs/SettingsTab";
 import { StockLedgerTab } from "../tabs/StockLedgerTab";
 import { SuppliersTab } from "../tabs/SuppliersTab";
 import { TransactionsTab } from "../tabs/TransactionsTab";
@@ -178,6 +179,14 @@ export function AppShell() {
               viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               viewerBranchId={session?.branchId ?? null}
               vatRatePercent={session?.vatRatePercent ?? 0}
+            />
+          )}
+          {activeTab === "settings" && (
+            <SettingsTab
+              canEditProfile={can("business_profile", "edit")}
+              canEditStorefronts={can("locations", "edit")}
+              canCreatePaymentMethod={can("payment_methods", "create")}
+              canEditPaymentMethods={can("payment_methods", "edit")}
             />
           )}
           {activeTab === "suppliers" && (
