@@ -1005,6 +1005,7 @@ export function CheckoutTab({
       {completedSaleId && (
         <DocumentDetailModal
           saleId={completedSaleId}
+          autoPrint
           onClose={() => {
             setCompletedSaleId(null);
             resetForNextSale();

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Download, Loader2, Package, Share2, Trash2, Undo2, X } from "lucide-react";
+import { Copy, Download, Loader2, Package, Printer, Settings2, Share2, Trash2, Undo2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { groupItemsBySections } from "@/lib/document-sections";
 import { formatCents } from "@/lib/money";
@@ -10,7 +10,9 @@ import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/shar
 import { taxBreakdownLabel } from "@/lib/tax";
 import type { InvoiceStockSource, PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
 import { CheckboxField } from "./CheckboxField";
+import { canPrintReceipts, getPrinterSettings, printDocument, printerErrorMessage, type PrinterSettings } from "@/lib/printer";
 import { DeliveryNoteModal } from "./DeliveryNoteModal";
+import { PrinterSetupSheet } from "./PrinterSetupSheet";
 import { RequestReturnModal } from "./RequestReturnModal";
 
 const KIND_LABEL: Record<SharedDocument["documentKind"], string> = {
@@ -68,6 +70,7 @@ export function DocumentDetailModal({
   canApprove = false,
   canManageDelivery = false,
   allowMainStoreStock = false,
+  autoPrint = false,
 }: {
   saleId: string;
   kind?: "sale" | "quotation";
@@ -91,9 +94,15 @@ export function DocumentDetailModal({
   canManageDelivery?: boolean;
   /** Admin "Invoice stock from Main Store" toggle — Convert to Invoice then offers Stock From. */
   allowMainStoreStock?: boolean;
+  /** Set by Checkout for a sale it just completed — prints once as soon as the document loads, if
+   * this phone has a receipt printer set up with "print every sale" on. */
+  autoPrint?: boolean;
 }) {
   const [doc, setDoc] = useState<SharedDocument | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const [printerSetupOpen, setPrinterSetupOpen] = useState(false);
+  const autoPrintedRef = useRef(false);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -156,6 +165,40 @@ export function DocumentDetailModal({
       cancelled = true;
     };
   }, [saleId, kind]);
+
+  async function printWith(settings: PrinterSettings, document: SharedDocument): Promise<void> {
+    setPrinting(true);
+    setActionError(null);
+    try {
+      await printDocument(document, settings);
+      setNotice("Sent to the printer.");
+    } catch (err) {
+      setActionError(printerErrorMessage(err));
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  /** First time on this phone: pick the printer, then print. */
+  function handlePrint(): void {
+    const settings = getPrinterSettings();
+    if (!settings || !doc) {
+      setPrinterSetupOpen(true);
+      return;
+    }
+    void printWith(settings, doc);
+  }
+
+  // Auto-print a just-completed sale once, when its document arrives (deferred a tick so the printing
+  // state isn't set inside the effect body itself).
+  useEffect(() => {
+    if (!autoPrint || !doc || autoPrintedRef.current || !canPrintReceipts()) return;
+    const settings = getPrinterSettings();
+    if (!settings?.autoPrint) return;
+    autoPrintedRef.current = true;
+    const timer = window.setTimeout(() => void printWith(settings, doc), 0);
+    return () => window.clearTimeout(timer);
+  }, [autoPrint, doc]);
 
   function ensurePaymentMethods(): void {
     if (paymentMethods) return;
@@ -596,7 +639,29 @@ export function DocumentDetailModal({
             )}
             {notice && <p className="mt-3 text-center text-xs text-navy/50">{notice}</p>}
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            {canPrintReceipts() && (
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  disabled={printing}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue py-3 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  {printing ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Printer className="size-4" aria-hidden="true" />}
+                  Print
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrinterSetupOpen(true)}
+                  aria-label="Printer settings"
+                  className="grid w-11 flex-none place-items-center rounded-lg border border-navy/20 bg-white text-navy/60"
+                >
+                  <Settings2 className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+
+            <div className={`${canPrintReceipts() ? "mt-2" : "mt-4"} grid grid-cols-2 gap-2`}>
               <button
                 type="button"
                 onClick={() => void handleDownload()}
@@ -990,6 +1055,19 @@ export function DocumentDetailModal({
             setRequestReturnSent(true);
           }}
         />
+      )}
+
+      {printerSetupOpen && (
+        // Stops a tap on the sheet's own backdrop from also closing this document underneath.
+        <div onClick={(e) => e.stopPropagation()}>
+          <PrinterSetupSheet
+            onClose={() => setPrinterSetupOpen(false)}
+            onSaved={(settings) => {
+              setPrinterSetupOpen(false);
+              if (doc) void printWith(settings, doc);
+            }}
+          />
+        </div>
       )}
 
       {deliveryNoteOpen && (
