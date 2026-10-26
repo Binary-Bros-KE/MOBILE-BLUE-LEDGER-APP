@@ -185,6 +185,7 @@ export function AppShell() {
               canCreate={can("products", "create")}
               canEdit={can("products", "edit")}
               canAdjustStock={can("inventory", "edit")}
+              canTransferStock={can("stock_transfers", "create")}
               viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               viewerBranchId={session?.branchId ?? null}
               vatRatePercent={session?.vatRatePercent ?? 0}

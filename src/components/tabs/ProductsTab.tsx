@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PackagePlus, ScanLine, Search } from "lucide-react";
+import { ArrowLeftRight, PackagePlus, ScanLine, Search } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { ProductListItem } from "@/lib/types";
 import { BarcodeScannerSheet, cameraScanSupported } from "../BarcodeScannerSheet";
@@ -10,6 +10,7 @@ import { ProductCard } from "../ProductCard";
 import type { ProductManageOptions } from "../products/manage-options";
 import { ProductFormModal } from "../products/ProductFormModal";
 import { StockAdjustModal } from "../products/StockAdjustModal";
+import { StockTransferModal } from "../products/StockTransferModal";
 
 const ALL_CATEGORY = "__all__";
 
@@ -28,6 +29,7 @@ export function ProductsTab({
   canCreate,
   canEdit,
   canAdjustStock,
+  canTransferStock,
   viewerIsSuperAdmin,
   viewerBranchId,
   vatRatePercent,
@@ -37,6 +39,8 @@ export function ProductsTab({
   canCreate: boolean;
   canEdit: boolean;
   canAdjustStock: boolean;
+  /** stock_transfers.create — DESKTOP's own Transfer grant. */
+  canTransferStock: boolean;
   viewerIsSuperAdmin: boolean;
   viewerBranchId: string | null;
   vatRatePercent: number;
@@ -53,8 +57,9 @@ export function ProductsTab({
   const [stockFor, setStockFor] = useState<ProductListItem | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
-  const canManage = canCreate || canEdit || canAdjustStock;
+  const canManage = canCreate || canEdit || canAdjustStock || canTransferStock;
 
   // A manager sees archived and non-stock products too (to restore/edit them); everyone else keeps
   // the plain active, stock-tracked catalog this tab always showed.
@@ -158,15 +163,29 @@ export function ProductsTab({
       </div>
 
       <div className="px-4 py-4">
-        {canCreate && manageOptions && (
-          <button
-            type="button"
-            onClick={() => setFormFor({ productId: null })}
-            className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white"
-          >
-            <PackagePlus className="size-4" aria-hidden="true" />
-            Add Product
-          </button>
+        {manageOptions && (canCreate || (canTransferStock && manageOptions.locations.length > 1)) && (
+          <div className="mb-4 flex gap-2">
+            {canCreate && (
+              <button
+                type="button"
+                onClick={() => setFormFor({ productId: null })}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white"
+              >
+                <PackagePlus className="size-4" aria-hidden="true" />
+                Add Product
+              </button>
+            )}
+            {canTransferStock && manageOptions.locations.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setTransferOpen(true)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-navy/20 bg-white py-3 text-sm font-bold text-navy"
+              >
+                <ArrowLeftRight className="size-4" aria-hidden="true" />
+                Transfer Stock
+              </button>
+            )}
+          </div>
         )}
         {notice && <div className="mb-3 rounded border border-green/30 bg-green/10 px-4 py-3 text-sm font-semibold text-green">{notice}</div>}
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
@@ -221,6 +240,18 @@ export function ProductsTab({
           onCategoryCreated={(category) =>
             setManageOptions((prev) => (prev ? { ...prev, categories: [...prev.categories, category].sort((a, b) => a.name.localeCompare(b.name)) } : prev))
           }
+        />
+      )}
+      {transferOpen && manageOptions && products && (
+        <StockTransferModal
+          products={products}
+          options={manageOptions}
+          onClose={() => setTransferOpen(false)}
+          onSaved={(message) => {
+            setTransferOpen(false);
+            setNotice(message);
+            loadProducts();
+          }}
         />
       )}
       {stockFor && manageOptions && (

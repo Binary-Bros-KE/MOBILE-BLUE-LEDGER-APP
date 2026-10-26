@@ -306,6 +306,9 @@ export const api = {
   updateProduct: (id: string, body: ProductInput) => request<DocumentIdResult>(`/mobile/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   setProductStatus: (id: string, status: "active" | "inactive") =>
     request<DocumentIdResult>(`/mobile/products/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
+  /** `id` minted client-side, resent unchanged on retry. */
+  recordStockTransfer: (body: { id: string; fromLocationId: string; toLocationId: string; items: Array<{ productId: string; quantity: number }>; notes: string | null }) =>
+    request<{ transferId: string; lineCount: number }>("/mobile/stock-transfers", { method: "POST", body: JSON.stringify(body) }),
   recordStockAdjustment: (body: StockAdjustmentInput) =>
     request<StockAdjustmentResult>("/mobile/stock-adjustments", { method: "POST", body: JSON.stringify(body) }),
   listPaymentMethods: () => request<PaymentMethodOption[]>("/mobile/payment-methods"),
