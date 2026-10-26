@@ -768,6 +768,8 @@ export type CheckoutRequest = {
   paymentReference?: string;
   customerId?: string;
   amountReceivedCents: number;
+  /** Split payment — only when paying with 2+ methods (SERVER's buildSplitPayments rules apply). */
+  payments?: Array<{ paymentMethodId: string; amountCents: number; reference?: string }>;
   delivery?: CheckoutDeliveryInput;
   serviceCharges?: ServiceChargeInput[];
   notes?: string;
@@ -804,6 +806,8 @@ export type DocumentIdResult = { id: string };
 export type InvoiceStockSource = "storefront" | "main_store";
 
 export type CreateInvoiceRequest = {
+  /** Optional client-minted id, resent unchanged on retry so the same invoice can't be created twice. */
+  id?: string;
   customerId: string;
   transactionType: "invoice" | "wholesale_sale";
   dueDate: string;

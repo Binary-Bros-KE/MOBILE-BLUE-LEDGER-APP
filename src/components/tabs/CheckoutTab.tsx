@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Loader2, Minus, Plus, Receipt, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
+import { ChevronRight, Minus, PauseCircle, Plus, Receipt, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { effectiveUnitPriceCents, naturalUnitPriceCents, serviceChargeDraftsToInputs, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import { discardParkedSale, listParkedSales, parkSale, takeParkedSale, type ParkedSale } from "@/lib/parked-sales";
 import { addPickToCart, needsVariantPicker, plainPick, type VariantPick } from "@/lib/variants";
+import { CheckoutPaymentSheet, type CheckoutPaymentEntry } from "../checkout/CheckoutPaymentSheet";
+import { ParkedSalesSheet } from "../checkout/ParkedSalesSheet";
 import { DocumentDetailModal } from "../DocumentDetailModal";
 import { VariantPickerSheet } from "../VariantPickerSheet";
 import { ServiceChargesModal } from "../ServiceChargesModal";
@@ -61,10 +64,12 @@ export function CheckoutTab({
   const [search, setSearch] = useState("");
   const [variantPickerFor, setVariantPickerFor] = useState<ProductListItem | null>(null);
   const [cart, setCart] = useState<CheckoutCartLine[]>([]);
-  const [paymentMethodId, setPaymentMethodId] = useState("");
-  const [paymentReference, setPaymentReference] = useState("");
-  const [amountReceived, setAmountReceived] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
+  const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
+  const [parkedSheetOpen, setParkedSheetOpen] = useState(false);
+  // Bumped after every park/resume/discard so the derived list below re-reads storage.
+  const [parkedVersion, setParkedVersion] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [completedSaleId, setCompletedSaleId] = useState<string | null>(null);
@@ -117,7 +122,6 @@ export function CheckoutTab({
         setCustomers(customerList);
         setRiders(riderList);
         setSuppliers(supplierList);
-        if (methods.length > 0) setPaymentMethodId((current) => current || (methods[0] as PaymentMethodOption).id);
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Could not load products or payment methods."));
   }, []);
@@ -128,8 +132,6 @@ export function CheckoutTab({
     if (!term) return [];
     return products.filter((p) => p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term)).slice(0, 12);
   }, [products, search]);
-
-  const selectedPaymentMethod = paymentMethods?.find((m) => m.id === paymentMethodId) ?? null;
 
   // grossCents (per line) is what actually gets charged — already includes tax whether it's baked
   // into the product's own price (inclusive) or added on top (exclusive). Summing THIS, not the raw
@@ -157,18 +159,22 @@ export function CheckoutTab({
   const deliveryFeeCents = delivery?.fee.trim() ? Math.round(Number(delivery.fee) * 100) : 0;
   const serviceChargeFeeCents = sumServiceChargeDraftFeeCents(serviceCharges);
   const grandTotalCents = lineTaxResults.reduce((sum, r) => sum + r.grossCents, 0) + deliveryFeeCents + serviceChargeFeeCents;
-  const amountReceivedCents = amountReceived.trim() ? Math.round(Number(amountReceived) * 100) : 0;
-  const changeCents = amountReceivedCents - grandTotalCents;
 
   const customerLabel = customerId ? (customers.find((c) => c.id === customerId)?.name ?? "Walk-in Customer") : "Walk-in Customer";
 
-  // submitError is only ever SET inside handleCheckout (on a failed submit attempt) — without this,
-  // fixing the thing that caused it (e.g. typing in the rest of the amount received) leaves the
-  // banner on screen until the cashier taps Charge again, which reads as "still blocked" even though
-  // the sale would now go through. Clear it the moment any input that could have caused it changes.
+  // submitError is only ever SET by a failed submit — clear it the moment the cart or anything else
+  // that could have caused it changes, so a stale banner never reads as "still blocked".
   useEffect(() => {
     setSubmitError(null);
-  }, [cart, paymentMethodId, paymentReference, amountReceived, customerId, delivery, serviceCharges]);
+  }, [cart, customerId, delivery, serviceCharges]);
+
+  // Parked carts are per storefront (and per phone) — re-read whenever the storefront changes or a
+  // park/resume/discard bumps parkedVersion.
+  const parkedSales: ParkedSale[] = useMemo(
+    () => (effectiveLocationId ? listParkedSales(effectiveLocationId) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- parkedVersion is the storage-change signal
+    [effectiveLocationId, parkedVersion],
+  );
 
   /** A product with variants asks which one first (VariantPickerSheet). */
   function addToCart(product: ProductListItem): void {
@@ -229,8 +235,6 @@ export function CheckoutTab({
 
   function resetForNextSale(): void {
     setCart([]);
-    setPaymentReference("");
-    setAmountReceived("");
     setCustomerId(null);
     setDelivery(null);
     setServiceCharges([]);
@@ -238,35 +242,44 @@ export function CheckoutTab({
     checkoutIdRef.current = crypto.randomUUID();
   }
 
-  async function handleCheckout(): Promise<void> {
-    if (!effectiveLocationId) {
-      setSubmitError("Choose a storefront before completing this sale.");
-      return;
-    }
-    if (cart.length === 0) {
-      setSubmitError("Add at least one item first.");
-      return;
-    }
-    if (!paymentMethodId) {
-      setSubmitError("Choose a payment method.");
-      return;
-    }
-    if (selectedPaymentMethod?.requiresReference && !paymentReference.trim()) {
-      setSubmitError(`${selectedPaymentMethod.name} requires a reference.`);
-      return;
-    }
-    if (amountReceivedCents < grandTotalCents) {
-      setSubmitError("Amount received is less than the total.");
-      return;
-    }
+  /** Puts the current cart aside (device-local, like DESKTOP's held sales) and clears the counter for
+   * the next customer. */
+  function parkCurrentSale(): void {
+    if (!effectiveLocationId || cart.length === 0) return;
+    parkSale({
+      locationId: effectiveLocationId,
+      label: customerId ? customerLabel : `${cart[0]!.name}${cart.length > 1 ? ` +${cart.length - 1} more` : ""}`,
+      cart,
+      customerId,
+      delivery,
+      serviceCharges,
+      orderNotes,
+    });
+    resetForNextSale();
+    setParkedVersion((v) => v + 1);
+    setNotice("Sale parked — resume it from Parked.");
+  }
 
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      const result = await api.checkout({
-        id: checkoutIdRef.current,
-        locationId: effectiveLocationId,
-        items: cart.map((line) => ({
+  /** Resuming parks whatever is on the counter first, so nothing is ever thrown away. */
+  function resumeParkedSale(id: string): void {
+    if (!effectiveLocationId) return;
+    if (cart.length > 0) parkCurrentSale();
+    const parked = takeParkedSale(id);
+    if (parked) {
+      setCart(parked.cart);
+      setCustomerId(parked.customerId);
+      setDelivery(parked.delivery as DeliveryDraft | null);
+      setServiceCharges(parked.serviceCharges);
+      setOrderNotes(parked.orderNotes);
+      checkoutIdRef.current = crypto.randomUUID();
+      setNotice(null);
+    }
+    setParkedVersion((v) => v + 1);
+    setParkedSheetOpen(false);
+  }
+
+  function cartItemsPayload() {
+    return cart.map((line) => ({
           productId: line.productId,
           variantKey: line.variantKey,
           quantity: line.quantity,
@@ -278,33 +291,97 @@ export function CheckoutTab({
           // here rather than changing anything downstream.
           localCostCents: line.isLocallySourced && line.localCost.trim() ? unitCostToTotalCents(line.localCost, line.quantity) : undefined,
           localSupplierId: line.isLocallySourced ? (line.localSupplierId ?? undefined) : undefined,
-        })),
-        paymentMethodId,
-        paymentReference: paymentReference.trim() || undefined,
+    }));
+  }
+
+  function deliveryPayload() {
+    return delivery
+      ? {
+          riderId: delivery.riderId ?? undefined,
+          recipientName: delivery.recipientName,
+          country: delivery.country,
+          town: delivery.town,
+          physicalAddress: delivery.physicalAddress,
+          notes: delivery.notes,
+          feeCents: delivery.fee.trim() ? Math.round(Number(delivery.fee) * 100) : 0,
+          costCents: delivery.cost.trim() ? Math.round(Number(delivery.cost) * 100) : 0,
+        }
+      : undefined;
+  }
+
+  function openPaymentSheet(): void {
+    if (!effectiveLocationId) {
+      setSubmitError("Choose a storefront before completing this sale.");
+      return;
+    }
+    if (cart.length === 0) {
+      setSubmitError("Add at least one item first.");
+      return;
+    }
+    setSubmitError(null);
+    setPaymentSheetOpen(true);
+  }
+
+  /** One entry = a normal single-method sale; 2+ = a split payment (SERVER's buildSplitPayments). */
+  async function handleCheckout(payments: CheckoutPaymentEntry[]): Promise<void> {
+    if (!effectiveLocationId) return;
+    const primary = payments[0]!;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const result = await api.checkout({
+        id: checkoutIdRef.current,
+        locationId: effectiveLocationId,
+        items: cartItemsPayload(),
+        paymentMethodId: primary.paymentMethodId,
+        paymentReference: primary.reference || undefined,
         customerId: customerId ?? undefined,
-        amountReceivedCents,
+        amountReceivedCents: payments.reduce((sum, p) => sum + p.amountCents, 0),
+        payments:
+          payments.length > 1
+            ? payments.map((p) => ({ paymentMethodId: p.paymentMethodId, amountCents: p.amountCents, reference: p.reference || undefined }))
+            : undefined,
         notes: orderNotes.trim() || undefined,
         includeTaxBreakdown,
         includeBusinessInfo,
         serviceCharges: serviceChargeDraftsToInputs(serviceCharges),
-        delivery: delivery
-          ? {
-              riderId: delivery.riderId ?? undefined,
-              recipientName: delivery.recipientName,
-              country: delivery.country,
-              town: delivery.town,
-              physicalAddress: delivery.physicalAddress,
-              notes: delivery.notes,
-              feeCents: delivery.fee.trim() ? Math.round(Number(delivery.fee) * 100) : 0,
-              costCents: delivery.cost.trim() ? Math.round(Number(delivery.cost) * 100) : 0,
-            }
-          : undefined,
+        delivery: deliveryPayload(),
       });
+      setPaymentSheetOpen(false);
       setCompletedSaleId(result.id);
     } catch (err) {
       // Deliberately NOT resetting checkoutIdRef here — a retry (network error, timeout) must reuse
       // the SAME id so SERVER treats it as the safe no-op it's designed to be, not a second sale.
       setSubmitError(err instanceof ApiError ? err.message : "Checkout failed — check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  /** "Put on account" — the cart becomes an invoice for the selected customer (DESKTOP's way of
+   * selling on credit). Reuses this checkout's id so a retry can't create a second invoice. */
+  async function handlePutOnAccount(dueDate: string): Promise<void> {
+    if (!effectiveLocationId || !customerId) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const result = await api.createInvoice({
+        id: checkoutIdRef.current,
+        customerId,
+        transactionType: "invoice",
+        dueDate,
+        invoiceNotes: orderNotes.trim() || undefined,
+        includeTaxBreakdown,
+        includeBusinessInfo,
+        items: cartItemsPayload(),
+        delivery: deliveryPayload(),
+        serviceCharges: serviceChargeDraftsToInputs(serviceCharges),
+        locationId: effectiveLocationId,
+      });
+      setPaymentSheetOpen(false);
+      setCompletedSaleId(result.id);
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : "Couldn't put this on account — check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -338,6 +415,22 @@ export function CheckoutTab({
           </div>
         )}
       </div>
+
+      {(parkedSales.length > 0 || notice) && (
+        <div className="flex items-center justify-between gap-2 px-4 pb-2">
+          {notice ? <p className="text-xs font-semibold text-green">{notice}</p> : <span />}
+          {parkedSales.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setParkedSheetOpen(true)}
+              className="flex flex-none items-center gap-1 rounded-full bg-gold/15 px-3 py-1 text-xs font-bold text-gold-text"
+            >
+              <PauseCircle className="size-3.5" aria-hidden="true" />
+              Parked ({parkedSales.length})
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="px-4 pb-2">
         <button
@@ -675,54 +768,28 @@ export function CheckoutTab({
             </label>
           </div>
 
-          <div className="mb-2 grid grid-cols-2 gap-2">
-            <select
-              value={paymentMethodId}
-              onChange={(e) => setPaymentMethodId(e.target.value)}
-              className="rounded-lg border border-navy/15 bg-white px-2.5 py-2 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+          {submitError && !paymentSheetOpen && (
+            <p className="mb-2 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{submitError}</p>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={parkCurrentSale}
+              disabled={!effectiveLocationId}
+              className="flex flex-none items-center justify-center gap-1.5 rounded-lg border border-navy/20 px-4 py-3 text-sm font-bold text-navy disabled:opacity-40"
             >
-              {(paymentMethods ?? []).map((method) => (
-                <option key={method.id} value={method.id}>
-                  {method.name}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={amountReceived}
-              onChange={(e) => setAmountReceived(e.target.value)}
-              placeholder="Amount received"
-              className="rounded-lg border border-navy/15 px-2.5 py-2 text-right text-xs font-semibold text-navy focus:border-blue focus:outline-none"
-            />
+              <PauseCircle className="size-4" aria-hidden="true" />
+              Park
+            </button>
+            <button
+              type="button"
+              onClick={openPaymentSheet}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white"
+            >
+              Charge {formatCents(grandTotalCents, currency)}
+            </button>
           </div>
-
-          {selectedPaymentMethod?.requiresReference && (
-            <input
-              type="text"
-              value={paymentReference}
-              onChange={(e) => setPaymentReference(e.target.value)}
-              placeholder={`${selectedPaymentMethod.name} reference`}
-              className="mb-2 w-full rounded-lg border border-navy/15 px-2.5 py-2 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
-            />
-          )}
-
-          {amountReceivedCents > 0 && changeCents >= 0 && (
-            <p className="mb-2 text-right text-xs font-semibold text-navy/50">Change: {formatCents(changeCents, currency)}</p>
-          )}
-
-          {submitError && <p className="mb-2 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{submitError}</p>}
-
-          <button
-            type="button"
-            onClick={() => void handleCheckout()}
-            disabled={submitting}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
-          >
-            {submitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            {submitting ? "Completing sale…" : `Charge ${formatCents(grandTotalCents, currency)}`}
-          </button>
         </div>
       )}
 
@@ -790,6 +857,34 @@ export function CheckoutTab({
             updateLocalSupplier(quickCreateSupplierFor, supplier.id);
             setQuickCreateSupplierFor(null);
           }}
+        />
+      )}
+
+      {paymentSheetOpen && (
+        <CheckoutPaymentSheet
+          grandTotalCents={grandTotalCents}
+          currency={currency}
+          paymentMethods={paymentMethods ?? []}
+          customerName={customerId ? customerLabel : null}
+          canPutOnAccount
+          submitting={submitting}
+          error={submitError}
+          onCharge={(payments) => void handleCheckout(payments)}
+          onPutOnAccount={(dueDate) => void handlePutOnAccount(dueDate)}
+          onClose={() => setPaymentSheetOpen(false)}
+        />
+      )}
+
+      {parkedSheetOpen && (
+        <ParkedSalesSheet
+          sales={parkedSales}
+          currency={currency}
+          onResume={resumeParkedSale}
+          onDiscard={(id) => {
+            discardParkedSale(id);
+            setParkedVersion((v) => v + 1);
+          }}
+          onClose={() => setParkedSheetOpen(false)}
         />
       )}
 
