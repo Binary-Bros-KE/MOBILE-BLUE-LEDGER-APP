@@ -278,7 +278,7 @@ export function InvoiceFormModal({
 
           {allowMainStoreStock && (
             <p className="mt-2.5 text-[11px] font-semibold text-navy/50">
-              Each product line can take its stock from this storefront or straight from the Main Store (this storefront's earmarked stock first, then unallocated) — use the line's "Stock from" select.
+              Each product line can take its stock from this storefront or straight from the Main Store (this storefront&apos;s earmarked stock first, then unallocated) — use the line&apos;s &quot;Stock from&quot; select.
             </p>
           )}
 

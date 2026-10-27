@@ -1255,7 +1255,7 @@ export function DocumentDetailModal({
                       </div>
                     );
                   })}
-                  <p className="text-[11px] text-navy/50">Taken straight from the Main Store — this storefront's earmarked stock first, then unallocated. No transfer needed.</p>
+                  <p className="text-[11px] text-navy/50">Taken straight from the Main Store — this storefront&apos;s earmarked stock first, then unallocated. No transfer needed.</p>
                 </div>
               )}
               {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}

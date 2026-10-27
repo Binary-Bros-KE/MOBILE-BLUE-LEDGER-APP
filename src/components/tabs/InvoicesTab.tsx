@@ -72,13 +72,18 @@ export function InvoicesTab({
   }, []);
 
   useEffect(() => {
-    setInvoices(null);
-    setError(null);
     api
       .listInvoices(locationFilter === ALL_FILTER ? undefined : locationFilter)
       .then(setInvoices)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load invoices."));
   }, [locationFilter]);
+
+  /** Clears the old storefront's results on a chip tap so they never flash under the new one. */
+  function selectLocation(next: string): void {
+    setInvoices(null);
+    setError(null);
+    setLocationFilter(next);
+  }
 
   function openStatementPicker(): void {
     setCustomerSearch("");
@@ -144,13 +149,13 @@ export function InvoicesTab({
         </div>
         {locations && locations.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => setLocationFilter(ALL_FILTER)} />
+            <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => selectLocation(ALL_FILTER)} />
             {locations.map((location) => (
               <FilterChip
                 key={location.id}
                 label={location.locationName}
                 active={locationFilter === location.id}
-                onClick={() => setLocationFilter(location.id)}
+                onClick={() => selectLocation(location.id)}
               />
             ))}
           </div>

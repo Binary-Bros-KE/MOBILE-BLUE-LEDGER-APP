@@ -30,13 +30,18 @@ export function StockLedgerTab() {
   }, []);
 
   useEffect(() => {
-    setMovements(null);
-    setError(null);
     api
       .listStockMovements(locationFilter === ALL_FILTER ? undefined : locationFilter)
       .then(setMovements)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load the stock ledger."));
   }, [locationFilter]);
+
+  /** Clears the old storefront's results on a chip tap so they never flash under the new one. */
+  function selectLocation(next: string): void {
+    setMovements(null);
+    setError(null);
+    setLocationFilter(next);
+  }
 
   const filtered = movements?.filter((movement) => typeFilter === ALL_FILTER || movement.movementType === typeFilter) ?? null;
 
@@ -45,13 +50,13 @@ export function StockLedgerTab() {
       <div className="sticky top-[60px] z-10 space-y-2 border-b border-navy/10 bg-cream-dark/95 px-4 py-3 backdrop-blur">
         {locations && locations.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <FilterChip label="All Storefronts" active={locationFilter === ALL_FILTER} onClick={() => setLocationFilter(ALL_FILTER)} />
+            <FilterChip label="All Storefronts" active={locationFilter === ALL_FILTER} onClick={() => selectLocation(ALL_FILTER)} />
             {locations.map((location) => (
               <FilterChip
                 key={location.id}
                 label={location.locationName}
                 active={locationFilter === location.id}
-                onClick={() => setLocationFilter(location.id)}
+                onClick={() => selectLocation(location.id)}
               />
             ))}
           </div>

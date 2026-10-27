@@ -30,25 +30,30 @@ export function TransactionsTab() {
   }, []);
 
   useEffect(() => {
-    setTransactions(null);
-    setError(null);
     api
       .listTransactions(locationFilter === ALL_FILTER ? undefined : locationFilter)
       .then(setTransactions)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load transactions."));
   }, [locationFilter]);
 
+  /** Clears the old storefront's results on a chip tap so they never flash under the new one. */
+  function selectLocation(next: string): void {
+    setTransactions(null);
+    setError(null);
+    setLocationFilter(next);
+  }
+
   return (
     <div className="pb-10">
       {locations && locations.length > 1 && (
         <div className="sticky top-[60px] z-10 flex gap-1.5 overflow-x-auto border-b border-navy/10 bg-cream-dark/95 px-4 py-3 backdrop-blur [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => setLocationFilter(ALL_FILTER)} />
+          <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => selectLocation(ALL_FILTER)} />
           {locations.map((location) => (
             <FilterChip
               key={location.id}
               label={location.locationName}
               active={locationFilter === location.id}
-              onClick={() => setLocationFilter(location.id)}
+              onClick={() => selectLocation(location.id)}
             />
           ))}
         </div>

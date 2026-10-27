@@ -14,17 +14,19 @@ export function WorkingHoursTab() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<WorkingHoursListItem | null>(null);
 
-  function refresh(): void {
-    setError(null);
+  function load(): void {
     api
       .listWorkingHours()
       .then(setItems)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load working hours."));
   }
 
-  useEffect(() => {
-    refresh();
-  }, []);
+  function refresh(): void {
+    setError(null);
+    load();
+  }
+
+  useEffect(load, []);
 
   return (
     <div className="pb-10">
@@ -77,6 +79,7 @@ export function WorkingHoursTab() {
 
       {selected && (
         <WorkingHoursModal
+          key={selected.locationId}
           locationId={selected.locationId}
           locationName={selected.locationName}
           onClose={() => setSelected(null)}

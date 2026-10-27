@@ -17,18 +17,19 @@ export function ApprovalsTab() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<InvoiceCancellationApprovalItem | null>(null);
 
-  function refresh(): void {
-    setError(null);
+  function load(): void {
     api
       .listPendingInvoiceCancellations()
       .then(setItems)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load pending approvals."));
   }
 
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  function refresh(): void {
+    setError(null);
+    load();
+  }
+
+  useEffect(load, []);
 
   return (
     <div className="pb-10">

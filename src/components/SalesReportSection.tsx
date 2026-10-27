@@ -72,18 +72,20 @@ type Breakdowns = { byStorefront: SalesByStorefrontRow[]; byEmployee: SalesByEmp
  * [[project_sales_report_mobile]] for the phasing rationale. */
 export function SalesReportSection({ locationId }: { locationId?: string }) {
   const [period, setPeriod] = useState<SalesReportPeriodInput>({ mode: "daily", anchor: defaultAnchorForMode("daily") });
-  const [overview, setOverview] = useState<SalesReportOverview | null>(null);
-  const [trend, setTrend] = useState<SalesTrendResult | null>(null);
-  const [breakdowns, setBreakdowns] = useState<Breakdowns | null>(null);
-  const [taxReport, setTaxReport] = useState<MobileTaxReport | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** Everything one request returned, tagged with the period/location it was for — figures from an
+   * older request are never shown under a newer selection (it reads as Loading until they arrive). */
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    overview: SalesReportOverview | null;
+    trend: SalesTrendResult | null;
+    breakdowns: Breakdowns | null;
+    taxReport: MobileTaxReport | null;
+    error: string | null;
+  } | null>(null);
+  const requestKey = JSON.stringify([period, locationId ?? null]);
 
   useEffect(() => {
-    setOverview(null);
-    setTrend(null);
-    setBreakdowns(null);
-    setTaxReport(null);
-    setError(null);
+    let cancelled = false;
     Promise.all([
       api.getSalesReportOverview(period, locationId),
       api.getSalesTrend(period, locationId),
@@ -91,13 +93,33 @@ export function SalesReportSection({ locationId }: { locationId?: string }) {
       api.getSalesTaxBreakdown(period, locationId),
     ])
       .then(([o, t, b, tax]) => {
-        setOverview(o);
-        setTrend(t);
-        setBreakdowns(b);
-        setTaxReport(tax);
+        if (!cancelled) setLoaded({ key: requestKey, overview: o, trend: t, breakdowns: b, taxReport: tax, error: null });
       })
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load the sales report."));
+      .catch((err) => {
+        if (!cancelled) {
+          setLoaded({
+            key: requestKey,
+            overview: null,
+            trend: null,
+            breakdowns: null,
+            taxReport: null,
+            error: err instanceof ApiError ? err.message : "Could not load the sales report.",
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // requestKey is derived from period + locationId.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, locationId]);
+
+  const current = loaded?.key === requestKey ? loaded : null;
+  const overview = current?.overview ?? null;
+  const trend = current?.trend ?? null;
+  const breakdowns = current?.breakdowns ?? null;
+  const taxReport = current?.taxReport ?? null;
+  const error = current?.error ?? null;
 
   const money = (cents: number) => formatCents(cents, overview?.currency ?? "KES");
 

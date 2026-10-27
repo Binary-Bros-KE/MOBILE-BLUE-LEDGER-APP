@@ -60,8 +60,6 @@ export function WorkingHoursModal({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     api
       .getWorkingHours(locationId)
       .then((existing) => {

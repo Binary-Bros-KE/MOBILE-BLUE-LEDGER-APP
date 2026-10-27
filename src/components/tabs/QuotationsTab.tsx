@@ -68,13 +68,18 @@ export function QuotationsTab({
   }
 
   useEffect(() => {
-    setQuotations(null);
-    setError(null);
     api
       .listQuotations(locationFilter === ALL_FILTER ? undefined : locationFilter)
       .then(setQuotations)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load quotations."));
   }, [locationFilter]);
+
+  /** Clears the old storefront's results on a chip tap so they never flash under the new one. */
+  function selectLocation(next: string): void {
+    setQuotations(null);
+    setError(null);
+    setLocationFilter(next);
+  }
 
   return (
     <div className="pb-10">
@@ -104,13 +109,13 @@ export function QuotationsTab({
         </div>
         {locations && locations.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => setLocationFilter(ALL_FILTER)} />
+            <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => selectLocation(ALL_FILTER)} />
             {locations.map((location) => (
               <FilterChip
                 key={location.id}
                 label={location.locationName}
                 active={locationFilter === location.id}
-                onClick={() => setLocationFilter(location.id)}
+                onClick={() => selectLocation(location.id)}
               />
             ))}
           </div>

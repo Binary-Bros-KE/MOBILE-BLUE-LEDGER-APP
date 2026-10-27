@@ -79,7 +79,14 @@ export function CheckoutTab({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanMiss, setScanMiss] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  /** The error plus the inputs it was about — see setSubmitError / submitError below. */
+  const [submitErrorState, setSubmitErrorState] = useState<{
+    message: string;
+    cart: CheckoutCartLine[];
+    customerId: string | null;
+    delivery: DeliveryDraft | null;
+    serviceCharges: ServiceChargeDraft[];
+  } | null>(null);
   const [completedSaleId, setCompletedSaleId] = useState<string | null>(null);
 
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -179,11 +186,20 @@ export function CheckoutTab({
 
   const customerLabel = customerId ? (customers.find((c) => c.id === customerId)?.name ?? "Walk-in Customer") : "Walk-in Customer";
 
-  // submitError is only ever SET by a failed submit — clear it the moment the cart or anything else
-  // that could have caused it changes, so a stale banner never reads as "still blocked".
-  useEffect(() => {
-    setSubmitError(null);
-  }, [cart, customerId, delivery, serviceCharges]);
+  // A failed submit's message is only shown while the cart, customer, delivery and service charges
+  // are still exactly what it was about — change any of them and the banner goes, so a stale error
+  // never reads as "still blocked".
+  function setSubmitError(message: string | null): void {
+    setSubmitErrorState(message ? { message, cart, customerId, delivery, serviceCharges } : null);
+  }
+  const submitError =
+    submitErrorState &&
+    submitErrorState.cart === cart &&
+    submitErrorState.customerId === customerId &&
+    submitErrorState.delivery === delivery &&
+    submitErrorState.serviceCharges === serviceCharges
+      ? submitErrorState.message
+      : null;
 
   // Parked carts are per storefront (and per phone) — re-read whenever the storefront changes or a
   // park/resume/discard bumps parkedVersion.

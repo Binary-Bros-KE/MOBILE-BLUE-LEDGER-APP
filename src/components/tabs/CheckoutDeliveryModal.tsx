@@ -77,7 +77,7 @@ export function CheckoutDeliveryModal({
               <Truck className="size-4 text-blue" aria-hidden="true" />
               Delivery Details
             </p>
-            <p className="text-xs text-navy/50">Fee is added to this sale's total.</p>
+            <p className="text-xs text-navy/50">Fee is added to this sale&apos;s total.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="grid size-8 flex-none place-items-center rounded-full text-navy/40 hover:bg-cream-dark hover:text-navy">
             <X className="size-4" aria-hidden="true" />
