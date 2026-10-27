@@ -56,17 +56,17 @@ export function BottomNav({
               type="button"
               onClick={() => onSelect(key)}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-bold ${active ? "text-blue" : "text-navy/45"}`}
+              className={`flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-0.5 text-[10px] font-bold ${active ? "text-blue" : "text-navy/45"}`}
             >
               <Icon className="size-5" aria-hidden="true" />
-              {label}
+              <span className="w-full truncate px-0.5 text-center">{label}</span>
             </button>
           );
         })}
         <button
           type="button"
           onClick={onMore}
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-bold ${activeInSlots ? "text-navy/45" : "text-blue"}`}
+          className={`flex min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-0.5 text-[10px] font-bold ${activeInSlots ? "text-navy/45" : "text-blue"}`}
         >
           <Menu className="size-5" aria-hidden="true" />
           More
