@@ -74,7 +74,7 @@ export const navGroups: NavGroup[] = [
       // access is just a normal Roles & Permissions edit, nothing mobile-specific to configure.
       { key: "checkout", label: "Checkout", icon: CreditCard, ready: true, permission: { module: "sales", action: "create" } },
       // Anyone who can sell gets their own cash-up; everyone's needs reports.view (see CashUpTab).
-      { key: "cashUp", label: "Cash Up", icon: Banknote, ready: true, permission: { module: "sales", action: "create" } },
+      { key: "cashUp", label: "Close Till", icon: Banknote, ready: true, permission: { module: "sales", action: "create" } },
       // Named "Receipts" like DESKTOP's tab — walk-in, non-invoice Sales (internally still key "sales").
       { key: "sales", label: "Receipts", icon: ShoppingCart, ready: true, permission: { module: "sales", action: "view" } },
       // "Invoices" also carries the "Statement" action (see InvoicesTab.tsx) — same as DESKTOP's

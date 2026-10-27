@@ -65,7 +65,7 @@ export function CashUpTab({
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load the cash-up.");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load the till close.");
       });
     return () => {
       cancelled = true;
@@ -79,7 +79,7 @@ export function CashUpTab({
   const shareText = useMemo(() => {
     if (!report) return "";
     const lines = [
-      `Cash-up ${report.date}${report.locationName ? ` · ${report.locationName}` : ""}`,
+      `Close Till ${report.date}${report.locationName ? ` · ${report.locationName}` : ""}`,
       ...report.byMethod.map((m) => `${m.name}: ${money(m.amountCents)}`),
       `Total collected: ${money(report.totalCollectedCents)} (${report.salesCount} sales)`,
       `Expected cash: ${money(report.expectedCashCents)}`,
@@ -94,7 +94,7 @@ export function CashUpTab({
 
   async function share(): Promise<void> {
     try {
-      if (navigator.share) await navigator.share({ title: "Cash-up", text: shareText });
+      if (navigator.share) await navigator.share({ title: "Close Till", text: shareText });
       else await navigator.clipboard.writeText(shareText);
     } catch {
       // Share sheet dismissed — nothing to do.
@@ -209,7 +209,7 @@ export function CashUpTab({
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-navy/20 py-3 text-sm font-bold text-navy"
           >
             <Share2 className="size-4" aria-hidden="true" />
-            Share cash-up
+            Share till close
           </button>
         </>
       )}
