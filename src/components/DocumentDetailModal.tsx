@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Download, Loader2, Package, Printer, Settings2, Share2, Trash2, Undo2, X } from "lucide-react";
+import { Ban, Copy, Download, Loader2, Package, Printer, Settings2, Share2, Trash2, Undo2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { groupItemsBySections } from "@/lib/document-sections";
 import { formatCents } from "@/lib/money";
@@ -122,6 +122,9 @@ export function DocumentDetailModal({
   const [requestCancelSent, setRequestCancelSent] = useState(false);
   const [requestReturnOpen, setRequestReturnOpen] = useState(false);
   const [requestReturnSent, setRequestReturnSent] = useState(false);
+  /** null = closed; otherwise the reason being typed for a void. */
+  const [voidReason, setVoidReason] = useState<string | null>(null);
+  const [voiding, setVoiding] = useState(false);
   const [deliveryNoteOpen, setDeliveryNoteOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockCheck, setStockCheck] = useState<QuotationStockCheckItem[] | null>(null);
@@ -199,6 +202,27 @@ export function DocumentDetailModal({
     const timer = window.setTimeout(() => void printWith(settings, doc), 0);
     return () => window.clearTimeout(timer);
   }, [autoPrint, doc]);
+
+  /** Void straight away when the viewer can approve (stock back now), otherwise request it. */
+  async function handleVoid(): Promise<void> {
+    if (!voidReason?.trim()) {
+      setActionError("Enter a reason for the void.");
+      return;
+    }
+    setVoiding(true);
+    setActionError(null);
+    try {
+      const result = await api.requestSaleVoid(saleId, { reason: voidReason.trim(), approveNow: canApprove });
+      setVoidReason(null);
+      setNotice(result.status === "approved" ? "Sale voided — the items are back in stock." : "Void requested — awaiting approval.");
+      reload();
+      onChanged?.();
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not void this sale.");
+    } finally {
+      setVoiding(false);
+    }
+  }
 
   function ensurePaymentMethods(): void {
     if (paymentMethods) return;
@@ -774,19 +798,56 @@ export function DocumentDetailModal({
               </div>
             )}
 
-            {doc.documentKind === "receipt" && (
-              <div className="mt-3 border-t border-dashed border-navy/15 pt-3">
-                {requestReturnSent ? (
-                  <p className="text-center text-[11px] font-semibold text-navy/50">Return requested — awaiting approval.</p>
+            {doc.documentKind === "receipt" && !doc.approvedVoid && (
+              <div className="mt-3 space-y-2 border-t border-dashed border-navy/15 pt-3">
+                {requestReturnSent && <p className="text-center text-[11px] font-semibold text-navy/50">Return requested — awaiting approval.</p>}
+                {voidReason !== null ? (
+                  <div className="space-y-2 rounded-lg border border-red/30 bg-red/5 p-3">
+                    <input
+                      autoFocus
+                      value={voidReason}
+                      onChange={(e) => setVoidReason(e.target.value)}
+                      placeholder="Why is this sale being voided?"
+                      className="w-full rounded-lg border border-navy/15 bg-white px-3 py-2 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setVoidReason(null)} className="rounded-lg border border-navy/20 bg-white py-2.5 text-xs font-bold text-navy">
+                        Keep Sale
+                      </button>
+                      <button
+                        type="button"
+                        disabled={voiding}
+                        onClick={() => void handleVoid()}
+                        className="flex items-center justify-center gap-1.5 rounded-lg bg-red py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        {voiding && <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />}
+                        {canApprove ? "Void Now" : "Send Request"}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setRequestReturnOpen(true)}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red"
-                  >
-                    <Undo2 className="size-3.5" aria-hidden="true" />
-                    Request Return
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    {!requestReturnSent && (
+                      <button
+                        type="button"
+                        onClick={() => setRequestReturnOpen(true)}
+                        className="flex items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red"
+                      >
+                        <Undo2 className="size-3.5" aria-hidden="true" />
+                        {canApprove ? "Return Items" : "Request Return"}
+                      </button>
+                    )}
+                    {!doc.pendingVoid && (
+                      <button
+                        type="button"
+                        onClick={() => setVoidReason("")}
+                        className={`flex items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red ${requestReturnSent ? "col-span-2" : ""}`}
+                      >
+                        <Ban className="size-3.5" aria-hidden="true" />
+                        {canApprove ? "Void Sale" : "Request Void"}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -1049,10 +1110,17 @@ export function DocumentDetailModal({
         <RequestReturnModal
           saleId={saleId}
           currency={doc.currency}
+          approveNow={canApprove}
           onClose={() => setRequestReturnOpen(false)}
           onRequested={() => {
             setRequestReturnOpen(false);
-            setRequestReturnSent(true);
+            if (canApprove) {
+              setNotice("Returned — the items are back in stock.");
+              reload();
+              onChanged?.();
+            } else {
+              setRequestReturnSent(true);
+            }
           }}
         />
       )}

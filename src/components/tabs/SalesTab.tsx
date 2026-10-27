@@ -15,7 +15,7 @@ const ALL_FILTER = "__all__";
  * client-loaded list, since the list itself is capped to the 200 most recent rows — filtering that
  * client-side after the fact could hide real sales for a storefront that fell outside the global
  * cap despite ranking well inside its own storefront's most-recent-200. */
-export function SalesTab({ canManageDelivery = false }: { canManageDelivery?: boolean }) {
+export function SalesTab({ canManageDelivery = false, canApprove = false }: { canManageDelivery?: boolean; canApprove?: boolean }) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [sales, setSales] = useState<SaleListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export function SalesTab({ canManageDelivery = false }: { canManageDelivery?: bo
       </div>
 
       {selectedSaleId && (
-        <DocumentDetailModal saleId={selectedSaleId} canManageDelivery={canManageDelivery} onClose={() => setSelectedSaleId(null)} />
+        <DocumentDetailModal saleId={selectedSaleId} canManageDelivery={canManageDelivery} canApprove={canApprove} onClose={() => setSelectedSaleId(null)} />
       )}
     </div>
   );

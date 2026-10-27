@@ -30,6 +30,7 @@ import type {
   MobileDeliveryNote,
   MobileInvoiceEditData,
   MobileLocation,
+  MobilePendingSaleAdjustment,
   MobilePeriod,
   MobileQuotationEditData,
   MobileReturnableItem,
@@ -242,6 +243,12 @@ export const api = {
   // Receipts only — an invoice has its own separate Request Cancellation flow instead. Request-only:
   // approving/rejecting a return stays DESKTOP-only, never built on mobile.
   getSaleReturnableItems: (id: string) => request<MobileReturnableItem[]>(`/mobile/sales/${id}/returnable-items`),
+  /** approveNow = void straight away (approvals.approve only). */
+  requestSaleVoid: (id: string, body: { reason: string; notes?: string; approveNow?: boolean }) =>
+    request<{ id: string; status: string }>(`/mobile/sales/${id}/request-void`, { method: "POST", body: JSON.stringify(body) }),
+  listPendingSaleAdjustments: () => request<MobilePendingSaleAdjustment[]>("/mobile/approvals/sale-adjustments"),
+  decideSaleAdjustment: (kind: "void" | "return", id: string, decision: "approve" | "reject", notes?: string) =>
+    request<{ id: string; saleId: string }>(`/mobile/approvals/sale-adjustments/${kind}/${id}/${decision}`, { method: "POST", body: JSON.stringify({ notes }) }),
   requestSaleReturn: (id: string, body: RequestSaleReturnInput) =>
     request<DocumentIdResult>(`/mobile/sales/${id}/request-return`, { method: "POST", body: JSON.stringify(body) }),
   listInvoices: (locationId?: string) =>

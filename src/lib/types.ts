@@ -360,6 +360,25 @@ export type RequestSaleReturnInput = {
   reason: string;
   notes?: string;
   items: Array<{ saleItemId: string; quantity: number }>;
+  /** Return now instead of requesting (approvals.approve only — SERVER checks). */
+  approveNow?: boolean;
+};
+
+/** A void or return waiting in the Approvals tab (SERVER's mobile-sale-adjustments-service.ts). */
+export type MobilePendingSaleAdjustment = {
+  kind: "void" | "return";
+  id: string;
+  saleId: string;
+  documentNumber: string | null;
+  saleGrandTotalCents: number;
+  amountCents: number;
+  locationName: string;
+  reason: string;
+  notes: string | null;
+  requestedByName: string;
+  requestedAt: string;
+  lines: string[];
+  currency: string;
 };
 
 export type InvoiceListItem = {

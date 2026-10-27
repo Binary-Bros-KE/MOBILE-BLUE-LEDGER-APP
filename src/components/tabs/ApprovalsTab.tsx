@@ -6,8 +6,10 @@ import { api, ApiError } from "@/lib/api";
 import type { InvoiceCancellationApprovalItem } from "@/lib/types";
 import { ApprovalCard } from "../ApprovalCard";
 import { ApprovalDecisionModal } from "../ApprovalDecisionModal";
+import { SaleAdjustmentApprovals } from "../SaleAdjustmentApprovals";
 
-/** Every invoice-cancellation request still awaiting a decision, tenant-wide (not location-filtered
+/** Void and return requests (SaleAdjustmentApprovals) and every invoice-cancellation request still
+ * awaiting a decision. Cancellations: tenant-wide (not location-filtered
  * — an approver needs to see requests from every storefront, same as DESKTOP's own Approvals inbox).
  * Same dashed-timeline list pattern as InvoicesTab/SalesTab. */
 export function ApprovalsTab() {
@@ -31,10 +33,12 @@ export function ApprovalsTab() {
   return (
     <div className="pb-10">
       <div className="sticky top-[60px] z-10 border-b border-navy/10 bg-cream-dark/95 px-4 py-3 backdrop-blur">
-        <p className="text-xs font-bold text-navy/50">Pending Cancellation Requests</p>
+        <p className="text-xs font-bold text-navy/50">Pending Approvals</p>
       </div>
 
       <div className="px-4 py-4">
+        <SaleAdjustmentApprovals />
+        {items && items.length > 0 && <p className="mb-2 text-xs font-bold text-navy/50">Invoice Cancellations</p>}
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
         {!items && !error && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
         {items && items.length === 0 && (

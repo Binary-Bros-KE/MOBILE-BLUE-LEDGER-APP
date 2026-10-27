@@ -151,7 +151,7 @@ export function AppShell() {
             />
           )}
           {activeTab === "sales" && (
-            <SalesTab canManageDelivery={can("sales", "edit")} />
+            <SalesTab canManageDelivery={can("sales", "edit")} canApprove={can("approvals", "approve")} />
           )}
           {activeTab === "invoices" && (
             <InvoicesTab
