@@ -53,3 +53,15 @@ export const UNIT_OF_MEASURE_OPTIONS = [
   { value: "plate", label: "Plate" },
   { value: "sheet", label: "Sheet" },
 ] as const;
+
+/** Measures written as a symbol — never pluralised ("2.5 Kg", "3 L"). */
+const UNIT_SYMBOLS: Record<string, string> = { kg: "Kg", g: "g", L: "L", mL: "mL", m: "m", cm: "cm" };
+
+/** "11 Pieces", "1 Box", "2.5 Kg" — a quantity in the product's unit of measure ("Units" when unset). */
+export function formatQuantityWithUnit(quantity: number, unitOfMeasure: string | null): string {
+  const symbol = unitOfMeasure ? UNIT_SYMBOLS[unitOfMeasure] : undefined;
+  if (symbol) return `${quantity} ${symbol}`;
+  const word = unitOfMeasure ? unitOfMeasure.charAt(0).toUpperCase() + unitOfMeasure.slice(1) : "Unit";
+  if (quantity === 1 || word === "Dozen") return `${quantity} ${word}`;
+  return `${quantity} ${/(x|s|ch|sh)$/.test(word) ? `${word}es` : `${word}s`}`;
+}

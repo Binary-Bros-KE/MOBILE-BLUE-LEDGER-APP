@@ -18,6 +18,7 @@ import type {
 } from "@/lib/types";
 import { HorizontalBarList } from "./charts/HorizontalBarList";
 import { OverviewCard } from "./OverviewCard";
+import { formatQuantityWithUnit } from "./products/manage-options";
 import { TrendAreaChart } from "./charts/TrendAreaChart";
 import { SalesReportPeriodSelector } from "./SalesReportPeriodSelector";
 
@@ -84,10 +85,11 @@ function ProductsSoldCard({ products, currency, startDate, endDate }: { products
           onClick={() =>
             void exportCsv(
               `products-sold-${startDate}-to-${endDate}.csv`,
-              ["Product", "Units Sold", "Revenue", "Cost", "Margin", "Margin %", "% of Revenue"],
+              ["Product", "Quantity Sold", "Unit", "Revenue", "Cost", "Margin", "Margin %", "% of Revenue"],
               products.map((p) => [
                 p.productName,
                 p.quantitySold,
+                p.unitOfMeasure ?? "",
                 centsForCsv(p.revenueCents),
                 centsForCsv(p.costCents),
                 centsForCsv(p.marginCents),
@@ -109,9 +111,12 @@ function ProductsSoldCard({ products, currency, startDate, endDate }: { products
             <span className="w-5 flex-none pt-px text-right font-bold text-navy/30">{index + 1}</span>
             <div className="min-w-0">
               <p className="truncate font-bold text-navy">{p.productName}</p>
-              <p className="text-navy/50">
-                {p.quantitySold} unit{p.quantitySold === 1 ? "" : "s"} · {percent(p.percentOfRevenue)} of revenue
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="rounded-full bg-blue px-2.5 py-0.5 text-xs font-extrabold text-white">
+                  {formatQuantityWithUnit(p.quantitySold, p.unitOfMeasure)}
+                </span>
+                <span className="text-navy/50">{percent(p.percentOfRevenue)} of revenue</span>
+              </div>
             </div>
           </div>
           <div className="flex-none text-right">

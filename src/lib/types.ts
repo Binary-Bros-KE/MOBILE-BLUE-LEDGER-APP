@@ -16,6 +16,7 @@ export type SalesTopProduct = {
 
 /** One row of the Sales Report's "Products Sold" list (DESKTOP's SalesProductSold). */
 export type SalesProductSold = SalesTopProduct & {
+  unitOfMeasure: string | null;
   costCents: number;
   marginCents: number;
   marginPercent: number;
