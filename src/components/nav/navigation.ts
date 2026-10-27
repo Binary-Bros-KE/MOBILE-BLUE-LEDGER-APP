@@ -109,7 +109,7 @@ export const navGroups: NavGroup[] = [
   {
     title: "Insights",
     // Same grant DESKTOP's own Inventory/Products reports require.
-    items: [{ key: "reports", label: "Reports", icon: BarChart3, ready: true, permission: { module: "reports", action: "view" } }],
+    items: [{ key: "reports", label: "Inventory Report", icon: BarChart3, ready: true, permission: { module: "reports", action: "view" } }],
   },
   {
     title: "Team",
