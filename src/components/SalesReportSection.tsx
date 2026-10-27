@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { centsForCsv, exportCsv } from "@/lib/csv-export";
 import { formatCents } from "@/lib/money";
 import { defaultAnchorForMode } from "@/lib/period";
 import { taxBreakdownLabel } from "@/lib/tax";
@@ -9,6 +11,7 @@ import type {
   MobileTaxReport,
   SalesByEmployeeRow,
   SalesByStorefrontRow,
+  SalesProductSold,
   SalesReportOverview,
   SalesReportPeriodInput,
   SalesTrendResult,
@@ -57,6 +60,75 @@ function BreakdownRow({
         <p className="font-bold text-navy">{formatCents(revenueCents, currency)}</p>
         <p className="text-navy/50">{percentOfTotal}%</p>
       </div>
+    </div>
+  );
+}
+
+const PRODUCTS_SOLD_PREVIEW = 10;
+
+const percent = (value: number) => `${value.toFixed(1)}%`;
+
+/** DESKTOP's "Products Sold" table as a stacked list: every distinct product sold in the period,
+ * most revenue first — units and share of revenue on the left, revenue and margin on the right. */
+function ProductsSoldCard({ products, currency, startDate, endDate }: { products: SalesProductSold[]; currency: string; startDate: string; endDate: string }) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? products : products.slice(0, PRODUCTS_SOLD_PREVIEW);
+
+  return (
+    <div className="rounded-lg bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-[11px] font-bold tracking-wide text-navy/50 uppercase">Products Sold ({products.length})</p>
+        <button
+          type="button"
+          aria-label="Export products sold as CSV"
+          onClick={() =>
+            void exportCsv(
+              `products-sold-${startDate}-to-${endDate}.csv`,
+              ["Product", "Units Sold", "Revenue", "Cost", "Margin", "Margin %", "% of Revenue"],
+              products.map((p) => [
+                p.productName,
+                p.quantitySold,
+                centsForCsv(p.revenueCents),
+                centsForCsv(p.costCents),
+                centsForCsv(p.marginCents),
+                p.marginPercent.toFixed(1),
+                p.percentOfRevenue.toFixed(1),
+              ]),
+            )
+          }
+          className="flex flex-none items-center gap-1 rounded-md border border-navy/15 px-2 py-1 text-[11px] font-bold text-navy/70"
+        >
+          <Download className="size-3.5" aria-hidden="true" />
+          CSV
+        </button>
+      </div>
+
+      {visible.map((p, index) => (
+        <div key={p.productId} className="flex items-center justify-between gap-3 border-t border-dashed border-navy/10 py-2 text-xs first:border-t-0 first:pt-0">
+          <div className="flex min-w-0 items-start gap-2">
+            <span className="w-5 flex-none pt-px text-right font-bold text-navy/30">{index + 1}</span>
+            <div className="min-w-0">
+              <p className="truncate font-bold text-navy">{p.productName}</p>
+              <p className="text-navy/50">
+                {p.quantitySold} unit{p.quantitySold === 1 ? "" : "s"} · {percent(p.percentOfRevenue)} of revenue
+              </p>
+            </div>
+          </div>
+          <div className="flex-none text-right">
+            <p className="font-bold text-navy">{formatCents(p.revenueCents, currency)}</p>
+            <p className={p.marginCents < 0 ? "text-red" : "text-green"}>
+              {formatCents(p.marginCents, currency)} · {percent(p.marginPercent)}
+            </p>
+          </div>
+        </div>
+      ))}
+
+      {products.length > PRODUCTS_SOLD_PREVIEW && (
+        <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 w-full rounded-md py-2 text-xs font-bold text-blue">
+          {showAll ? "Show less" : `Show all ${products.length} products`}
+        </button>
+      )}
+      <p className="mt-2 text-[10px] text-navy/40">Net of returns. Margin uses each product&apos;s current buying price.</p>
     </div>
   );
 }
@@ -190,6 +262,16 @@ export function SalesReportSection({ locationId }: { locationId?: string }) {
                 formatValue={money}
               />
             </div>
+          )}
+
+          {overview.productsSold.length > 0 && (
+            <ProductsSoldCard
+              key={requestKey}
+              products={overview.productsSold}
+              currency={overview.currency}
+              startDate={overview.startDate}
+              endDate={overview.endDate}
+            />
           )}
 
           {overview.paymentSplit.length > 0 && (

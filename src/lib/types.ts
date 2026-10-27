@@ -14,6 +14,14 @@ export type SalesTopProduct = {
   revenueCents: number;
 };
 
+/** One row of the Sales Report's "Products Sold" list (DESKTOP's SalesProductSold). */
+export type SalesProductSold = SalesTopProduct & {
+  costCents: number;
+  marginCents: number;
+  marginPercent: number;
+  percentOfRevenue: number;
+};
+
 export type SalesSnapshot = {
   revenueCents: number;
   transactionCount: number;
@@ -549,6 +557,7 @@ export type SalesReportOverview = {
   spansMultipleDays: boolean;
   averageDailyRevenueCents: number;
   topProducts: SalesTopProduct[];
+  productsSold: SalesProductSold[];
   paymentSplit: PaymentMethodBreakdownEntry[];
   /** Purchases (goods + shipping) actually paid to suppliers this period — "Total Capital
    * Invested." Informational only, never folded into totalExpensesCents/netProfitCents. */
