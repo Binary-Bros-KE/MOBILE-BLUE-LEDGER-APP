@@ -352,8 +352,8 @@ export function SalesReportSection({ locationId }: { locationId?: string }) {
                   </div>
                 ))}
                 <div className="flex items-center justify-between gap-2 border-t border-navy/10 pt-2 text-sm font-extrabold text-navy">
-                  <span>Total</span>
-                  <span>{money(taxReport.totalGrossCents)}</span>
+                  <span>Total Tax Payable</span>
+                  <span>{money(taxReport.totalTaxCents)}</span>
                 </div>
               </div>
             </div>
