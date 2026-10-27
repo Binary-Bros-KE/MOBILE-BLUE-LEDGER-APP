@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { formatCents, priceTextToCents } from "@/lib/money";
-import type { MobileLocation, MobileSupplier, ProductListItem } from "@/lib/types";
+import { centsToPriceText, formatCents, priceTextToCents } from "@/lib/money";
+import type { MobileLocation, MobileSupplier, ProductListItem, PurchaseDetail } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 
@@ -25,29 +25,47 @@ type Line = {
  * nothing yet. Stock only moves later, on Receive Goods. Line tax is computed server-side from each
  * product's own tax category — the total shown here is cost × quantity only. The purchase id is
  * minted once when the sheet opens, so a retry after a dropped connection can't create it twice.
+ *
+ * Each new line's unit cost starts at the product's last buying price (a separate lookup, so cost
+ * prices never reach staff who can't buy stock). With `editing` set, the same form re-opens a DRAFT
+ * purchase and saves over it (Save Draft) or places it (Place Order).
  */
 export function NewPurchaseModal({
   locations,
   currency,
+  editing = null,
   onClose,
   onCreated,
 }: {
   /** Where this viewer may receive goods (already narrowed for a branch-scoped employee). */
   locations: MobileLocation[];
   currency: string;
+  /** A draft purchase to edit instead of creating a new one. */
+  editing?: PurchaseDetail | null;
   onClose: () => void;
   onCreated: (purchaseId: string) => void;
 }) {
   const [suppliers, setSuppliers] = useState<MobileSupplier[] | null>(null);
   const [products, setProducts] = useState<ProductListItem[] | null>(null);
-  const [supplierId, setSupplierId] = useState("");
-  const [locationId, setLocationId] = useState(locations.length === 1 ? locations[0]!.id : "");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [costs, setCosts] = useState<Record<string, number>>({});
+  const [supplierId, setSupplierId] = useState(editing?.supplierId ?? "");
+  const [locationId, setLocationId] = useState(editing?.locationId ?? (locations.length === 1 ? locations[0]!.id : ""));
+  const [lines, setLines] = useState<Line[]>(() =>
+    (editing?.items ?? []).map((item) => ({
+      productId: item.productId,
+      name: item.productName,
+      sku: item.sku ?? "",
+      taxType: item.taxType,
+      quantity: String(item.orderedQuantity),
+      unitCost: centsToPriceText(item.unitCostCents),
+      sellingPrice: centsToPriceText(item.sellingPriceCents),
+    })),
+  );
   const [search, setSearch] = useState("");
-  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState("");
-  const [shippingFee, setShippingFee] = useState("");
-  const [shippingCost, setShippingCost] = useState("");
-  const [notes, setNotes] = useState("");
+  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState(editing?.supplierInvoiceNumber ?? "");
+  const [shippingFee, setShippingFee] = useState(editing && editing.shippingCostCents > 0 ? centsToPriceText(editing.shippingCostCents) : "");
+  const [shippingCost, setShippingCost] = useState(editing && editing.shippingExpenseCents > 0 ? centsToPriceText(editing.shippingExpenseCents) : "");
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [showMore, setShowMore] = useState(false);
   const [creatingSupplier, setCreatingSupplier] = useState(false);
   const [saving, setSaving] = useState<"draft" | "ordered" | null>(null);
@@ -61,6 +79,11 @@ export function NewPurchaseModal({
         setProducts(p);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load suppliers and products."));
+    // Pre-fill only — without access to buying prices the lines just start blank.
+    api
+      .listProductCosts()
+      .then(setCosts)
+      .catch(() => undefined);
   }, []);
 
   const matches = useMemo(() => {
@@ -81,7 +104,7 @@ export function NewPurchaseModal({
         sku: product.sku,
         taxType: product.taxType,
         quantity: "1",
-        unitCost: "",
+        unitCost: costs[product.id] ? centsToPriceText(costs[product.id]!) : "",
         sellingPrice: "",
       },
     ]);
@@ -114,8 +137,7 @@ export function NewPurchaseModal({
     setSaving(intent);
     setError(null);
     try {
-      const result = await api.createPurchase({
-        id: purchaseId.current,
+      const body = {
         supplierId,
         supplierInvoiceNumber: supplierInvoiceNumber.trim() || null,
         locationId,
@@ -124,7 +146,8 @@ export function NewPurchaseModal({
         notes: notes.trim() || null,
         items,
         intent,
-      });
+      };
+      const result = editing ? await api.updateDraftPurchase(editing.id, body) : await api.createPurchase({ ...body, id: purchaseId.current });
       onCreated(result.id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save purchase.");
@@ -135,7 +158,11 @@ export function NewPurchaseModal({
 
   return (
     <>
-      <BottomSheet title="New Purchase" subtitle="Stock is added when you receive the goods." onClose={onClose}>
+      <BottomSheet
+        title={editing ? `Edit Draft ${editing.purchaseNumber}` : "New Purchase"}
+        subtitle="Stock is added when you receive the goods."
+        onClose={onClose}
+      >
         {!suppliers || !products ? (
           error ? (
             <SheetError message={error} />

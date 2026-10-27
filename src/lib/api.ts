@@ -364,6 +364,11 @@ export const api = {
   listPurchases: (locationId?: string) =>
     request<PurchaseListItem[]>(`/mobile/purchases${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
   getPurchase: (id: string) => request<PurchaseDetail>(`/mobile/purchases/${id}`),
+  /** Rewrite a DRAFT purchase (intent "ordered" also places it). */
+  updateDraftPurchase: (id: string, body: Omit<CreatePurchaseInput, "id">) =>
+    request<{ id: string; status: string }>(`/mobile/purchases/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  /** productId → last buying price (purchases.create or products.edit only). */
+  listProductCosts: () => request<Record<string, number>>("/mobile/products/costs"),
   createPurchase: (body: CreatePurchaseInput) =>
     request<{ id: string; purchaseNumber: string }>("/mobile/purchases", { method: "POST", body: JSON.stringify(body) }),
   markPurchaseOrdered: (id: string) => request<DocumentIdResult>(`/mobile/purchases/${id}/order`, { method: "POST" }),

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ClipboardPlus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { MobileLocation, PurchaseListItem } from "@/lib/types";
+import type { MobileLocation, PurchaseDetail, PurchaseListItem } from "@/lib/types";
 import { FilterChip } from "../FilterChip";
 import { PurchaseCard } from "../PurchaseCard";
 import { PurchaseDetailModal } from "../PurchaseDetailModal";
@@ -35,6 +35,7 @@ export function PurchasesTab({
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editingDraft, setEditingDraft] = useState<PurchaseDetail | null>(null);
 
   useEffect(() => {
     api.listLocations().then(setLocations).catch(() => {
@@ -119,15 +120,29 @@ export function PurchasesTab({
       </div>
 
       {selectedPurchaseId && (
-        <PurchaseDetailModal purchaseId={selectedPurchaseId} canEdit={canEdit} onClose={() => setSelectedPurchaseId(null)} onChanged={loadPurchases} />
+        <PurchaseDetailModal
+          purchaseId={selectedPurchaseId}
+          canEdit={canEdit}
+          onClose={() => setSelectedPurchaseId(null)}
+          onChanged={loadPurchases}
+          onEditDraft={(purchase) => {
+            setSelectedPurchaseId(null);
+            setEditingDraft(purchase);
+          }}
+        />
       )}
-      {creating && (
+      {(creating || editingDraft) && (
         <NewPurchaseModal
           locations={receivingLocations}
           currency={currency}
-          onClose={() => setCreating(false)}
+          editing={editingDraft}
+          onClose={() => {
+            setCreating(false);
+            setEditingDraft(null);
+          }}
           onCreated={(purchaseId) => {
             setCreating(false);
+            setEditingDraft(null);
             loadPurchases();
             // Straight into the new PO — the next step (receive goods) usually follows right away.
             setSelectedPurchaseId(purchaseId);

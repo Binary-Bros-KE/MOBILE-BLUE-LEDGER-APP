@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Ban, Loader2, PackageCheck, Send, Wallet, X } from "lucide-react";
+import { Ban, Loader2, PackageCheck, Pencil, Send, Wallet, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import { taxBreakdownLabel } from "@/lib/tax";
@@ -34,11 +34,14 @@ export function PurchaseDetailModal({
   canEdit = false,
   onClose,
   onChanged,
+  onEditDraft,
 }: {
   purchaseId: string;
   canEdit?: boolean;
   onClose: () => void;
   onChanged?: () => void;
+  /** Re-open this draft in the purchase form (the tab closes this modal first). */
+  onEditDraft?: (purchase: PurchaseDetail) => void;
 }) {
   const [doc, setDoc] = useState<PurchaseDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -133,6 +136,7 @@ export function PurchaseDetailModal({
               {canOrder && (
                 <ActionButton icon={busy === "order" ? Loader2 : Send} label="Place Order" onClick={() => void runAction("order")} primary spinning={busy === "order"} />
               )}
+              {canOrder && onEditDraft && <ActionButton icon={Pencil} label="Edit Draft" onClick={() => onEditDraft(doc)} />}
               {canReceive && <ActionButton icon={PackageCheck} label="Receive Goods" onClick={() => setSheet("receive")} primary />}
               {canPay && <ActionButton icon={Wallet} label="Pay Supplier" onClick={() => setSheet("pay")} primary={!canReceive} />}
               {canCancel && (

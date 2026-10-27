@@ -1053,6 +1053,9 @@ export type PurchaseItemLine = {
   id: string;
   productId: string;
   productName: string;
+  /** Needed to re-open a draft for editing. */
+  taxType: string;
+  sellingPriceCents: number | null;
   sku: string | null;
   orderedQuantity: number;
   receivedQuantity: number;
