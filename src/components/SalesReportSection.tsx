@@ -74,7 +74,6 @@ const percent = (value: number) => `${value.toFixed(1)}%`;
 function ProductsSoldCard({ products, currency, startDate, endDate }: { products: SalesProductSold[]; currency: string; startDate: string; endDate: string }) {
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? products : products.slice(0, PRODUCTS_SOLD_PREVIEW);
-  const totalUnits = products.reduce((sum, p) => sum + p.quantitySold, 0);
 
   return (
     <div className="rounded-lg bg-white p-4 shadow-sm">
@@ -104,11 +103,6 @@ function ProductsSoldCard({ products, currency, startDate, endDate }: { products
           <Download className="size-3.5" aria-hidden="true" />
           CSV
         </button>
-      </div>
-
-      <div className="mb-3 flex items-center justify-between gap-2 rounded-lg bg-navy px-4 py-3 text-white">
-        <p className="text-[11px] font-bold tracking-wide text-white/70 uppercase">Total Units Sold</p>
-        <p className="font-display text-2xl">{totalUnits.toLocaleString()}</p>
       </div>
 
       {visible.map((p, index) => (
