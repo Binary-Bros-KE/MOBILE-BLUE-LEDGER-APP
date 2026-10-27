@@ -74,6 +74,7 @@ const percent = (value: number) => `${value.toFixed(1)}%`;
 function ProductsSoldCard({ products, currency, startDate, endDate }: { products: SalesProductSold[]; currency: string; startDate: string; endDate: string }) {
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? products : products.slice(0, PRODUCTS_SOLD_PREVIEW);
+  const totalUnits = products.reduce((sum, p) => sum + p.quantitySold, 0);
 
   return (
     <div className="rounded-lg bg-white p-4 shadow-sm">
@@ -105,6 +106,11 @@ function ProductsSoldCard({ products, currency, startDate, endDate }: { products
         </button>
       </div>
 
+      <div className="mb-3 flex items-center justify-between gap-2 rounded-lg bg-navy px-4 py-3 text-white">
+        <p className="text-[11px] font-bold tracking-wide text-white/70 uppercase">Total Units Sold</p>
+        <p className="font-display text-2xl">{totalUnits.toLocaleString()}</p>
+      </div>
+
       {visible.map((p, index) => (
         <div key={p.productId} className="flex items-center justify-between gap-3 border-t border-dashed border-navy/10 py-2 text-xs first:border-t-0 first:pt-0">
           <div className="flex min-w-0 items-start gap-2">
@@ -112,7 +118,7 @@ function ProductsSoldCard({ products, currency, startDate, endDate }: { products
             <div className="min-w-0">
               <p className="truncate font-bold text-navy">{p.productName}</p>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="rounded-full bg-blue px-2.5 py-0.5 text-xs font-extrabold text-white">
+                <span className="rounded-full bg-blue/50 px-2.5 py-0.5 text-xs font-extrabold text-white">
                   {formatQuantityWithUnit(p.quantitySold, p.unitOfMeasure)}
                 </span>
                 <span className="text-navy/50">{percent(p.percentOfRevenue)} of revenue</span>
