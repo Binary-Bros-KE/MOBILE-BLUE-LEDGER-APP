@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Loader2, Wallet } from "lucide-react";
+import { CheckCircle2, Loader2, Pencil, Wallet } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { centsToPriceText, formatCents, priceTextToCents } from "@/lib/money";
 import type { CollectCustomerPaymentResult, MobileCustomerDebt, MobileCustomerWithBalance, PaymentMethodOption } from "@/lib/types";
@@ -18,12 +18,15 @@ export function CustomerDebtModal({
   customer,
   currency,
   canCollect,
+  onEdit,
   onClose,
   onPaid,
 }: {
   customer: MobileCustomerWithBalance;
   currency: string;
   canCollect: boolean;
+  /** customers.edit — opens CustomerEditModal (the tab closes this sheet first, so they never stack). */
+  onEdit?: () => void;
   onClose: () => void;
   onPaid: () => void;
 }) {
@@ -118,6 +121,12 @@ export function CustomerDebtModal({
       ) : (
         <div className="space-y-3">
           <SheetError message={error} />
+          {onEdit && (
+            <button type="button" onClick={onEdit} className="flex items-center gap-1 text-xs font-bold text-blue">
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Edit details & credit limit
+            </button>
+          )}
           {debt.invoices.length === 0 && <p className="py-6 text-center text-sm text-navy/50">Nothing owed right now.</p>}
           <div className="space-y-2">
             {debt.invoices.map((invoice) => {

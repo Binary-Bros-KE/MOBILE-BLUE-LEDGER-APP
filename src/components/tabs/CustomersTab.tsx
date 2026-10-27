@@ -6,19 +6,21 @@ import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import type { MobileCustomerWithBalance } from "@/lib/types";
 import { CustomerDebtModal } from "../customers/CustomerDebtModal";
+import { CustomerEditModal } from "../customers/CustomerEditModal";
 import { FilterChip } from "../FilterChip";
 import { QuickCreateCustomerModal } from "../QuickCreateCustomerModal";
 
 /** Customer directory with what each one owes — debtors first. Tapping a customer who owes opens
  * their unpaid invoices and (with sales.edit, the same grant as paying a single invoice) Collect
  * Payment, which SERVER spreads across those invoices oldest first. */
-export function CustomersTab({ currency, canCollect }: { currency: string; canCollect: boolean }) {
+export function CustomersTab({ currency, canCollect, canEdit }: { currency: string; canCollect: boolean; canEdit: boolean }) {
   const [customers, setCustomers] = useState<MobileCustomerWithBalance[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [owingOnly, setOwingOnly] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [debtFor, setDebtFor] = useState<MobileCustomerWithBalance | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const loadCustomers = useCallback(() => {
     api
@@ -82,9 +84,8 @@ export function CustomersTab({ currency, canCollect }: { currency: string; canCo
               <button
                 key={customer.id}
                 type="button"
-                disabled={customer.balanceDueCents <= 0}
                 onClick={() => setDebtFor(customer)}
-                className="flex w-full items-center gap-3 rounded-lg bg-white p-3 text-left shadow-sm disabled:cursor-default"
+                className="flex w-full items-center gap-3 rounded-lg bg-white p-3 text-left shadow-sm"
               >
                 <div className="grid size-10 flex-none place-items-center rounded-full bg-navy/10 text-navy">
                   <UserRound className="size-5" aria-hidden="true" />
@@ -128,8 +129,26 @@ export function CustomersTab({ currency, canCollect }: { currency: string; canCo
           customer={debtFor}
           currency={currency}
           canCollect={canCollect}
+          onEdit={
+            canEdit
+              ? () => {
+                  setEditId(debtFor.id);
+                  setDebtFor(null);
+                }
+              : undefined
+          }
           onClose={() => setDebtFor(null)}
           onPaid={loadCustomers}
+        />
+      )}
+      {editId && (
+        <CustomerEditModal
+          customerId={editId}
+          onClose={() => setEditId(null)}
+          onSaved={() => {
+            setEditId(null);
+            loadCustomers();
+          }}
         />
       )}
     </div>

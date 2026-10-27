@@ -25,6 +25,7 @@ import type {
   MobileCategory,
   MobileCustomer,
   MobileCustomerDebt,
+  MobileCustomerDetail,
   MobileCustomerWithBalance,
   MobileExpenseCategory,
   MobileDeliveryNote,
@@ -42,6 +43,7 @@ import type {
   MobileSessionInfo,
   MobileSupplier,
   MobileSupplierBalanceEntry,
+  MobileSupplierDetail,
   MobileSupplierWithBalance,
   MobileTaxReport,
   MpesaStatusResult,
@@ -271,6 +273,12 @@ export const api = {
   rejectInvoiceCancellation: (id: string, notes?: string) =>
     request<DocumentIdResult>(`/mobile/approvals/invoice-cancellations/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
   listCustomers: () => request<MobileCustomer[]>("/mobile/customers"),
+  getCustomerDetail: (id: string) => request<MobileCustomerDetail>(`/mobile/customers/${id}/detail`),
+  updateCustomer: (id: string, body: Omit<MobileCustomerDetail, "id" | "customerCode" | "status"> & { status: "active" | "inactive" }) =>
+    request<DocumentIdResult>(`/mobile/customers/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  getSupplierDetail: (id: string) => request<MobileSupplierDetail>(`/mobile/suppliers/${id}/detail`),
+  updateSupplier: (id: string, body: Omit<MobileSupplierDetail, "id" | "supplierCode" | "status"> & { status: "active" | "inactive" }) =>
+    request<DocumentIdResult>(`/mobile/suppliers/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   listCustomerBalances: () => request<MobileCustomerWithBalance[]>("/mobile/customers/balances"),
   getCustomerDebt: (customerId: string) => request<MobileCustomerDebt>(`/mobile/customers/${customerId}/debt`),
   collectCustomerPayment: (customerId: string, body: CollectCustomerPaymentInput) =>

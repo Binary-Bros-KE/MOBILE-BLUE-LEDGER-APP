@@ -7,6 +7,7 @@ import { formatCents } from "@/lib/money";
 import type { MobileSupplierWithBalance } from "@/lib/types";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 import { SupplierBalanceModal } from "../suppliers/SupplierBalanceModal";
+import { SupplierEditModal } from "../suppliers/SupplierEditModal";
 
 /** Supplier directory with what's owed to each — biggest balance first. Tap a supplier for its
  * balance history and (suppliers.edit) Adjust Balance. Same grants as DESKTOP's Suppliers screen. */
@@ -16,6 +17,7 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<MobileSupplierWithBalance | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const loadSuppliers = useCallback(() => {
     api
@@ -110,7 +112,31 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
         />
       )}
       {selected && (
-        <SupplierBalanceModal supplier={selected} currency={currency} canAdjust={canAdjust} onClose={() => setSelected(null)} onChanged={loadSuppliers} />
+        <SupplierBalanceModal
+          supplier={selected}
+          currency={currency}
+          canAdjust={canAdjust}
+          onEdit={
+            canAdjust
+              ? () => {
+                  setEditId(selected.id);
+                  setSelected(null);
+                }
+              : undefined
+          }
+          onClose={() => setSelected(null)}
+          onChanged={loadSuppliers}
+        />
+      )}
+      {editId && (
+        <SupplierEditModal
+          supplierId={editId}
+          onClose={() => setEditId(null)}
+          onSaved={() => {
+            setEditId(null);
+            loadSuppliers();
+          }}
+        />
       )}
     </div>
   );

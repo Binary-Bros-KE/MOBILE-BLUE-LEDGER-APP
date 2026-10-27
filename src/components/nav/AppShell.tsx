@@ -178,7 +178,7 @@ export function AppShell() {
             />
           )}
           {activeTab === "transactions" && <TransactionsTab />}
-          {activeTab === "customers" && <CustomersTab currency={session?.currency ?? "KES"} canCollect={can("sales", "edit")} />}
+          {activeTab === "customers" && <CustomersTab currency={session?.currency ?? "KES"} canCollect={can("sales", "edit")} canEdit={can("customers", "edit")} />}
           {activeTab === "riders" && <RidersTab />}
           {activeTab === "products" && (
             <ProductsTab

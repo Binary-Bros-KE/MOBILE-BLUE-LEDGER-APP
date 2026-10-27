@@ -399,6 +399,42 @@ export type InvoiceListItem = {
 
 export type MobileCustomer = { id: string; name: string; phone: string; customerCode: string };
 
+export type MobileCustomerDetail = {
+  id: string;
+  customerCode: string;
+  customerType: "retail" | "wholesale" | "corporate" | "walk_in" | "personal";
+  name: string;
+  phone: string;
+  email: string | null;
+  kraPin: string | null;
+  physicalAddress: string | null;
+  creditLimitCents: number | null;
+  notes: string | null;
+  status: string;
+};
+
+export type MobileSupplierDetail = {
+  id: string;
+  supplierCode: string;
+  businessName: string;
+  contactPerson: string | null;
+  phone1: string;
+  phone2: string | null;
+  email: string | null;
+  kraPin: string | null;
+  town: string | null;
+  physicalAddress: string | null;
+  paymentOption: "cash" | "mpesa" | "bank_transfer" | "other";
+  mpesaName: string | null;
+  mpesaNumber: string | null;
+  bankName: string | null;
+  bankAccountName: string | null;
+  bankAccountNumber: string | null;
+  creditLimitCents: number | null;
+  notes: string | null;
+  status: string;
+};
+
 /** Customers tab list item — what they currently owe across unpaid invoices (SERVER computes it the
  * same way DESKTOP's own debtor balance does: total − paid − approved returns, voided excluded). */
 export type MobileCustomerWithBalance = MobileCustomer & { balanceDueCents: number; unpaidInvoiceCount: number };

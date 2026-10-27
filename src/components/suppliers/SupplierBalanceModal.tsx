@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, SlidersHorizontal } from "lucide-react";
+import { Loader2, Pencil, SlidersHorizontal } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents, priceTextToCents } from "@/lib/money";
 import type { MobileSupplierBalanceEntry, MobileSupplierWithBalance } from "@/lib/types";
@@ -29,12 +29,15 @@ export function SupplierBalanceModal({
   supplier,
   currency,
   canAdjust,
+  onEdit,
   onClose,
   onChanged,
 }: {
   supplier: MobileSupplierWithBalance;
   currency: string;
   canAdjust: boolean;
+  /** suppliers.edit — opens SupplierEditModal (the tab closes this sheet first). */
+  onEdit?: () => void;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -88,6 +91,12 @@ export function SupplierBalanceModal({
   return (
     <BottomSheet title={supplier.businessName} subtitle={`${supplier.supplierCode} · ${supplier.phone1}`} onClose={onClose}>
       <div className="space-y-3">
+        {onEdit && (
+          <button type="button" onClick={onEdit} className="flex items-center gap-1 text-xs font-bold text-blue">
+            <Pencil className="size-3.5" aria-hidden="true" />
+            Edit supplier details
+          </button>
+        )}
         <div className="flex items-center justify-between rounded-lg bg-cream-dark/60 px-3 py-2.5">
           <span className="text-xs font-semibold text-navy/60">{balanceCents >= 0 ? "We owe them" : "They owe us"}</span>
           <span className={`font-display text-lg ${balanceCents > 0 ? "text-red" : "text-navy"}`}>{money(Math.abs(balanceCents))}</span>
