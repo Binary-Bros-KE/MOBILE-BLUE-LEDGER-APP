@@ -73,11 +73,10 @@ export const navGroups: NavGroup[] = [
       // Same permission DESKTOP's own completeSale() checks — granting a role mobile checkout
       // access is just a normal Roles & Permissions edit, nothing mobile-specific to configure.
       { key: "checkout", label: "Checkout", icon: CreditCard, ready: true, permission: { module: "sales", action: "create" } },
-      // "Sales" covers what DESKTOP calls Receipts (a walk-in, non-invoice Sale) — no separate
-      // Receipts tab, they're the same underlying document.
       // Anyone who can sell gets their own cash-up; everyone's needs reports.view (see CashUpTab).
       { key: "cashUp", label: "Cash Up", icon: Banknote, ready: true, permission: { module: "sales", action: "create" } },
-      { key: "sales", label: "Sales", icon: ShoppingCart, ready: true, permission: { module: "sales", action: "view" } },
+      // Named "Receipts" like DESKTOP's tab — walk-in, non-invoice Sales (internally still key "sales").
+      { key: "sales", label: "Receipts", icon: ShoppingCart, ready: true, permission: { module: "sales", action: "view" } },
       // "Invoices" also carries the "Statement" action (see InvoicesTab.tsx) — same as DESKTOP's
       // own InvoicesRoute, no separate Statements nav entry. Invoices are just Sales with an
       // invoiceNumber set — DESKTOP gates them under the same "sales" permission, not a distinct one.
