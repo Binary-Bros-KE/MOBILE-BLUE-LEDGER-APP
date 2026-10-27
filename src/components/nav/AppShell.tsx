@@ -95,7 +95,8 @@ export function AppShell() {
 
   return (
     // --bottom-nav-h lets anything else pinned to the bottom (Checkout's cart bar) sit above BottomNav.
-    <div className="min-h-screen bg-cream-dark" style={{ "--bottom-nav-h": `${BOTTOM_NAV_HEIGHT_PX}px` } as React.CSSProperties}>
+    // overflow-x-clip: nothing in a tab can ever widen the page (clip, not hidden, so sticky bars still work).
+    <div className="min-h-screen overflow-x-clip bg-cream-dark" style={{ "--bottom-nav-h": `${BOTTOM_NAV_HEIGHT_PX}px` } as React.CSSProperties}>
       <header className="sticky top-0 z-30 flex items-center gap-3 bg-navy px-4 py-4 text-white">
         <button
           type="button"

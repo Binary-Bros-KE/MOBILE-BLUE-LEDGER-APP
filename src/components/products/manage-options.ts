@@ -18,6 +18,11 @@ export function storefrontLocations(options: ProductManageOptions): MobileLocati
   return options.locations.filter((l) => l.locationType !== MAIN_STORE_TYPE && l.locationType !== "warehouse");
 }
 
+/** One storefront (or none) — "Sold at" is then fixed to All Storefronts; SERVER enforces the same. */
+export function hasSingleStorefront(options: ProductManageOptions): boolean {
+  return storefrontLocations(options).length <= 1;
+}
+
 /** Where this viewer may change stock: their own storefront + the Main Store when branch-scoped
  * (DESKTOP's assertOpeningStockLocationsAllowed), everywhere otherwise. */
 export function stockLocations(options: ProductManageOptions): MobileLocation[] {

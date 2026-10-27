@@ -47,7 +47,7 @@ export const sheetInputClass =
 
 export function SheetField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="text-[11px] font-semibold text-navy/50">{label}</span>
       {children}
     </label>

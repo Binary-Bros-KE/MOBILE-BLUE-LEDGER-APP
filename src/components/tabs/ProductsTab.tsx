@@ -147,7 +147,7 @@ export function ProductsTab({
             </button>
           )}
         </div>
-        <div className="flex gap-1.5 px-4 py-3">
+        <div className="flex gap-1.5 overflow-x-auto px-4 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <FilterChip label="Low Stock" active={lowStockOnly} onClick={() => setLowStockOnly((v) => !v)} />
           <FilterChip label="Out of Stock" active={outOfStockOnly} onClick={() => setOutOfStockOnly((v) => !v)} />
           {(hasArchived || archivedOnly) && <FilterChip label="Archived" active={archivedOnly} onClick={() => setArchivedOnly((v) => !v)} />}

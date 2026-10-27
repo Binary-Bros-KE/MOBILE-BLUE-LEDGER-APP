@@ -7,7 +7,7 @@ import { centsToPriceText, priceTextToCents } from "@/lib/money";
 import type { MobileCategory, ProductInput, ProductTaxTypeValue } from "@/lib/types";
 import { BarcodeScannerSheet, cameraScanSupported } from "../BarcodeScannerSheet";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
-import { type ProductManageOptions, stockLocations, storefrontLocations, UNIT_OF_MEASURE_OPTIONS } from "./manage-options";
+import { hasSingleStorefront, type ProductManageOptions, stockLocations, storefrontLocations, UNIT_OF_MEASURE_OPTIONS } from "./manage-options";
 
 type TaxMode = "inherit" | "inclusive" | "exclusive";
 
@@ -37,12 +37,14 @@ type FormState = {
 const ALL_STOREFRONTS = "";
 
 function emptyForm(options: ProductManageOptions): FormState {
+  // Only one place stock can go (a single-location business) — opening stock goes there, no picker.
+  const onlyStockLocation = stockLocations(options).length === 1 ? stockLocations(options)[0].id : null;
   return {
     name: "",
     sku: "",
     barcode: "",
     categoryId: "",
-    storefrontId: options.branchScope ?? ALL_STOREFRONTS,
+    storefrontId: hasSingleStorefront(options) ? ALL_STOREFRONTS : (options.branchScope ?? ALL_STOREFRONTS),
     unitOfMeasure: "piece",
     description: "",
     sellingPrice: "",
@@ -55,7 +57,7 @@ function emptyForm(options: ProductManageOptions): FormState {
     reorderLevel: "",
     trackStock: true,
     allowNegativeStock: false,
-    openingLocationId: options.branchScope ?? "",
+    openingLocationId: onlyStockLocation ?? options.branchScope ?? "",
     openingQuantity: "",
   };
 }
@@ -92,6 +94,7 @@ export function ProductFormModal({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const singleStorefront = hasSingleStorefront(options);
 
   useEffect(() => {
     if (!productId) return;
@@ -104,7 +107,7 @@ export function ProductFormModal({
           sku: p.sku,
           barcode: p.barcode ?? "",
           categoryId: p.categoryId ?? "",
-          storefrontId: p.storefrontId ?? ALL_STOREFRONTS,
+          storefrontId: singleStorefront ? ALL_STOREFRONTS : (p.storefrontId ?? ALL_STOREFRONTS),
           unitOfMeasure: p.unitOfMeasure ?? "",
           description: p.description ?? "",
           sellingPrice: centsToPriceText(p.sellingPriceCents),
@@ -125,7 +128,7 @@ export function ProductFormModal({
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load this product."))
       .finally(() => setLoading(false));
-  }, [productId]);
+  }, [productId, singleStorefront]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -242,7 +245,7 @@ export function ProductFormModal({
             </SheetField>
             <SheetField label="Barcode (optional)">
               <div className="flex gap-1.5">
-                <input inputMode="numeric" value={form.barcode} onChange={(e) => set("barcode", e.target.value)} className={sheetInputClass} />
+                <input inputMode="numeric" value={form.barcode} onChange={(e) => set("barcode", e.target.value)} className={`min-w-0 ${sheetInputClass}`} />
                 {cameraScanSupported() && (
                   <button
                     type="button"
@@ -320,7 +323,7 @@ export function ProductFormModal({
             <select
               value={form.storefrontId}
               onChange={(e) => set("storefrontId", e.target.value)}
-              disabled={options.branchScope !== null}
+              disabled={singleStorefront || options.branchScope !== null}
               className={sheetInputClass}
             >
               <option value={ALL_STOREFRONTS}>All Storefronts</option>
@@ -344,8 +347,13 @@ export function ProductFormModal({
           {!isEdit && form.trackStock && (
             <div className="grid grid-cols-2 gap-3">
               <SheetField label="Opening stock at">
-                <select value={form.openingLocationId} onChange={(e) => set("openingLocationId", e.target.value)} className={sheetInputClass}>
-                  <option value="">None</option>
+                <select
+                  value={form.openingLocationId}
+                  onChange={(e) => set("openingLocationId", e.target.value)}
+                  disabled={openingLocations.length === 1}
+                  className={sheetInputClass}
+                >
+                  {openingLocations.length !== 1 && <option value="">None</option>}
                   {openingLocations.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.locationName}
