@@ -70,7 +70,9 @@ export function ProductCard({ product, currency, actions }: { product: ProductLi
         )}
       </div>
       {hasActions && (
-        <div className="mt-1.5 flex gap-2 border-t border-dashed border-navy/15 pt-2.5 pl-14">
+        // Full card width (not indented under the name) with equal-width buttons, so the row can never
+        // be wider than the screen and push the page sideways.
+        <div className="mt-1.5 flex gap-2 border-t border-dashed border-navy/15 pt-2.5">
           {actions?.onAdjustStock && product.trackStock && !archived && (
             <CardAction icon={Boxes} label="Stock" onClick={actions.onAdjustStock} primary />
           )}
@@ -89,7 +91,7 @@ function CardAction({ icon: Icon, label, onClick, primary }: { icon: typeof Pack
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[11px] font-bold ${
+      className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md border px-2 py-1.5 text-[11px] font-bold ${
         primary ? "border-blue bg-blue text-white" : "border-navy/15 text-navy hover:bg-cream-dark"
       }`}
     >
