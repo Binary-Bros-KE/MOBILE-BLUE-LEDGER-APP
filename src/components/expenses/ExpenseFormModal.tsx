@@ -24,6 +24,7 @@ export function ExpenseFormModal({
   expense,
   storefronts,
   branchScope,
+  workingStorefrontId,
   canCreateCategory,
   onClose,
   onSaved,
@@ -32,6 +33,9 @@ export function ExpenseFormModal({
   /** Storefront-type locations only — DESKTOP has no "General/Head Office" expense. */
   storefronts: MobileLocation[];
   branchScope: string | null;
+  /** The viewer's assigned storefront (Super Admins included) — a NEW expense is booked there
+   * without asking, same as Checkout. Editing keeps the expense's own storefront. */
+  workingStorefrontId: string | null;
   canCreateCategory: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -42,7 +46,8 @@ export function ExpenseFormModal({
   const [amount, setAmount] = useState(expense ? centsToPriceText(expense.amountCents) : "");
   const [categoryId, setCategoryId] = useState(expense?.categoryId ?? "");
   const [paymentMethodId, setPaymentMethodId] = useState(expense?.paymentMethodId ?? "");
-  const [storefrontId, setStorefrontId] = useState(branchScope ?? expense?.storefrontId ?? (storefronts.length === 1 ? storefronts[0]!.id : ""));
+  const fixedStorefrontId = branchScope ?? (expense ? null : workingStorefrontId) ?? (storefronts.length === 1 ? storefronts[0]!.id : null);
+  const [storefrontId, setStorefrontId] = useState(branchScope ?? expense?.storefrontId ?? fixedStorefrontId ?? "");
   const [paidBy, setPaidBy] = useState(expense?.paidBy ?? "");
   const [reference, setReference] = useState(expense?.reference ?? "");
   const [description, setDescription] = useState(expense?.description ?? "");
@@ -186,7 +191,7 @@ export function ExpenseFormModal({
               </select>
             </SheetField>
             <SheetField label="Storefront">
-              <select value={storefrontId} onChange={(e) => setStorefrontId(e.target.value)} disabled={branchScope !== null} className={sheetInputClass}>
+              <select value={storefrontId} onChange={(e) => setStorefrontId(e.target.value)} disabled={fixedStorefrontId !== null} className={sheetInputClass}>
                 <option value="" disabled>
                   Choose
                 </option>

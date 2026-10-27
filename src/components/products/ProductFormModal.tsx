@@ -33,12 +33,19 @@ type FormState = {
   openingQuantity: string;
 };
 
+/** Where stock goes without asking: the viewer's assigned location, else the only stock location. */
+function openingStockLocation(options: ProductManageOptions): string | null {
+  const locations = stockLocations(options);
+  if (options.workingLocationId && locations.some((l) => l.id === options.workingLocationId)) return options.workingLocationId;
+  return locations.length === 1 ? locations[0]!.id : null;
+}
+
 /** "" = All Storefronts (storefrontId null) — same sentinel the Employees branch picker uses. */
 const ALL_STOREFRONTS = "";
 
 function emptyForm(options: ProductManageOptions): FormState {
-  // Only one place stock can go (a single-location business) — opening stock goes there, no picker.
-  const onlyStockLocation = stockLocations(options).length === 1 ? stockLocations(options)[0].id : null;
+  // Opening stock goes to the viewer's own location, or the only place stock can go — no picker.
+  const fixedStockLocation = openingStockLocation(options);
   return {
     name: "",
     sku: "",
@@ -57,7 +64,7 @@ function emptyForm(options: ProductManageOptions): FormState {
     reorderLevel: "",
     trackStock: true,
     allowNegativeStock: false,
-    openingLocationId: onlyStockLocation ?? options.branchScope ?? "",
+    openingLocationId: fixedStockLocation ?? options.branchScope ?? "",
     openingQuantity: "",
   };
 }
@@ -200,6 +207,7 @@ export function ProductFormModal({
 
   const storefronts = storefrontLocations(options);
   const openingLocations = stockLocations(options);
+  const openingLocationFixed = openingStockLocation(options) !== null;
 
   if (scannerOpen) {
     return (
@@ -350,10 +358,10 @@ export function ProductFormModal({
                 <select
                   value={form.openingLocationId}
                   onChange={(e) => set("openingLocationId", e.target.value)}
-                  disabled={openingLocations.length === 1}
+                  disabled={openingLocationFixed}
                   className={sheetInputClass}
                 >
-                  {openingLocations.length !== 1 && <option value="">None</option>}
+                  {!openingLocationFixed && <option value="">None</option>}
                   {openingLocations.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.locationName}

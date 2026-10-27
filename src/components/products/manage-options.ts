@@ -8,6 +8,10 @@ export type ProductManageOptions = {
   /** Every location, with locationType ("distribution_center" = Main Store). */
   locations: MobileLocation[];
   branchScope: string | null;
+  /** The viewer's assigned location (session.branchId), Super Admins included — where they work.
+   * Like Checkout, anything done "at a location" (opening stock, stock adjustments) uses it without
+   * asking. Unlike branchScope it grants/limits nothing on SERVER. */
+  workingLocationId: string | null;
   vatRatePercent: number;
 };
 

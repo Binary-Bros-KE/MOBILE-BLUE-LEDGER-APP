@@ -67,6 +67,13 @@ export function PurchasesTab({
     return scope ? locations.filter((l) => l.id === scope || l.locationType === MAIN_STORE_TYPE) : locations;
   }, [locations, viewerIsSuperAdmin, viewerBranchId]);
 
+  // Someone assigned to a location (Super Admins included) receives new stock there without being
+  // asked — same as Checkout. A draft being edited keeps whatever it already had.
+  const newPurchaseLocations = useMemo(() => {
+    const own = receivingLocations.find((l) => l.id === viewerBranchId);
+    return own ? [own] : receivingLocations;
+  }, [receivingLocations, viewerBranchId]);
+
   return (
     <div className="pb-10">
       {locations && locations.length > 1 && (
@@ -133,7 +140,7 @@ export function PurchasesTab({
       )}
       {(creating || editingDraft) && (
         <NewPurchaseModal
-          locations={receivingLocations}
+          locations={editingDraft ? receivingLocations : newPurchaseLocations}
           currency={currency}
           editing={editingDraft}
           onClose={() => {

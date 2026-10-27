@@ -39,7 +39,14 @@ export function StockAdjustModal({
 }) {
   const locations = stockLocations(options);
   const [mode, setMode] = useState<StockAdjustmentMode>("add");
-  const [locationId, setLocationId] = useState(options.branchScope ?? (locations.length === 1 ? locations[0]!.id : ""));
+  // The viewer's assigned location (or the only one) is fixed — same as Checkout, no picker.
+  const fixedLocationId =
+    options.workingLocationId && locations.some((l) => l.id === options.workingLocationId)
+      ? options.workingLocationId
+      : locations.length === 1
+        ? locations[0]!.id
+        : null;
+  const [locationId, setLocationId] = useState(fixedLocationId ?? options.branchScope ?? "");
   const [addReason, setAddReason] = useState<AddReason>("purchase");
   const [quantity, setQuantity] = useState("");
   const [notes, setNotes] = useState("");
@@ -107,7 +114,7 @@ export function StockAdjustModal({
         </div>
 
         <SheetField label="Location">
-          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} required className={sheetInputClass}>
+          <select value={locationId} onChange={(e) => setLocationId(e.target.value)} required disabled={fixedLocationId !== null} className={sheetInputClass}>
             <option value="" disabled>
               Choose a location
             </option>

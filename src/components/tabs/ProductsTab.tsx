@@ -81,6 +81,7 @@ export function ProductsTab({
           locations,
           // Same rule SERVER applies: a non-Super-Admin with a branch only manages that branch.
           branchScope: viewerIsSuperAdmin ? null : viewerBranchId,
+          workingLocationId: viewerBranchId,
           vatRatePercent,
         }),
       )

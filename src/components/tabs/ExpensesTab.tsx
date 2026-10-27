@@ -146,6 +146,7 @@ export function ExpensesTab({
           expense={form.expense}
           storefronts={storefronts}
           branchScope={branchScope}
+          workingStorefrontId={storefronts.some((l) => l.id === viewerBranchId) ? viewerBranchId : null}
           canCreateCategory={canCreateCategory}
           onClose={() => setForm(null)}
           onSaved={() => {
