@@ -122,7 +122,7 @@ export function CartItemsEditor({
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-navy">{product.name}</p>
                 <p className="text-[11px] text-navy/50">
-                  {product.sku} · {stockAtLocation(product)} in stock
+                  {product.sku} · {product.trackStock ? `${stockAtLocation(product)} in stock` : "No stock count"}
                 </p>
               </div>
               <p className="flex-none text-sm font-bold text-navy">{formatCents(product.sellingPriceCents, currency)}</p>

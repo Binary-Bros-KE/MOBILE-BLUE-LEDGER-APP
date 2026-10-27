@@ -67,7 +67,7 @@ export function NewPurchaseModal({
     const term = search.trim().toLowerCase();
     if (!products || !term) return [];
     const inCart = new Set(lines.map((l) => l.productId));
-    return products.filter((p) => !inCart.has(p.id) && `${p.name} ${p.sku}`.toLowerCase().includes(term)).slice(0, 6);
+    return products.filter((p) => p.trackStock && !inCart.has(p.id) && `${p.name} ${p.sku}`.toLowerCase().includes(term)).slice(0, 6);
   }, [products, search, lines]);
 
   const totalCents = lines.reduce((sum, l) => sum + (priceTextToCents(l.unitCost) ?? 0) * (Number.parseInt(l.quantity, 10) || 0), 0);
