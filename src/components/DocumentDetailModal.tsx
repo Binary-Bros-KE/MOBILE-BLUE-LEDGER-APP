@@ -6,13 +6,13 @@ import { Ban, Copy, Download, Loader2, Package, Printer, Settings2, Share2, Tras
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { groupItemsBySections } from "@/lib/document-sections";
 import { formatCents } from "@/lib/money";
-import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/share-preferences";
 import { taxBreakdownLabel } from "@/lib/tax";
 import type { InvoiceStockSource, PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
 import { CheckboxField } from "./CheckboxField";
 import { canPrintReceipts, getPrinterSettings, printDocument, printerErrorMessage, type PrinterSettings } from "@/lib/printer";
 import { DeliveryNoteModal } from "./DeliveryNoteModal";
 import { PrinterSetupSheet } from "./PrinterSetupSheet";
+import { ShareSheet } from "./ShareSheet";
 import { RequestReturnModal } from "./RequestReturnModal";
 
 const KIND_LABEL: Record<SharedDocument["documentKind"], string> = {
@@ -104,10 +104,9 @@ export function DocumentDetailModal({
   const [printerSetupOpen, setPrinterSetupOpen] = useState(false);
   const autoPrintedRef = useRef(false);
   const [downloading, setDownloading] = useState(false);
-  const [sharing, setSharing] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [includeWhatsappPreview, setIncludeWhatsappPreviewState] = useState(() => getIncludeWhatsappPreview());
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[] | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -363,11 +362,6 @@ export function DocumentDetailModal({
     }
   }
 
-  function handleToggleIncludeWhatsappPreview(next: boolean): void {
-    setIncludeWhatsappPreviewState(next);
-    setIncludeWhatsappPreview(next);
-  }
-
   async function handleToggleTaxBreakdown(next: boolean): Promise<void> {
     await runAction("toggleTax", async () => {
       await api.setIncludeTaxBreakdown(kind, saleId, next);
@@ -380,26 +374,6 @@ export function DocumentDetailModal({
       await api.setIncludeBusinessInfo(kind, saleId, next);
       reload();
     });
-  }
-
-  async function handleShare(): Promise<void> {
-    setSharing(true);
-    setActionError(null);
-    setNotice(null);
-    try {
-      const link = await api.createShareLink(kind, saleId, includeWhatsappPreview);
-      if (navigator.share) {
-        await navigator.share({ title: documentLabel, text: link.message, url: link.url });
-      } else {
-        await navigator.clipboard.writeText(`${link.message}\n\n${link.url}`);
-        setNotice("Copied to clipboard — paste it anywhere to share.");
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return; // user dismissed the native share sheet
-      setActionError(err instanceof ApiError ? err.message : "Couldn't prepare this share.");
-    } finally {
-      setSharing(false);
-    }
   }
 
   const documentLabel = doc ? `${KIND_LABEL[doc.documentKind]} ${doc.documentNumber ?? ""}`.trim() : "Document";
@@ -651,13 +625,6 @@ export function DocumentDetailModal({
               />
             )}
 
-            <CheckboxField
-              label="Include WhatsApp preview"
-              description="Shares the full formatted document text alongside the link, not just a short summary"
-              checked={includeWhatsappPreview}
-              onChange={handleToggleIncludeWhatsappPreview}
-            />
-
             {actionError && (
               <p className="mt-3 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>
             )}
@@ -697,11 +664,10 @@ export function DocumentDetailModal({
               </button>
               <button
                 type="button"
-                onClick={() => void handleShare()}
-                disabled={sharing}
-                className="flex items-center justify-center gap-2 rounded-lg bg-navy py-3 text-xs font-bold text-white disabled:opacity-50"
+                onClick={() => setShareOpen(true)}
+                className="flex items-center justify-center gap-2 rounded-lg bg-navy py-3 text-xs font-bold text-white"
               >
-                {sharing ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Share2 className="size-4" aria-hidden="true" />}
+                <Share2 className="size-4" aria-hidden="true" />
                 Share
               </button>
             </div>
@@ -1134,6 +1100,18 @@ export function DocumentDetailModal({
               setPrinterSetupOpen(false);
               if (doc) void printWith(settings, doc);
             }}
+          />
+        </div>
+      )}
+
+      {shareOpen && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ShareSheet
+            entity={kind}
+            entityId={saleId}
+            documentLabel={documentLabel}
+            deliveryEntity={doc?.hasDeliveryNote ? (kind === "quotation" ? "quotation_delivery" : "sale_delivery") : undefined}
+            onClose={() => setShareOpen(false)}
           />
         </div>
       )}

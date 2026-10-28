@@ -7,6 +7,7 @@ import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import type { SharedStatement } from "@/lib/types";
 import { Row } from "./DocumentDetailModal";
+import { ShareSheet } from "./ShareSheet";
 
 const STATUS_TONE: Record<string, string> = {
   overdue: "border-red text-red",
@@ -27,7 +28,7 @@ export function StatementDetailModal({ customerId, onClose }: { customerId: stri
   const [doc, setDoc] = useState<SharedStatement | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const [sharing, setSharing] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -63,27 +64,6 @@ export function StatementDetailModal({ customerId, onClose }: { customerId: stri
       setActionError(err instanceof ApiError ? err.message : "Couldn't prepare the download.");
     } finally {
       setDownloading(false);
-    }
-  }
-
-  async function handleShare(): Promise<void> {
-    setSharing(true);
-    setActionError(null);
-    setNotice(null);
-    try {
-      const link = await api.createShareLink("customer_statement", customerId, true);
-      const label = doc ? `Statement — ${doc.customerName}` : "Statement";
-      if (navigator.share) {
-        await navigator.share({ title: label, text: link.message, url: link.url });
-      } else {
-        await navigator.clipboard.writeText(`${link.message}\n\n${link.url}`);
-        setNotice("Copied to clipboard — paste it anywhere to share.");
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setActionError(err instanceof ApiError ? err.message : "Couldn't prepare this share.");
-    } finally {
-      setSharing(false);
     }
   }
 
@@ -195,17 +175,26 @@ export function StatementDetailModal({ customerId, onClose }: { customerId: stri
               </button>
               <button
                 type="button"
-                onClick={() => void handleShare()}
-                disabled={sharing}
-                className="flex items-center justify-center gap-2 rounded-lg bg-navy py-3 text-xs font-bold text-white disabled:opacity-50"
+                onClick={() => setShareOpen(true)}
+                className="flex items-center justify-center gap-2 rounded-lg bg-navy py-3 text-xs font-bold text-white"
               >
-                {sharing ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Share2 className="size-4" aria-hidden="true" />}
+                <Share2 className="size-4" aria-hidden="true" />
                 Share
               </button>
             </div>
           </>
         )}
       </motion.div>
+      {shareOpen && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ShareSheet
+            entity="customer_statement"
+            entityId={customerId}
+            documentLabel={doc ? `Statement — ${doc.customerName}` : "Statement"}
+            onClose={() => setShareOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

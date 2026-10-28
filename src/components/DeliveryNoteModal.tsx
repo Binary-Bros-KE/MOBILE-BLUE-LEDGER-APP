@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, Clock, Download, Loader2, Package, RotateCcw, Share2, X } from "lucide-react";
 import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
-import { getIncludeWhatsappPreview, setIncludeWhatsappPreview } from "@/lib/share-preferences";
 import type { MobileDeliveryNote } from "@/lib/types";
-import { CheckboxField } from "./CheckboxField";
+import { ShareSheet } from "./ShareSheet";
 
 function Field({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
@@ -40,11 +39,10 @@ export function DeliveryNoteModal({
   const [note, setNote] = useState<MobileDeliveryNote | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const [sharing, setSharing] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [togglingDelivered, setTogglingDelivered] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [includeWhatsappPreview, setIncludeWhatsappPreviewState] = useState(() => getIncludeWhatsappPreview());
 
   const entity = kind === "quotation" ? "quotation_delivery" : "sale_delivery";
 
@@ -62,11 +60,6 @@ export function DeliveryNoteModal({
       cancelled = true;
     };
   }, [saleId, kind]);
-
-  function handleToggleIncludeWhatsappPreview(next: boolean): void {
-    setIncludeWhatsappPreviewState(next);
-    setIncludeWhatsappPreview(next);
-  }
 
   async function handleDownload(): Promise<void> {
     setDownloading(true);
@@ -101,26 +94,6 @@ export function DeliveryNoteModal({
       setActionError(err instanceof ApiError ? err.message : "Failed to update delivery status.");
     } finally {
       setTogglingDelivered(false);
-    }
-  }
-
-  async function handleShare(): Promise<void> {
-    setSharing(true);
-    setActionError(null);
-    setNotice(null);
-    try {
-      const link = await api.createShareLink(entity, saleId, includeWhatsappPreview);
-      if (navigator.share) {
-        await navigator.share({ title: `Delivery Note ${note?.deliveryNoteNumber ?? ""}`.trim(), text: link.message, url: link.url });
-      } else {
-        await navigator.clipboard.writeText(`${link.message}\n\n${link.url}`);
-        setNotice("Copied to clipboard — paste it anywhere to share.");
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setActionError(err instanceof ApiError ? err.message : "Couldn't prepare this share.");
-    } finally {
-      setSharing(false);
     }
   }
 
@@ -211,12 +184,6 @@ export function DeliveryNoteModal({
               {notice && <p className="mt-3 rounded border border-green/30 bg-green/10 px-3 py-2 text-xs font-bold text-green">{notice}</p>}
               {actionError && <p className="mt-3 rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
 
-              <CheckboxField
-                label="Include preview in WhatsApp message"
-                checked={includeWhatsappPreview}
-                onChange={handleToggleIncludeWhatsappPreview}
-              />
-
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -229,11 +196,10 @@ export function DeliveryNoteModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleShare()}
-                  disabled={sharing}
-                  className="flex items-center justify-center gap-1.5 rounded-lg bg-blue py-2.5 text-xs font-bold text-white disabled:opacity-50"
+                  onClick={() => setShareOpen(true)}
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-blue py-2.5 text-xs font-bold text-white"
                 >
-                  {sharing ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Share2 className="size-3.5" aria-hidden="true" />}
+                  <Share2 className="size-3.5" aria-hidden="true" />
                   Share
                 </button>
               </div>
@@ -241,6 +207,16 @@ export function DeliveryNoteModal({
           )}
         </div>
       </motion.div>
+      {shareOpen && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ShareSheet
+            entity={entity}
+            entityId={saleId}
+            documentLabel={`Delivery Note ${note?.deliveryNoteNumber ?? ""}`.trim()}
+            onClose={() => setShareOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

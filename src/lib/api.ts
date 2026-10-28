@@ -74,6 +74,7 @@ import type {
   StockValueReport,
   StockAdjustmentResult,
   ShareLinkResult,
+  ShareRecipient,
   StockMovementRow,
   TransactionRow,
   UpdateEmployeeAccessInput,
@@ -402,6 +403,8 @@ export const api = {
     request<SalesReportBreakdowns>(`/mobile/sales-report/breakdowns?${periodQuery(period, locationId)}`),
   getSalesTaxBreakdown: (period: SalesReportPeriodInput, locationId?: string) =>
     request<MobileTaxReport>(`/mobile/sales-report/tax?${periodQuery(period, locationId)}`),
+  getShareRecipient: (entity: ShareDocumentEntity, entityId: string) =>
+    request<ShareRecipient>(`/mobile/share-recipient?entity=${entity}&entityId=${encodeURIComponent(entityId)}`),
   createShareLink: (entity: ShareDocumentEntity, entityId: string, includePreview: boolean) =>
     request<ShareLinkResult>("/mobile/share-links", {
       method: "POST",

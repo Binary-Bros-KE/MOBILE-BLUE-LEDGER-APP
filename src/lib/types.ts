@@ -326,6 +326,9 @@ export type SharedDocument = Partial<SaleStatusFlags> & {
 
 export type ShareDocumentEntity = "sale" | "quotation" | "customer_statement" | "sale_delivery" | "quotation_delivery";
 
+/** The customer a document is shared to — pre-fills the Share sheet (mobile /share-recipient). */
+export type ShareRecipient = { name: string | null; phone: string | null; email: string | null };
+
 export type ShareLinkResult = { url: string; message: string };
 
 /** Non-pricing view-model for an attached delivery note — mirrors SERVER's SharedDeliveryNoteResult
