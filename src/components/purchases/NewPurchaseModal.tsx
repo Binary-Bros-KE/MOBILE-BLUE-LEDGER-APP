@@ -105,7 +105,9 @@ export function NewPurchaseModal({
         taxType: product.taxType,
         quantity: "1",
         unitCost: costs[product.id] ? centsToPriceText(costs[product.id]!) : "",
-        sellingPrice: "",
+        // The current selling price, so buying vs selling is visible side by side — edit it right here
+        // when the cost has moved. Left as-is, the order just re-saves the same price.
+        sellingPrice: product.sellingPriceCents > 0 ? centsToPriceText(product.sellingPriceCents) : "",
       },
     ]);
     setSearch("");
@@ -276,7 +278,7 @@ export function NewPurchaseModal({
                       className={sheetInputClass}
                     />
                   </SheetField>
-                  <SheetField label="New sell price">
+                  <SheetField label="Sell price">
                     <input
                       inputMode="decimal"
                       value={line.sellingPrice}
