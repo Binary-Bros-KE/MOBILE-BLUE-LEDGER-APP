@@ -141,6 +141,8 @@ export function ReportsTab({ viewerIsSuperAdmin }: { viewerIsSuperAdmin: boolean
           <section className="grid grid-cols-2 gap-2">
             <Tile label="Stock at cost" value={formatCents(stock.costValueCents, stock.currency)} />
             <Tile label="At selling price" value={formatCents(stock.retailValueCents, stock.currency)} />
+            <Tile label="Products in stock" value={stock.productsInStock.toLocaleString()} />
+            <Tile label="Out of stock" value={stock.productsOutOfStock.toLocaleString()} />
             <Tile label="Units on hand" value={stock.totalUnits.toLocaleString()} />
             <Tile label="Potential margin" value={formatCents(stock.retailValueCents - stock.costValueCents, stock.currency)} />
           </section>
@@ -165,7 +167,8 @@ export function ReportsTab({ viewerIsSuperAdmin }: { viewerIsSuperAdmin: boolean
           </section>
 
           <section className="rounded-lg bg-white p-4 shadow-sm">
-            <p className="mb-2 text-[11px] font-extrabold tracking-wide text-navy/50 uppercase">Where the money is sitting</p>
+            <p className="text-[11px] font-extrabold tracking-wide text-navy/50 uppercase">Top 15 by stock value</p>
+            <p className="mb-2 text-[11px] text-navy/40">The products holding the most money — units on hand × buying price.</p>
             <div className="space-y-1.5">
               {stock.topProducts.map((p) => (
                 <div key={p.productId} className="flex justify-between gap-2 text-sm">

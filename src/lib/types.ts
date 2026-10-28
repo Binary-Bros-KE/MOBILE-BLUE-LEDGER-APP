@@ -758,6 +758,10 @@ export type PaymentMethodOption = { id: string; name: string; code: string; requ
 
 export type StockValueReport = {
   currency: string;
+  /** Distinct products with at least one unit on hand. */
+  productsInStock: number;
+  /** Active, stock-tracked products with nothing on hand. */
+  productsOutOfStock: number;
   totalUnits: number;
   costValueCents: number;
   retailValueCents: number;
