@@ -8,6 +8,13 @@ import type { CollectCustomerPaymentResult, MobileCustomerDebt, MobileCustomerWi
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
 import { DocumentDetailModal } from "../DocumentDetailModal";
 
+/** "5 Sep" this year, "5 Sep 2025" otherwise — short enough to keep a debt row's dates on one line. */
+function shortDate(value: string): string {
+  const date = new Date(value);
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) });
+}
+
 /**
  * What a customer owes — their unpaid invoices, oldest first — and, with sales.edit, Collect
  * Payment: one amount that SERVER applies across those invoices oldest first, each slice recorded as
@@ -142,21 +149,23 @@ export function CustomerDebtModal({
                   key={invoice.id}
                   type="button"
                   onClick={() => setOpenInvoiceId(invoice.id)}
-                  className="flex w-full items-start justify-between gap-2 rounded-lg border border-navy/10 px-3 py-2 text-left text-xs active:bg-cream-dark"
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-navy/10 px-3 py-2 text-left active:bg-cream-dark"
                 >
-                  <div className="min-w-0">
-                    <p className="font-bold text-navy">{invoice.invoiceNumber}</p>
-                    <p className={overdue ? "font-semibold text-red" : "text-navy/50"}>
-                      {new Date(invoice.issuedAt).toLocaleDateString()}
-                      {invoice.dueDate ? ` · due ${new Date(invoice.dueDate).toLocaleDateString()}` : ""}
+                  {/* Sizes set on each line — a <button> doesn't carry the small text the old plain
+                      rows had, which made these rows balloon. Short dates keep it to two lines. */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold text-navy">{invoice.invoiceNumber}</p>
+                    <p className={`text-[11px] leading-snug ${overdue ? "font-semibold text-red" : "text-navy/50"}`}>
+                      {shortDate(invoice.issuedAt)}
+                      {invoice.dueDate ? ` · due ${shortDate(invoice.dueDate)}` : ""}
                       {overdue ? " · overdue" : ""}
                     </p>
                   </div>
                   <div className="flex-none text-right">
-                    <p className="font-bold text-navy">{money(invoice.outstandingCents)}</p>
-                    {invoice.amountPaidCents > 0 && <p className="text-navy/40">of {money(invoice.grandTotalCents)}</p>}
+                    <p className="text-xs font-bold text-navy">{money(invoice.outstandingCents)}</p>
+                    {invoice.amountPaidCents > 0 && <p className="text-[11px] text-navy/40">of {money(invoice.grandTotalCents)}</p>}
                   </div>
-                  <ChevronRight className="mt-0.5 size-4 flex-none self-center text-navy/30" aria-hidden="true" />
+                  <ChevronRight className="size-4 flex-none text-navy/30" aria-hidden="true" />
                 </button>
               );
             })}
