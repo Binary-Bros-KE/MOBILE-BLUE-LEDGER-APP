@@ -49,8 +49,15 @@ export function ExpenseFormModal({
   const [amount, setAmount] = useState(expense ? centsToPriceText(expense.amountCents) : "");
   const [categoryId, setCategoryId] = useState(expense?.categoryId ?? "");
   const [paymentMethodId, setPaymentMethodId] = useState(expense?.paymentMethodId ?? "");
-  const fixedStorefrontId = branchScope ?? (expense ? null : workingStorefrontId) ?? (storefronts.length === 1 ? storefronts[0]!.id : null);
-  const [storefrontId, setStorefrontId] = useState(branchScope ?? expense?.storefrontId ?? fixedStorefrontId ?? "");
+  // Fixed when the viewer works at one storefront (branch scope or assignment) or there's only one:
+  // a new expense goes there, and an existing one can't be moved to another storefront either.
+  const worksAtOneStorefront = branchScope !== null || workingStorefrontId !== null || storefronts.length === 1;
+  const fixedStorefrontId = !worksAtOneStorefront
+    ? null
+    : expense
+      ? expense.storefrontId
+      : (branchScope ?? workingStorefrontId ?? storefronts[0]?.id ?? null);
+  const [storefrontId, setStorefrontId] = useState(expense?.storefrontId ?? fixedStorefrontId ?? "");
   // Always the signed-in employee on a new expense; an edit keeps whoever originally paid — same as
   // DESKTOP. SERVER applies the same rule, so this field is display-only.
   const paidBy = expense ? (expense.paidBy ?? "—") : viewerName;
