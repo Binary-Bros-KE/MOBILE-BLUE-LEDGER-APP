@@ -1195,6 +1195,8 @@ export type StockMovementRow = {
   locationName: string;
   movementType: StockMovementType;
   quantityChange: number;
+  /** That location's stock right after this movement — null on older rows. */
+  balanceAfter: number | null;
   valueCents: number;
   notes: string | null;
   createdAt: string;

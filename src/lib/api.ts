@@ -387,8 +387,13 @@ export const api = {
   archiveExpense: (id: string) => request<DocumentIdResult>(`/mobile/expenses/${id}/archive`, { method: "POST" }),
   listExpenses: (locationId?: string) =>
     request<ExpenseListItem[]>(`/mobile/expenses${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
-  listStockMovements: (locationId?: string) =>
-    request<StockMovementRow[]>(`/mobile/stock-ledger${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
+  listStockMovements: (locationId?: string, productId?: string) => {
+    const params = new URLSearchParams();
+    if (locationId) params.set("locationId", locationId);
+    if (productId) params.set("productId", productId);
+    const query = params.toString();
+    return request<StockMovementRow[]>(`/mobile/stock-ledger${query ? `?${query}` : ""}`);
+  },
   getSalesReportOverview: (period: SalesReportPeriodInput, locationId?: string) =>
     request<SalesReportOverview>(`/mobile/sales-report/overview?${periodQuery(period, locationId)}`),
   getSalesTrend: (period: SalesReportPeriodInput, locationId?: string) =>

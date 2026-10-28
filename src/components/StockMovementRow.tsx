@@ -50,6 +50,11 @@ export function StockMovementRow({ movement }: { movement: StockMovementRowType 
           <Store className="size-3.5 flex-none" aria-hidden="true" />
           {movement.locationName}
         </p>
+        {movement.balanceAfter !== null && (
+          <p className="mt-0.5 truncate text-xs text-navy/60">
+            Balance after: <span className="font-bold text-navy">{movement.balanceAfter}</span>
+          </p>
+        )}
         <p className="mt-0.5 truncate text-xs text-navy/50">
           {formatCents(movement.valueCents, movement.currency)} value
           {movement.notes ? ` · ${movement.notes}` : ""}
