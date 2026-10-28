@@ -106,25 +106,25 @@ export function MpesaPromptPanel({
 
   return (
     <div className="space-y-2 rounded-md bg-green/5 p-2.5">
-      <div className="flex gap-2">
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Customer's M-Pesa number"
-          disabled={state === "sending" || state === "awaiting"}
-          className={`${sheetInputClass} mt-0 flex-1`}
-        />
-        <button
-          type="button"
-          onClick={() => void send()}
-          disabled={state === "sending" || state === "awaiting" || phone.trim().length < 9}
-          className="flex flex-none items-center gap-1.5 rounded-lg bg-green px-3 text-xs font-bold text-white disabled:opacity-50"
-        >
+      {/* Two lines — the number needs the full width (sheetInputClass is w-full, so sharing a row
+          with the button squeezed it). */}
+      <input
+        type="tel"
+        value={phone}
+        onChange={(e) => setPhone(e.target.value)}
+        placeholder="Customer's M-Pesa number"
+        disabled={state === "sending" || state === "awaiting"}
+        className={`${sheetInputClass} mt-0`}
+      />
+      <button
+        type="button"
+        onClick={() => void send()}
+        disabled={state === "sending" || state === "awaiting" || phone.trim().length < 9}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-green py-2.5 text-xs font-bold text-white disabled:opacity-50"
+      >
           {state === "sending" ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Smartphone className="size-3.5" aria-hidden="true" />}
           {state === "error" ? "Resend" : `Prompt ${formatCents(amountCents, currency)}`}
-        </button>
-      </div>
+      </button>
       {message && <p className={`text-[11px] font-semibold ${state === "error" ? "text-red" : "text-navy/60"}`}>{message}</p>}
       {state === "awaiting" && (
         <button type="button" onClick={() => void checkNow()} disabled={checking} className="flex items-center gap-1 text-[11px] font-bold text-blue disabled:opacity-50">

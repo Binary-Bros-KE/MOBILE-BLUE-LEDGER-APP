@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookUser, Loader2, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { centsToPriceText, formatCents, priceTextToCents } from "@/lib/money";
@@ -13,7 +13,9 @@ const MPESA_CODE = "MPESA";
 
 export type CheckoutPaymentEntry = { paymentMethodId: string; amountCents: number; reference: string };
 
-type Row = { paymentMethodId: string; amount: string; reference: string };
+/** `stkPaid`: the customer already paid this row through an M-Pesa prompt — its method, amount and
+ * receipt number are then fixed (the money has moved; only recording it is left). */
+type Row = { paymentMethodId: string; amount: string; reference: string; stkPaid?: boolean };
 
 /** YYYY-MM-DD in the phone's own timezone, `days` from today. */
 function localDatePlus(days: number): string {
@@ -77,6 +79,13 @@ export function CheckoutPaymentSheet({
   const [dueDate, setDueDate] = useState(localDatePlus(30));
   const money = (cents: number) => formatCents(cents, currency);
   const [mpesaConfigured, setMpesaConfigured] = useState(false);
+  const hasPaidStk = rows.some((r) => r.stkPaid);
+  /** Latest rows/submitting for the M-Pesa success callback — the prompt's polling timer holds the
+   * callback from when it started, so reading state through it would see stale rows. */
+  const latest = useRef({ rows, submitting });
+  useEffect(() => {
+    latest.current = { rows, submitting };
+  });
 
   useEffect(() => {
     api
@@ -104,9 +113,28 @@ export function CheckoutPaymentSheet({
     setRows((prev) => [...prev, { paymentMethodId: next?.id ?? "", amount: remainingCents > 0 ? centsToPriceText(remainingCents) : "", reference: "" }]);
   }
 
-  function handleCharge(): void {
+  /** Paid through the prompt: lock the row with its receipt and complete straight away when that
+   * covers everything — a paid customer is never left with an unrecorded sale. A split with another
+   * part still to pay just says what's left (handleCharge's own messages). */
+  function handleStkPaid(index: number, receipt: string): void {
+    const next = latest.current.rows.map((r, i) => (i === index ? { ...r, reference: receipt, stkPaid: true } : r));
+    setRows(next);
+    if (!latest.current.submitting) handleCharge(next);
+  }
+
+  /** Closing would leave money already taken by M-Pesa with no sale recorded — not allowed. */
+  function handleClose(): void {
+    if (hasPaidStk && !submitting) {
+      setLocalError("An M-Pesa payment was received — complete the sale to record it before closing.");
+      return;
+    }
+    onClose();
+  }
+
+  function handleCharge(chargeRows: Row[] = rows): void {
+    if (submitting) return;
     const entries: CheckoutPaymentEntry[] = [];
-    for (const row of rows) {
+    for (const row of chargeRows) {
       const method = methodOf(row.paymentMethodId);
       const amountCents = priceTextToCents(row.amount);
       if (!method) return setLocalError("Choose a payment method for every row.");
@@ -114,13 +142,18 @@ export function CheckoutPaymentSheet({
       if (method.requiresReference && !row.reference.trim()) return setLocalError(`${method.name} needs a reference.`);
       entries.push({ paymentMethodId: method.id, amountCents, reference: row.reference.trim() });
     }
-    if (remainingCents > 0) return setLocalError(`Still ${money(remainingCents)} to pay.`);
-    if (changeNotPossible) return setLocalError("Change can only be given from a cash payment — lower the other amounts.");
+    // Worked out from chargeRows (not this render's rows) — the M-Pesa success path passes rows newer
+    // than the render its callback came from.
+    const paid = entries.reduce((sum, e) => sum + e.amountCents, 0);
+    const stillToPay = grandTotalCents - paid;
+    const cashPaid = entries.filter((e) => !methodOf(e.paymentMethodId)?.requiresReference).reduce((sum, e) => sum + e.amountCents, 0);
+    if (stillToPay > 0) return setLocalError(`Still ${money(stillToPay)} to pay.`);
+    if (-stillToPay > 0 && cashPaid < -stillToPay) return setLocalError("Change can only be given from a cash payment — lower the other amounts.");
     onCharge(entries);
   }
 
   return (
-    <BottomSheet title={`Total ${money(grandTotalCents)}`} subtitle={customerName ?? "Walk-in Customer"} onClose={onClose}>
+    <BottomSheet title={`Total ${money(grandTotalCents)}`} subtitle={customerName ?? "Walk-in Customer"} onClose={handleClose}>
       {onAccount ? (
         <div className="space-y-3">
           <SheetError message={error} />
@@ -158,7 +191,12 @@ export function CheckoutPaymentSheet({
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
                     <SheetField label={rows.length > 1 ? `Payment ${index + 1}` : "Paid with"}>
-                      <select value={row.paymentMethodId} onChange={(e) => updateRow(index, { paymentMethodId: e.target.value })} className={sheetInputClass}>
+                      <select
+                        value={row.paymentMethodId}
+                        onChange={(e) => updateRow(index, { paymentMethodId: e.target.value })}
+                        disabled={row.stkPaid}
+                        className={sheetInputClass}
+                      >
                         {paymentMethods.map((m) => (
                           <option key={m.id} value={m.id}>
                             {m.name}
@@ -169,10 +207,16 @@ export function CheckoutPaymentSheet({
                   </div>
                   <div className="w-28">
                     <SheetField label="Amount">
-                      <input inputMode="decimal" value={row.amount} onChange={(e) => updateRow(index, { amount: e.target.value })} className={`${sheetInputClass} text-right`} />
+                      <input
+                        inputMode="decimal"
+                        value={row.amount}
+                        onChange={(e) => updateRow(index, { amount: e.target.value })}
+                        disabled={row.stkPaid}
+                        className={`${sheetInputClass} text-right`}
+                      />
                     </SheetField>
                   </div>
-                  {rows.length > 1 && (
+                  {rows.length > 1 && !row.stkPaid && (
                     <button
                       type="button"
                       onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
@@ -189,7 +233,7 @@ export function CheckoutPaymentSheet({
                     currency={currency}
                     locationId={locationId}
                     defaultPhone={customerPhone ?? ""}
-                    onPaid={(receipt) => updateRow(index, { reference: receipt })}
+                    onPaid={(receipt) => handleStkPaid(index, receipt)}
                   />
                 )}
                 {method?.requiresReference && (
@@ -197,6 +241,9 @@ export function CheckoutPaymentSheet({
                     value={row.reference}
                     onChange={(e) => updateRow(index, { reference: e.target.value })}
                     placeholder={`${method.name} reference`}
+                    // The receipt from a successful prompt is the proof of payment — not editable.
+                    readOnly={row.stkPaid}
+                    disabled={row.stkPaid}
                     className={`${sheetInputClass} mt-0`}
                   />
                 )}
@@ -219,7 +266,7 @@ export function CheckoutPaymentSheet({
           })}
 
           {rows.length < 4 && paymentMethods.length > 1 && (
-            <button type="button" onClick={addSplitRow} className="flex items-center gap-1 text-xs font-bold text-blue">
+            <button type="button" onClick={addSplitRow} disabled={submitting} className="flex items-center gap-1 text-xs font-bold text-blue">
               <Plus className="size-3.5" aria-hidden="true" />
               Split with another method
             </button>
@@ -242,14 +289,14 @@ export function CheckoutPaymentSheet({
           <button
             type="button"
             disabled={submitting}
-            onClick={handleCharge}
+            onClick={() => handleCharge()}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
           >
             {submitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
             {submitting ? "Completing sale…" : `Complete Sale · ${money(grandTotalCents)}`}
           </button>
 
-          {canPutOnAccount && (
+          {canPutOnAccount && !hasPaidStk && (
             <button
               type="button"
               disabled={!customerName}
