@@ -142,7 +142,7 @@ export function PurchaseDetailModal({
               {canCancel && (
                 <ActionButton
                   icon={busy === "cancel" ? Loader2 : Ban}
-                  label={confirmCancel ? "Tap again to cancel" : "Cancel Purchase"}
+                  label={confirmCancel ? "Tap again" : "Cancel"}
                   onClick={() => void runAction("cancel")}
                   danger
                   spinning={busy === "cancel"}

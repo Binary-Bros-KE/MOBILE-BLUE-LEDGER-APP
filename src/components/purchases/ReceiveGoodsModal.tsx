@@ -51,17 +51,21 @@ export function ReceiveGoodsModal({ purchase, onClose, onSaved }: { purchase: Pu
                   {remaining} of {item.orderedQuantity} still to come
                 </p>
               </div>
-              <input
-                inputMode="numeric"
-                aria-label={`Quantity of ${item.productName} received`}
-                value={quantities[item.id] ?? ""}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, "");
-                  const capped = digits && Number(digits) > remaining ? String(remaining) : digits;
-                  setQuantities((prev) => ({ ...prev, [item.id]: capped }));
-                }}
-                className={`${sheetInputClass} mt-0 w-20 text-center`}
-              />
+              {/* Fixed-width wrapper: sheetInputClass is w-full, so sizing the input itself fought it and
+                  the input swallowed the row, squeezing the product name to nothing. */}
+              <div className="w-20 flex-none">
+                <input
+                  inputMode="numeric"
+                  aria-label={`Quantity of ${item.productName} received`}
+                  value={quantities[item.id] ?? ""}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "");
+                    const capped = digits && Number(digits) > remaining ? String(remaining) : digits;
+                    setQuantities((prev) => ({ ...prev, [item.id]: capped }));
+                  }}
+                  className={`${sheetInputClass} mt-0 text-center`}
+                />
+              </div>
             </div>
           );
         })}

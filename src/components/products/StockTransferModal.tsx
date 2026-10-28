@@ -150,17 +150,20 @@ export function StockTransferModal({
                 <p className="truncate text-sm font-bold text-navy">{line.name}</p>
                 {available !== null && <p className="text-[11px] text-navy/50">{available} available to move</p>}
               </div>
-              <input
-                inputMode="numeric"
-                aria-label={`Quantity of ${line.name}`}
-                value={line.quantity}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, "");
-                  const capped = available !== null && digits && Number(digits) > available ? String(available) : digits;
-                  setLines((prev) => prev.map((l) => (l.productId === line.productId ? { ...l, quantity: capped } : l)));
-                }}
-                className={`${sheetInputClass} mt-0 w-16 text-center`}
-              />
+              {/* Fixed-width wrapper — sheetInputClass is w-full, see ReceiveGoodsModal. */}
+              <div className="w-16 flex-none">
+                <input
+                  inputMode="numeric"
+                  aria-label={`Quantity of ${line.name}`}
+                  value={line.quantity}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, "");
+                    const capped = available !== null && digits && Number(digits) > available ? String(available) : digits;
+                    setLines((prev) => prev.map((l) => (l.productId === line.productId ? { ...l, quantity: capped } : l)));
+                  }}
+                  className={`${sheetInputClass} mt-0 text-center`}
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setLines((prev) => prev.filter((l) => l.productId !== line.productId))}
