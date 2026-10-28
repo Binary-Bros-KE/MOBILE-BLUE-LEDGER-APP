@@ -88,7 +88,9 @@ export function CheckoutDeliveryModal({
           {error && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{error}</p>}
 
           <label className="block">
-            <span className="text-[11px] font-semibold text-navy/50">Recipient Name</span>
+            <span className="text-[11px] font-semibold text-navy/50">
+              Recipient Name <span className="text-red" aria-hidden="true">*</span>
+            </span>
             <input
               autoFocus
               type="text"
@@ -148,7 +150,9 @@ export function CheckoutDeliveryModal({
           </div>
 
           <label className="block">
-            <span className="text-[11px] font-semibold text-navy/50">Physical Address</span>
+            <span className="text-[11px] font-semibold text-navy/50">
+              Physical Address <span className="text-red" aria-hidden="true">*</span>
+            </span>
             <input
               type="text"
               value={draft.physicalAddress}
