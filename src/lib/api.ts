@@ -18,6 +18,7 @@ import type {
   ExpenseInput,
   ExpenseListItem,
   InvoiceCancellationApprovalItem,
+  RecentApprovalDecision,
   InvoiceListItem,
   MarkPaidRequest,
   MobileBusinessProfile,
@@ -271,6 +272,7 @@ export const api = {
     request<DocumentIdResult>(`/mobile/invoices/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) }),
   requestInvoiceCancellation: (id: string, body: { reason: string; notes?: string }) =>
     request<DocumentIdResult>(`/mobile/invoices/${id}/request-cancel`, { method: "POST", body: JSON.stringify(body) }),
+  listRecentApprovalDecisions: () => request<RecentApprovalDecision[]>("/mobile/approvals/recent"),
   listPendingInvoiceCancellations: () => request<InvoiceCancellationApprovalItem[]>("/mobile/approvals/invoice-cancellations"),
   approveInvoiceCancellation: (id: string, notes?: string) =>
     request<DocumentIdResult>(`/mobile/approvals/invoice-cancellations/${id}/approve`, { method: "POST", body: JSON.stringify({ notes }) }),

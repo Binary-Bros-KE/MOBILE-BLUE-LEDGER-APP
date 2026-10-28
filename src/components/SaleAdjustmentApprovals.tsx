@@ -12,7 +12,8 @@ import type { MobilePendingSaleAdjustment } from "@/lib/types";
  * mobile-sale-adjustments-service.ts); rejecting leaves the sale as it is. Rendered at the top of the
  * Approvals tab, above invoice cancellations.
  */
-export function SaleAdjustmentApprovals() {
+/** `onDecided` lets the tab refresh its Recent Decisions after an approve/reject here. */
+export function SaleAdjustmentApprovals({ onDecided }: { onDecided?: () => void } = {}) {
   const [items, setItems] = useState<MobilePendingSaleAdjustment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export function SaleAdjustmentApprovals() {
     try {
       await api.decideSaleAdjustment(item.kind, item.id, decision);
       load();
+      onDecided?.();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not record the decision.");
     } finally {

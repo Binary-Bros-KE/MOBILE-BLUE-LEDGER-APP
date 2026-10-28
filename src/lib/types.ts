@@ -1231,6 +1231,19 @@ export type StockMovementRow = {
   currency: string;
 };
 
+/** Approvals tab "Recent Decisions" — one approved/rejected void, return or invoice cancellation. */
+export type RecentApprovalDecision = {
+  kind: "void" | "return" | "invoice_cancellation";
+  id: string;
+  saleId: string;
+  documentNumber: string | null;
+  locationName: string | null;
+  reason: string;
+  status: "approved" | "rejected";
+  decidedByName: string | null;
+  decidedAt: string | null;
+};
+
 /** Backs the Approvals tab — one invoice-cancellation request still awaiting a decision. */
 export type InvoiceCancellationApprovalItem = {
   id: string;
