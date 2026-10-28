@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Loader2, Pencil, Wallet } from "lucide-react";
+import { CheckCircle2, ChevronRight, Loader2, Pencil, Wallet } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { centsToPriceText, formatCents, priceTextToCents } from "@/lib/money";
 import type { CollectCustomerPaymentResult, MobileCustomerDebt, MobileCustomerWithBalance, PaymentMethodOption } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
+import { DocumentDetailModal } from "../DocumentDetailModal";
 
 /**
  * What a customer owes — their unpaid invoices, oldest first — and, with sales.edit, Collect
@@ -40,9 +41,11 @@ export function CustomerDebtModal({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CollectCustomerPaymentResult | null>(null);
   const paymentId = useRef(`payment_${crypto.randomUUID()}`);
+  /** The invoice opened from the list — the same full invoice view as the Invoices tab. */
+  const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null);
   const money = (cents: number) => formatCents(cents, currency);
 
-  useEffect(() => {
+  function loadDebt(): void {
     api
       .getCustomerDebt(customer.id)
       .then((d) => {
@@ -50,7 +53,9 @@ export function CustomerDebtModal({
         setAmount(centsToPriceText(d.totalDueCents));
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load what this customer owes."));
-  }, [customer.id]);
+  }
+
+  useEffect(loadDebt, [customer.id]);
 
   function startCollecting(): void {
     setCollecting(true);
@@ -93,6 +98,7 @@ export function CustomerDebtModal({
   }
 
   return (
+    <>
     <BottomSheet title={customer.name} subtitle={debt ? `Owes ${money(debt.totalDueCents)}` : customer.phone} onClose={onClose}>
       {result ? (
         <div className="space-y-3">
@@ -132,7 +138,12 @@ export function CustomerDebtModal({
             {debt.invoices.map((invoice) => {
               const overdue = invoice.dueDate !== null && new Date(invoice.dueDate) < new Date();
               return (
-                <div key={invoice.id} className="flex items-start justify-between gap-2 rounded-lg border border-navy/10 px-3 py-2 text-xs">
+                <button
+                  key={invoice.id}
+                  type="button"
+                  onClick={() => setOpenInvoiceId(invoice.id)}
+                  className="flex w-full items-start justify-between gap-2 rounded-lg border border-navy/10 px-3 py-2 text-left text-xs active:bg-cream-dark"
+                >
                   <div className="min-w-0">
                     <p className="font-bold text-navy">{invoice.invoiceNumber}</p>
                     <p className={overdue ? "font-semibold text-red" : "text-navy/50"}>
@@ -145,7 +156,8 @@ export function CustomerDebtModal({
                     <p className="font-bold text-navy">{money(invoice.outstandingCents)}</p>
                     {invoice.amountPaidCents > 0 && <p className="text-navy/40">of {money(invoice.grandTotalCents)}</p>}
                   </div>
-                </div>
+                  <ChevronRight className="mt-0.5 size-4 flex-none self-center text-navy/30" aria-hidden="true" />
+                </button>
               );
             })}
           </div>
@@ -197,5 +209,22 @@ export function CustomerDebtModal({
         </div>
       )}
     </BottomSheet>
+    {openInvoiceId && (
+      // Rendered outside the sheet (a fixed child of its animated panel would position against it)
+      // and above it — this sheet is z-[60], the invoice view's own backdrop z-50.
+      <div className="relative z-[70]">
+        <DocumentDetailModal
+          saleId={openInvoiceId}
+          onClose={() => setOpenInvoiceId(null)}
+          // A payment recorded on the invoice changes what's owed here — refresh the list behind it.
+          onChanged={() => {
+            loadDebt();
+            onPaid();
+          }}
+          canManageDelivery={canCollect}
+        />
+      </div>
+    )}
+    </>
   );
 }
