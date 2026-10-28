@@ -152,3 +152,26 @@ export function buildReceipt(doc: SharedDocument, paperWidth: 58 | 80): Uint8Arr
   else w.text("Thank you!");
   return w.feed(4).cut().toBytes();
 }
+
+/** The receipt's text with the ESC/POS commands stripped — for the browser print sheet (iPhone
+ * Safari has no Bluetooth access), so that copy is laid out by exactly the same code as the
+ * thermal one. Knows only the commands EscPosWriter emits. */
+export function escposToText(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i]!;
+    if (b === ESC) {
+      const cmd = bytes[i + 1];
+      if (cmd === 0x40) i += 1; // ESC @ reset
+      else if (cmd === 0x64) {
+        out += "\n".repeat(bytes[i + 2] ?? 0); // ESC d n feed
+        i += 2;
+      } else i += 2; // ESC a n align, ESC E n bold
+    } else if (b === GS) {
+      i += bytes[i + 1] === 0x56 ? 3 : 2; // GS V B n cut, GS ! n size
+    } else {
+      out += String.fromCharCode(b);
+    }
+  }
+  return out.replace(/\n+$/, "\n");
+}
