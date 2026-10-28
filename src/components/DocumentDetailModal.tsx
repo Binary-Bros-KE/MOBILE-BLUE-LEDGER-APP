@@ -146,6 +146,7 @@ export function DocumentDetailModal({
 
   const [convertPaymentMethodId, setConvertPaymentMethodId] = useState("");
   const [convertAmountReceived, setConvertAmountReceived] = useState("");
+  const [convertReference, setConvertReference] = useState("");
   const [convertDueDate, setConvertDueDate] = useState("");
 
   function reload(): void {
@@ -301,15 +302,30 @@ export function DocumentDetailModal({
     });
   }
 
+  // A sale is always paid in full (part-payment is an invoice's deposit). The only amount asked is the
+  // CASH handed over, so the change can be worked out — SERVER rejects anything below the total.
+  const convertMethod = paymentMethods?.find((m) => m.id === convertPaymentMethodId) ?? null;
+  const convertIsCash = convertMethod?.code === "CASH";
+  const convertCashCents = convertIsCash && convertAmountReceived.trim() ? Math.round(Number(convertAmountReceived) * 100) : null;
+
   async function handleConvertToSale(): Promise<void> {
-    if (!convertPaymentMethodId) {
+    if (!convertPaymentMethodId || !convertMethod) {
       setActionError("Choose a payment method.");
+      return;
+    }
+    if (convertMethod.requiresReference && !convertReference.trim()) {
+      setActionError(`Enter the ${convertMethod.name} reference.`);
+      return;
+    }
+    if (doc && convertCashCents !== null && convertCashCents < doc.grandTotalCents) {
+      setActionError("Cash received can't be less than the total — a sale is paid in full.");
       return;
     }
     await runAction("convertSale", async () => {
       const result = await api.convertQuotationToSale(saleId, {
         paymentMethodId: convertPaymentMethodId,
-        amountReceivedCents: convertAmountReceived.trim() ? Math.round(Number(convertAmountReceived) * 100) : null,
+        paymentReference: convertMethod.requiresReference ? convertReference.trim() : undefined,
+        amountReceivedCents: convertCashCents,
       });
       setConvertSaleOpen(false);
       setNotice("Converted to a completed sale — find it in your Sales list.");
@@ -1142,11 +1158,19 @@ export function DocumentDetailModal({
                 <X className="size-4" aria-hidden="true" />
               </button>
             </div>
-            <p className="mb-3 text-xs text-navy/50">Charging {money(doc.grandTotalCents)}. Leave amount blank to charge the exact total.</p>
+            <div className="mb-3 flex items-center justify-between rounded-lg bg-cream-dark/60 px-3 py-2.5">
+              <span className="text-xs font-bold text-navy/60">Total (paid in full)</span>
+              <span className="font-display text-lg text-navy">{money(doc.grandTotalCents)}</span>
+            </div>
             <div className="space-y-2.5">
               <select
                 value={convertPaymentMethodId}
-                onChange={(e) => setConvertPaymentMethodId(e.target.value)}
+                onChange={(e) => {
+                  setConvertPaymentMethodId(e.target.value);
+                  setConvertAmountReceived("");
+                  setConvertReference("");
+                  setActionError(null);
+                }}
                 className="h-10 w-full rounded-lg border border-navy/15 bg-white px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
               >
                 <option value="">Select a payment method…</option>
@@ -1156,15 +1180,31 @@ export function DocumentDetailModal({
                   </option>
                 ))}
               </select>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={convertAmountReceived}
-                onChange={(e) => setConvertAmountReceived(e.target.value)}
-                placeholder="Amount received (optional)"
-                className="h-10 w-full rounded-lg border border-navy/15 px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
-              />
+              {convertMethod?.requiresReference && (
+                <input
+                  value={convertReference}
+                  onChange={(e) => setConvertReference(e.target.value)}
+                  placeholder={`${convertMethod.name} reference`}
+                  className="h-10 w-full rounded-lg border border-navy/15 px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+                />
+              )}
+              {convertIsCash && (
+                <>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={convertAmountReceived}
+                    onChange={(e) => setConvertAmountReceived(e.target.value)}
+                    placeholder="Cash received (optional, for change)"
+                    className="h-10 w-full rounded-lg border border-navy/15 px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+                  />
+                  {convertCashCents !== null && convertCashCents >= doc.grandTotalCents && (
+                    <p className="text-xs font-bold text-green">Change: {money(convertCashCents - doc.grandTotalCents)}</p>
+                  )}
+                </>
+              )}
               {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
               <button
                 type="button"
