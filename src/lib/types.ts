@@ -1014,6 +1014,8 @@ export type ConvertToInvoiceRequest = {
   quantityOverrides?: QuantityOverride[];
   /** Per-line stock source, keyed by productId; a line not listed takes the storefront. */
   stockSources?: Array<{ productId: string; stockSource: InvoiceStockSource }>;
+  /** Who to bill when the quotation was for a walk-in — ignored when it already has a customer. */
+  customerId?: string;
 };
 
 /** Raw, re-editable line item shape — deliberately NOT SharedLineItem (that's a display-only shape

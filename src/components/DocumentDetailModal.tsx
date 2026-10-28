@@ -7,13 +7,14 @@ import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { groupItemsBySections } from "@/lib/document-sections";
 import { formatCents } from "@/lib/money";
 import { taxBreakdownLabel } from "@/lib/tax";
-import type { InvoiceStockSource, PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
+import type { InvoiceStockSource, MobileCustomer, PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
 import { CheckboxField } from "./CheckboxField";
 import { canPrintReceipts, getPrinterSettings, printDocument, printerErrorMessage, type PrinterSettings } from "@/lib/printer";
 import { DeliveryNoteModal } from "./DeliveryNoteModal";
 import { PrinterSetupSheet } from "./PrinterSetupSheet";
 import { ShareSheet } from "./ShareSheet";
 import { RequestReturnModal } from "./RequestReturnModal";
+import { CheckoutCustomerPickerModal } from "./tabs/CheckoutCustomerPickerModal";
 
 const KIND_LABEL: Record<SharedDocument["documentKind"], string> = {
   receipt: "Receipt",
@@ -147,6 +148,11 @@ export function DocumentDetailModal({
   const [convertPaymentMethodId, setConvertPaymentMethodId] = useState("");
   const [convertAmountReceived, setConvertAmountReceived] = useState("");
   const [convertReference, setConvertReference] = useState("");
+  /** Walk-in quotation -> invoice: the customer to bill, chosen in the convert sheet (SERVER's
+   * convertQuotationToInvoice takes it as customerId — an invoice always needs someone to bill). */
+  const [billCustomers, setBillCustomers] = useState<MobileCustomer[] | null>(null);
+  const [billCustomerId, setBillCustomerId] = useState<string | null>(null);
+  const [billPickerOpen, setBillPickerOpen] = useState(false);
   const [convertDueDate, setConvertDueDate] = useState("");
 
   function reload(): void {
@@ -338,9 +344,14 @@ export function DocumentDetailModal({
       setActionError("Choose a due date.");
       return;
     }
+    if (!doc?.customerName && !billCustomerId) {
+      setActionError("Choose the customer to bill.");
+      return;
+    }
     await runAction("convertInvoice", async () => {
       const result = await api.convertQuotationToInvoice(saleId, {
         dueDate: convertDueDate,
+        customerId: doc?.customerName ? undefined : (billCustomerId ?? undefined),
         stockSources: allowMainStoreStock
           ? Object.entries(convertLineSources).map(([productId, stockSource]) => ({ productId, stockSource }))
           : undefined,
@@ -915,23 +926,24 @@ export function DocumentDetailModal({
                       >
                         Convert to Sale
                       </button>
-                      {/* An invoice is billed to someone (DESKTOP requires a customer too) — shown
-                          disabled with the reason rather than silently missing. */}
                       <button
                         type="button"
-                        disabled={!doc.customerName}
                         onClick={() => {
                           setActionError(null);
+                          // A walk-in quotation picks who to bill inside the convert sheet.
+                          if (!doc.customerName && !billCustomers) {
+                            api
+                              .listCustomers()
+                              .then(setBillCustomers)
+                              .catch(() => setBillCustomers([]));
+                          }
                           setConvertInvoiceOpen(true);
                         }}
-                        className="rounded-lg border border-blue/30 bg-blue/5 py-2.5 text-xs font-bold text-blue disabled:border-navy/15 disabled:bg-transparent disabled:text-navy/30"
+                        className="rounded-lg border border-blue/30 bg-blue/5 py-2.5 text-xs font-bold text-blue"
                       >
                         Convert to Invoice
                       </button>
                     </div>
-                    {!doc.customerName && (
-                      <p className="mt-1.5 text-[11px] text-navy/50">An invoice needs a customer — add one to this quotation to convert it to an invoice.</p>
-                    )}
                   </>
                 )}
 
@@ -1224,6 +1236,23 @@ export function DocumentDetailModal({
         </div>
       )}
 
+      {billPickerOpen && billCustomers && (
+        // Above the convert sheet (z-[60]); the picker's own backdrop is z-50.
+        <div className="relative z-[70]" onClick={(e) => e.stopPropagation()}>
+          <CheckoutCustomerPickerModal
+            customers={billCustomers}
+            selectedCustomerId={billCustomerId}
+            allowWalkIn={false}
+            onSelect={(id) => {
+              setBillCustomerId(id);
+              setBillPickerOpen(false);
+            }}
+            onCustomerCreated={(customer) => setBillCustomers((prev) => [...(prev ?? []), customer])}
+            onClose={() => setBillPickerOpen(false)}
+          />
+        </div>
+      )}
+
       {convertInvoiceOpen && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-navy-deep/60 sm:items-center" onClick={() => setConvertInvoiceOpen(false)}>
           <motion.div
@@ -1241,6 +1270,24 @@ export function DocumentDetailModal({
               </button>
             </div>
             <div className="space-y-2.5">
+              {doc && !doc.customerName && (
+                <div className="block">
+                  <span className="text-[11px] font-semibold text-navy/50">Bill to</span>
+                  <button
+                    type="button"
+                    onClick={() => setBillPickerOpen(true)}
+                    disabled={!billCustomers}
+                    className="mt-1 flex h-10 w-full items-center justify-between rounded-lg border border-navy/15 bg-white px-2.5 text-left text-sm font-semibold text-navy disabled:opacity-50"
+                  >
+                    <span className="truncate">
+                      {!billCustomers
+                        ? "Loading customers…"
+                        : (billCustomers.find((c) => c.id === billCustomerId)?.name ?? "Choose a customer…")}
+                    </span>
+                  </button>
+                  <p className="mt-1 text-[11px] text-navy/50">This quotation was for a walk-in — an invoice needs a customer to bill.</p>
+                </div>
+              )}
               <label className="block">
                 <span className="text-[11px] font-semibold text-navy/50">Due Date</span>
                 <input
