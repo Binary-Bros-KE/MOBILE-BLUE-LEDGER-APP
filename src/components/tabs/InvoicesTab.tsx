@@ -19,6 +19,7 @@ const ALL_FILTER = "__all__";
  * [[project_customer_statement_feature]] for why). */
 export function InvoicesTab({
   branchId,
+  viewerIsSuperAdmin,
   branchName,
   currency,
   tenantTaxConfig,
@@ -29,6 +30,9 @@ export function InvoicesTab({
   defaultIncludeBusinessInfo,
 }: {
   branchId: string | null;
+  /** With branchId, a non-Super-Admin only ever sees their own storefront's invoices (SERVER forces
+   * it) — the storefront chips are hidden for them. */
+  viewerIsSuperAdmin: boolean;
   branchName: string | null;
   currency: string;
   tenantTaxConfig: TenantTaxConfig;
@@ -147,7 +151,7 @@ export function InvoicesTab({
             />
           </div>
         </div>
-        {locations && locations.length > 1 && (
+        {locations && locations.length > 1 && (viewerIsSuperAdmin || !branchId) && (
           <div className="flex gap-1.5 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <FilterChip label="All" active={locationFilter === ALL_FILTER} onClick={() => selectLocation(ALL_FILTER)} />
             {locations.map((location) => (

@@ -157,6 +157,7 @@ export function AppShell() {
           {activeTab === "invoices" && (
             <InvoicesTab
               branchId={session?.branchId ?? null}
+              viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               branchName={session?.branchName ?? null}
               currency={session?.currency ?? "KES"}
               tenantTaxConfig={{ vatRatePercent: session?.vatRatePercent ?? 0, pricesTaxInclusive: session?.pricesTaxInclusive ?? false }}
