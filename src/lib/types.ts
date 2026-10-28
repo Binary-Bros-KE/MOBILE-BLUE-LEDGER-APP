@@ -152,7 +152,19 @@ export type EmployeeStatusValue = "active" | "suspended" | "terminated";
 
 export type MobileRole = { id: string; roleName: string; isSuperAdmin: boolean };
 
-export type CreateEmployeeInput = {
+/** The optional profile fields (DESKTOP's Employee form minus photo/salary defaults). */
+export type EmployeeProfileInput = {
+  middleName: string | null;
+  gender: "female" | "male" | "other" | null;
+  dateOfBirth: string | null;
+  alternativePhone: string | null;
+  email: string | null;
+  department: string | null;
+  jobTitle: string | null;
+  hireDate: string | null;
+};
+
+export type CreateEmployeeInput = Partial<EmployeeProfileInput> & {
   employeeCode: string;
   firstName: string;
   lastName: string;
@@ -160,6 +172,14 @@ export type CreateEmployeeInput = {
   roleId: string;
   branchId: string | null;
   pin: string;
+};
+
+/** Body for PATCH /mobile/employees/:id/details — the whole profile at once. */
+export type UpdateEmployeeDetailsInput = EmployeeProfileInput & {
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
 };
 
 /** Every field optional — Suspend/Reactivate sends just `status`, Edit Access sends role + branch. */

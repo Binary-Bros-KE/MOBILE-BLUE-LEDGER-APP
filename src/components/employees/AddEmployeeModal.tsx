@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { type EmployeeAccessOptions, BranchSelect, RoleSelect } from "./access-options";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
+import { type EmployeeProfileDraft, EmployeeProfileFields, emptyProfileDraft, profileInputFrom } from "./EmployeeProfileFields";
 import { PinInput } from "./PinInput";
 
-/** Adds a staff member with just what they need to log in — name, code, role, storefront, PIN.
- * HR details (DOB, department, salary defaults, photo) stay on DESKTOP's full Employee form. */
+/** Adds a staff member with what they need to log in — name, code, role, storefront, PIN — plus
+ * optional details under "More details" (job, contacts, dates). Salary defaults and photo stay on
+ * DESKTOP's full Employee form. */
 export function AddEmployeeModal({
   options,
   onClose,
@@ -26,6 +28,8 @@ export function AddEmployeeModal({
   const [branchId, setBranchId] = useState<string | null>(options.branchScope);
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
+  const [showMore, setShowMore] = useState(false);
+  const [profile, setProfile] = useState<EmployeeProfileDraft>(emptyProfileDraft);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +48,7 @@ export function AddEmployeeModal({
         roleId,
         branchId: options.branchScope ?? branchId,
         pin,
+        ...profileInputFrom(profile),
       });
       onCreated();
     } catch (err) {
@@ -89,6 +94,19 @@ export function AddEmployeeModal({
             <PinInput value={confirmPin} onChange={setConfirmPin} />
           </SheetField>
         </div>
+
+        <button type="button" onClick={() => setShowMore((v) => !v)} className="flex items-center gap-1 text-xs font-bold text-blue">
+          <ChevronDown className={`size-3.5 transition ${showMore ? "rotate-180" : ""}`} aria-hidden="true" />
+          More details
+        </button>
+        {showMore && (
+          <div className="space-y-3 rounded-lg bg-cream-dark/50 p-3">
+            <SheetField label="Middle name">
+              <input value={profile.middleName} onChange={(e) => setProfile((p) => ({ ...p, middleName: e.target.value }))} className={sheetInputClass} />
+            </SheetField>
+            <EmployeeProfileFields value={profile} onChange={(patch) => setProfile((p) => ({ ...p, ...patch }))} />
+          </div>
+        )}
 
         <button
           type="submit"

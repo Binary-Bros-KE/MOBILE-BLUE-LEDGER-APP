@@ -78,6 +78,7 @@ import type {
   StockMovementRow,
   TransactionRow,
   UpdateEmployeeAccessInput,
+  UpdateEmployeeDetailsInput,
   WorkingHoursListItem,
   WorkingHoursConfig,
   WorkingHoursUpsertInput,
@@ -213,6 +214,8 @@ export const api = {
   getEmployeeSalaries: (employeeId: string) => request<Salary[]>(`/mobile/employees/${employeeId}/salaries`),
   listRoles: () => request<MobileRole[]>("/mobile/roles"),
   createEmployee: (body: CreateEmployeeInput) => request<DocumentIdResult>("/mobile/employees", { method: "POST", body: JSON.stringify(body) }),
+  updateEmployeeDetails: (employeeId: string, body: UpdateEmployeeDetailsInput) =>
+    request<DocumentIdResult>(`/mobile/employees/${employeeId}/details`, { method: "PATCH", body: JSON.stringify(body) }),
   updateEmployeeAccess: (employeeId: string, body: UpdateEmployeeAccessInput) =>
     request<DocumentIdResult>(`/mobile/employees/${employeeId}/access`, { method: "PATCH", body: JSON.stringify(body) }),
   resetEmployeePin: (employeeId: string, pin: string) =>

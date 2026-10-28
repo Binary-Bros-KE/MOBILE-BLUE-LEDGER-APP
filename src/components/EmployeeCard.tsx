@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, KeyRound, Loader2, Mail, Phone, ShieldCheck, Store, UserCheck, UserX } from "lucide-react";
+import { ChevronDown, KeyRound, Loader2, Mail, Pencil, Phone, ShieldCheck, Store, UserCheck, UserX } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
 import type { Employee, Salary } from "@/lib/types";
 import { PayslipModal } from "./PayslipModal";
 import type { EmployeeAccessOptions } from "./employees/access-options";
 import { ChangePinModal } from "./employees/ChangePinModal";
+import { EditEmployeeModal } from "./employees/EditEmployeeModal";
 import { ManageAccessModal } from "./employees/ManageAccessModal";
 
 const STATUS_TONE: Record<string, string> = {
@@ -39,7 +40,7 @@ export function EmployeeCard({
   const [loadingSalaries, setLoadingSalaries] = useState(false);
   const [salariesError, setSalariesError] = useState<string | null>(null);
   const [selectedSalary, setSelectedSalary] = useState<Salary | null>(null);
-  const [sheet, setSheet] = useState<"pin" | "access" | null>(null);
+  const [sheet, setSheet] = useState<"pin" | "access" | "details" | null>(null);
   const [confirmingToggle, setConfirmingToggle] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [accessNotice, setAccessNotice] = useState<string | null>(null);
@@ -48,6 +49,8 @@ export function EmployeeCard({
   // Own card: PIN only (SERVER blocks changing your own status/role — no self-lockout from a phone).
   const canManageAccess = accessOptions !== null && !isSelf;
   const canChangePin = isSelf || canManageAccess;
+  // Details (unlike status/role) are fine to edit on your own card too — same employees.edit grant.
+  const canEditDetails = accessOptions !== null;
   const isActive = employee.status === "active";
 
   /** Two taps (arm, then confirm) rather than a native confirm() — a suspension is instant and the
@@ -127,6 +130,7 @@ export function EmployeeCard({
                 {employee.roleName && <Pill label="Role" value={employee.roleName} />}
                 {employee.branchName && <Pill label="Branch" value={employee.branchName} />}
                 {employee.department && <Pill label="Dept" value={employee.department} />}
+                {employee.jobTitle && <Pill label="Title" value={employee.jobTitle} />}
               </div>
 
               <div className="space-y-1.5 text-xs">
@@ -138,6 +142,17 @@ export function EmployeeCard({
                 <InfoRow label="Hire date" value={employee.hireDate} />
                 <InfoRow label="Alternative phone" value={employee.alternativePhone} />
               </div>
+
+              {canEditDetails && (
+                <button
+                  type="button"
+                  onClick={() => setSheet("details")}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-navy/15 py-2.5 text-xs font-bold text-navy hover:bg-cream-dark"
+                >
+                  <Pencil className="size-3.5 text-navy/50" aria-hidden="true" />
+                  Edit Details
+                </button>
+              )}
 
               {canChangePin && (
                 <div className="border-t border-dashed border-navy/15 pt-3">
@@ -219,6 +234,16 @@ export function EmployeeCard({
           onSaved={() => {
             setSheet(null);
             setAccessNotice(isSelf ? "Your PIN was changed." : "PIN reset — share the new PIN with them privately.");
+          }}
+        />
+      )}
+      {sheet === "details" && (
+        <EditEmployeeModal
+          employee={employee}
+          onClose={() => setSheet(null)}
+          onSaved={() => {
+            setSheet(null);
+            onChanged();
           }}
         />
       )}
