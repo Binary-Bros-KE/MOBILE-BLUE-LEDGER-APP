@@ -93,7 +93,9 @@ export function ShareSheet({
       const { message } = await buildMessage();
       if (channel === "whatsapp") {
         const digits = normalizePhoneForWhatsApp(phone, effectiveCode);
-        window.location.href = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+        // WhatsApp's own scheme opens the app (WhatsApp or WhatsApp Business) directly — a wa.me web
+        // link can stop on a "Continue to chat" page in a browser tab first. Same default as DESKTOP.
+        window.location.href = `whatsapp://send?phone=${digits}&text=${encodeURIComponent(message)}`;
       } else {
         window.location.href = `mailto:${email.trim()}?subject=${encodeURIComponent(documentLabel)}&body=${encodeURIComponent(message)}`;
       }
