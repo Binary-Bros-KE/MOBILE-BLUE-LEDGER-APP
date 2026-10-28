@@ -1184,7 +1184,6 @@ export type ExpenseInput = {
   expenseDate: string;
   categoryId: string;
   amountCents: number;
-  paidBy: string | null;
   paymentMethodId: string;
   storefrontId: string;
   reference: string | null;

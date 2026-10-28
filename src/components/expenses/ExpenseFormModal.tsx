@@ -25,6 +25,7 @@ export function ExpenseFormModal({
   storefronts,
   branchScope,
   workingStorefrontId,
+  viewerName,
   canCreateCategory,
   onClose,
   onSaved,
@@ -36,6 +37,8 @@ export function ExpenseFormModal({
   /** The viewer's assigned storefront (Super Admins included) — a NEW expense is booked there
    * without asking, same as Checkout. Editing keeps the expense's own storefront. */
   workingStorefrontId: string | null;
+  /** The signed-in employee's name. */
+  viewerName: string;
   canCreateCategory: boolean;
   onClose: () => void;
   onSaved: () => void;
@@ -48,7 +51,9 @@ export function ExpenseFormModal({
   const [paymentMethodId, setPaymentMethodId] = useState(expense?.paymentMethodId ?? "");
   const fixedStorefrontId = branchScope ?? (expense ? null : workingStorefrontId) ?? (storefronts.length === 1 ? storefronts[0]!.id : null);
   const [storefrontId, setStorefrontId] = useState(branchScope ?? expense?.storefrontId ?? fixedStorefrontId ?? "");
-  const [paidBy, setPaidBy] = useState(expense?.paidBy ?? "");
+  // Always the signed-in employee on a new expense; an edit keeps whoever originally paid — same as
+  // DESKTOP. SERVER applies the same rule, so this field is display-only.
+  const paidBy = expense ? (expense.paidBy ?? "—") : viewerName;
   const [reference, setReference] = useState(expense?.reference ?? "");
   const [description, setDescription] = useState(expense?.description ?? "");
   const [newCategoryName, setNewCategoryName] = useState<string | null>(null);
@@ -93,7 +98,6 @@ export function ExpenseFormModal({
       expenseDate,
       categoryId,
       amountCents,
-      paidBy: paidBy.trim() || null,
       paymentMethodId,
       storefrontId,
       reference: reference.trim() || null,
@@ -208,8 +212,8 @@ export function ExpenseFormModal({
             <SheetField label={method?.requiresReference ? "Reference" : "Reference (optional)"}>
               <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. M-Pesa code" className={sheetInputClass} />
             </SheetField>
-            <SheetField label="Paid by (optional)">
-              <input value={paidBy} onChange={(e) => setPaidBy(e.target.value)} className={sheetInputClass} />
+            <SheetField label="Paid by">
+              <input value={paidBy} disabled readOnly className={sheetInputClass} />
             </SheetField>
           </div>
 

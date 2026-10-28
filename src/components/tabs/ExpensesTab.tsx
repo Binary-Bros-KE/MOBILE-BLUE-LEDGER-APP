@@ -22,6 +22,7 @@ export function ExpensesTab({
   canCreateCategory,
   viewerIsSuperAdmin,
   viewerBranchId,
+  viewerName,
 }: {
   canCreate: boolean;
   canEdit: boolean;
@@ -29,6 +30,8 @@ export function ExpensesTab({
   canCreateCategory: boolean;
   viewerIsSuperAdmin: boolean;
   viewerBranchId: string | null;
+  /** The signed-in employee — a new expense's Paid By. */
+  viewerName: string;
 }) {
   const [locations, setLocations] = useState<MobileLocation[] | null>(null);
   const [expenses, setExpenses] = useState<ExpenseListItem[] | null>(null);
@@ -146,6 +149,7 @@ export function ExpensesTab({
           expense={form.expense}
           storefronts={storefronts}
           branchScope={branchScope}
+          viewerName={viewerName}
           workingStorefrontId={storefronts.some((l) => l.id === viewerBranchId) ? viewerBranchId : null}
           canCreateCategory={canCreateCategory}
           onClose={() => setForm(null)}

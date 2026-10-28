@@ -229,6 +229,7 @@ export function AppShell() {
               canCreateCategory={can("expense_categories", "create")}
               viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               viewerBranchId={session?.branchId ?? null}
+              viewerName={session?.employeeName ?? ""}
             />
           )}
           {activeTab === "stockLedger" && <StockLedgerTab />}
