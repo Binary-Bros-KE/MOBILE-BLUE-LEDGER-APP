@@ -915,19 +915,23 @@ export function DocumentDetailModal({
                       >
                         Convert to Sale
                       </button>
-                      {doc.customerName && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActionError(null);
-                            setConvertInvoiceOpen(true);
-                          }}
-                          className="rounded-lg border border-blue/30 bg-blue/5 py-2.5 text-xs font-bold text-blue"
-                        >
-                          Convert to Invoice
-                        </button>
-                      )}
+                      {/* An invoice is billed to someone (DESKTOP requires a customer too) — shown
+                          disabled with the reason rather than silently missing. */}
+                      <button
+                        type="button"
+                        disabled={!doc.customerName}
+                        onClick={() => {
+                          setActionError(null);
+                          setConvertInvoiceOpen(true);
+                        }}
+                        className="rounded-lg border border-blue/30 bg-blue/5 py-2.5 text-xs font-bold text-blue disabled:border-navy/15 disabled:bg-transparent disabled:text-navy/30"
+                      >
+                        Convert to Invoice
+                      </button>
                     </div>
+                    {!doc.customerName && (
+                      <p className="mt-1.5 text-[11px] text-navy/50">An invoice needs a customer — add one to this quotation to convert it to an invoice.</p>
+                    )}
                   </>
                 )}
 
