@@ -9,6 +9,9 @@ import type {
   CreateEmployeeInput,
   CreateProductInput,
   CreatePurchaseInput,
+  CreateRequisitionInput,
+  RequisitionDetail,
+  RequisitionListItem,
   CreateInvoiceRequest,
   CreateQuotationRequest,
   CreateRiderInput,
@@ -381,6 +384,20 @@ export const api = {
   cancelPurchase: (id: string) => request<DocumentIdResult>(`/mobile/purchases/${id}/cancel`, { method: "POST" }),
   receivePurchaseGoods: (id: string, items: Array<{ purchaseItemId: string; receivingQuantity: number }>) =>
     request<DocumentIdResult>(`/mobile/purchases/${id}/receive`, { method: "POST", body: JSON.stringify({ items }) }),
+  listRequisitions: () => request<RequisitionListItem[]>("/mobile/requisitions"),
+  getRequisition: (id: string) => request<RequisitionDetail>(`/mobile/requisitions/${id}`),
+  /** purchase_requisitions.approve only — the badge on the Requisitions tab. */
+  countPendingRequisitions: () => request<{ pending: number }>("/mobile/requisitions/pending-count"),
+  createRequisition: (body: CreateRequisitionInput) =>
+    request<{ id: string; requisitionNumber: string }>("/mobile/requisitions", { method: "POST", body: JSON.stringify(body) }),
+  cancelRequisition: (id: string) => request<DocumentIdResult>(`/mobile/requisitions/${id}/cancel`, { method: "POST" }),
+  rejectRequisition: (id: string, reason: string) =>
+    request<DocumentIdResult>(`/mobile/requisitions/${id}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
+  linkRequisitionItem: (id: string, itemId: string, productId: string) =>
+    request<RequisitionDetail>(`/mobile/requisitions/${id}/link-item`, { method: "POST", body: JSON.stringify({ itemId, productId }) }),
+  /** Same body as createPurchase — SERVER creates the purchase and approves the requisition together. */
+  approveRequisition: (id: string, body: CreatePurchaseInput) =>
+    request<{ id: string; purchaseId: string }>(`/mobile/requisitions/${id}/approve`, { method: "POST", body: JSON.stringify(body) }),
   recordPurchasePayment: (id: string, body: PurchasePaymentInput) =>
     request<DocumentIdResult>(`/mobile/purchases/${id}/payments`, { method: "POST", body: JSON.stringify(body) }),
   listExpenseCategories: () => request<MobileExpenseCategory[]>("/mobile/expense-categories"),

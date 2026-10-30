@@ -82,18 +82,22 @@ function emptyForm(options: ProductManageOptions): FormState {
 export function ProductFormModal({
   productId,
   options,
+  initialName,
   onClose,
   onSaved,
   onCategoryCreated,
 }: {
   productId: string | null;
   options: ProductManageOptions;
+  /** Pre-fills Name on a NEW product — e.g. a requisition's free-text item becoming a real product. */
+  initialName?: string;
   onClose: () => void;
-  onSaved: () => void;
+  /** `createdId` is set when a new product was created (absent on edit). */
+  onSaved: (createdId?: string) => void;
   onCategoryCreated: (category: MobileCategory) => void;
 }) {
   const isEdit = productId !== null;
-  const [form, setForm] = useState<FormState>(() => emptyForm(options));
+  const [form, setForm] = useState<FormState>(() => ({ ...emptyForm(options), ...(initialName ? { name: initialName } : {}) }));
   const [loading, setLoading] = useState(isEdit);
   const [hasVariants, setHasVariants] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -190,14 +194,15 @@ export function ProductFormModal({
     try {
       if (isEdit) {
         await api.updateProduct(productId, body);
+        onSaved();
       } else {
         const openingQuantity = Number.parseInt(form.openingQuantity, 10) || 0;
-        await api.createProduct({
+        const created = await api.createProduct({
           ...body,
           openingStock: form.trackStock && openingQuantity > 0 && form.openingLocationId ? { locationId: form.openingLocationId, quantity: openingQuantity } : null,
         });
+        onSaved(created.id);
       }
-      onSaved();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save product.");
     } finally {

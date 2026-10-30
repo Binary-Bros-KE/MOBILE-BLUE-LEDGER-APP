@@ -1307,3 +1307,52 @@ export type WorkingHoursUpsertInput = {
   timezoneOffsetMinutes: number;
   schedule: WorkingHoursSchedule;
 };
+
+/** Purchase requisitions — SERVER's mobile-requisitions-service.ts. pending → approved (became
+ * purchaseId) | rejected | cancelled. A line is a catalog product or a free-text item (productId null)
+ * an approver links before converting. */
+export type RequisitionStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export type RequisitionListItem = {
+  id: string;
+  requisitionNumber: string;
+  storefrontId: string;
+  storefrontName: string;
+  status: RequisitionStatus;
+  itemCount: number;
+  totalQuantityRequested: number;
+  unlinkedItemCount: number;
+  notes: string | null;
+  rejectionReason: string | null;
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: string;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  purchaseId: string | null;
+  purchaseNumber: string | null;
+  purchaseStatus: string | null;
+};
+
+export type RequisitionItem = {
+  id: string;
+  productId: string | null;
+  itemName: string;
+  productName: string | null;
+  sku: string | null;
+  taxType: string | null;
+  sellingPriceCents: number | null;
+  trackStock: boolean | null;
+  quantityRequested: number;
+  notes: string | null;
+};
+
+export type RequisitionDetail = RequisitionListItem & { items: RequisitionItem[] };
+
+export type CreateRequisitionInput = {
+  /** Minted client-side once per form, resent unchanged on retry. */
+  id: string;
+  storefrontId: string | null;
+  notes: string | null;
+  items: Array<{ productId: string | null; itemName: string; quantity: number; notes: string | null }>;
+};
