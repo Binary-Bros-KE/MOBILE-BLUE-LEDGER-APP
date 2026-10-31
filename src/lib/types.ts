@@ -1085,6 +1085,18 @@ export type PurchaseListItem = {
   receivedAt: string | null;
   createdAt: string;
   currency: string;
+  /** The requisition this purchase was approved from ("from REQ-…"), null for a direct purchase. */
+  requisitionNumber: string | null;
+};
+
+/** Where a purchase came from — shown as the Requested → Approved part of its history. */
+export type PurchaseOrigin = {
+  requisitionId: string;
+  requisitionNumber: string;
+  requestedByName: string;
+  requestedAt: string;
+  approvedByName: string | null;
+  approvedAt: string | null;
 };
 
 export type PurchaseItemLine = {
@@ -1114,6 +1126,7 @@ export type PurchasePaymentLine = {
 };
 
 export type PurchaseDetail = {
+  origin: PurchaseOrigin | null;
   id: string;
   purchaseNumber: string;
   supplierId: string;
@@ -1348,6 +1361,12 @@ export type RequisitionItem = {
 };
 
 export type RequisitionDetail = RequisitionListItem & { items: RequisitionItem[] };
+
+/** Editing a pending requisition (requester or Super Admin): the full line list; `id` keeps a line. */
+export type UpdateRequisitionInput = {
+  notes: string | null;
+  items: Array<{ id: string | null; productId: string | null; itemName: string; quantity: number; notes: string | null }>;
+};
 
 export type CreateRequisitionInput = {
   /** Minted client-side once per form, resent unchanged on retry. */

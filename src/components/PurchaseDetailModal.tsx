@@ -155,6 +155,20 @@ export function PurchaseDetailModal({
         {doc && (
           <div className="rounded-lg border border-dashed border-navy/15 bg-cream-dark/40 p-4 text-sm">
             <div className="space-y-0.5 text-xs text-navy/70">
+              {doc.origin && (
+                <>
+                  <Row
+                    label="Requested"
+                    value={`${doc.origin.requisitionNumber} · ${doc.origin.requestedByName} · ${new Date(doc.origin.requestedAt).toLocaleDateString()}`}
+                  />
+                  {doc.origin.approvedByName && (
+                    <Row
+                      label="Approved"
+                      value={`${doc.origin.approvedByName}${doc.origin.approvedAt ? ` · ${new Date(doc.origin.approvedAt).toLocaleDateString()}` : ""}`}
+                    />
+                  )}
+                </>
+              )}
               <Row label="Storefront" value={doc.locationName} />
               {doc.supplierPhone && <Row label="Supplier Phone" value={doc.supplierPhone} />}
               {doc.supplierInvoiceNumber && <Row label="Supplier Invoice #" value={doc.supplierInvoiceNumber} />}

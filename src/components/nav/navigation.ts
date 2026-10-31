@@ -4,7 +4,6 @@ import {
   BarChart3,
   Bike,
   CheckCircle2,
-  ClipboardPen,
   Clock,
   CreditCard,
   FileSpreadsheet,
@@ -32,7 +31,6 @@ export type TabKey =
   | "transactions"
   | "products"
   | "purchases"
-  | "requisitions"
   | "suppliers"
   | "expenses"
   | "stockLedger"
@@ -100,10 +98,18 @@ export const navGroups: NavGroup[] = [
     title: "Inventory & Costs",
     items: [
       { key: "products", label: "Products", icon: Package, ready: true, permission: { module: "products", action: "view" } },
-      // Same module as DESKTOP's Requisitions screen — anyone can raise one by default; approvers
-      // (purchase_requisitions.approve) convert them into purchases.
-      { key: "requisitions", label: "Requisitions", icon: ClipboardPen, ready: true, permission: { module: "purchase_requisitions", action: "view" } },
-      { key: "purchases", label: "Purchases", icon: Truck, ready: true, permission: { module: "purchases", action: "view" } },
+      // One tab for the whole Requisition → Received document (client request): a requisition-only
+      // role (e.g. Cashier) gets it too, with everything purchase-side hidden — see PurchasesTab.
+      {
+        key: "purchases",
+        label: "Purchases",
+        icon: Truck,
+        ready: true,
+        permissionAnyOf: [
+          { module: "purchases", action: "view" },
+          { module: "purchase_requisitions", action: "view" },
+        ],
+      },
       // Same module DESKTOP's own Suppliers screen requires — a Cashier deliberately doesn't have it
       // (see DESKTOP's role-service.ts), so they never see supplier balances here either.
       { key: "suppliers", label: "Suppliers", icon: Store, ready: true, permission: { module: "suppliers", action: "view" } },

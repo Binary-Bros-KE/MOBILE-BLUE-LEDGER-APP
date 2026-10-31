@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { MobileLocation, ProductListItem } from "@/lib/types";
+import type { MobileLocation, ProductListItem, RequisitionDetail } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
 
 type Line = {
   key: string;
+  /** The existing line's id while editing — kept so SERVER updates the same line. */
+  id: string | null;
   productId: string | null;
   itemName: string;
   sku: string | null;
@@ -23,9 +25,12 @@ type Line = {
  */
 export function NewRequisitionModal({
   storefronts,
+  editing = null,
   onClose,
   onCreated,
 }: {
+  /** A pending requisition to edit (requester or Super Admin) instead of raising a new one. */
+  editing?: RequisitionDetail | null;
   /** Only offered when the viewer has no storefront of their own (an unassigned Super Admin). */
   storefronts: MobileLocation[] | null;
   onClose: () => void;
@@ -33,10 +38,20 @@ export function NewRequisitionModal({
 }) {
   const [products, setProducts] = useState<ProductListItem[] | null>(null);
   const [storefrontId, setStorefrontId] = useState(storefronts?.length === 1 ? storefronts[0]!.id : "");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<Line[]>(() =>
+    (editing?.items ?? []).map((item) => ({
+      key: item.id,
+      id: item.id,
+      productId: item.productId,
+      itemName: item.itemName,
+      sku: item.sku,
+      quantity: String(item.quantityRequested),
+      notes: item.notes ?? "",
+    })),
+  );
   const [search, setSearch] = useState("");
   const [freeText, setFreeText] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requisitionId = useRef(`preq_${crypto.randomUUID()}`);
@@ -59,14 +74,14 @@ export function NewRequisitionModal({
   }, [products, search, lines]);
 
   function addProduct(product: ProductListItem): void {
-    setLines((prev) => [...prev, { key: product.id, productId: product.id, itemName: product.name, sku: product.sku, quantity: "1", notes: "" }]);
+    setLines((prev) => [...prev, { key: product.id, id: null, productId: product.id, itemName: product.name, sku: product.sku, quantity: "1", notes: "" }]);
     setSearch("");
   }
 
   function addFreeText(): void {
     const name = freeText.trim();
     if (!name) return;
-    setLines((prev) => [...prev, { key: `free_${Date.now()}_${prev.length}`, productId: null, itemName: name, sku: null, quantity: "1", notes: "" }]);
+    setLines((prev) => [...prev, { key: `free_${Date.now()}_${prev.length}`, id: null, productId: null, itemName: name, sku: null, quantity: "1", notes: "" }]);
     setFreeText("");
   }
 
@@ -75,21 +90,27 @@ export function NewRequisitionModal({
   }
 
   async function submit(): Promise<void> {
-    if (storefronts && storefronts.length > 0 && !storefrontId) return setError("Choose which storefront this is for.");
+    if (!editing && storefronts && storefronts.length > 0 && !storefrontId) return setError("Choose which storefront this is for.");
     if (lines.length === 0) return setError("Add at least one item.");
     const items = [];
     for (const line of lines) {
       const quantity = Number.parseInt(line.quantity, 10);
       if (!quantity || quantity <= 0) return setError(`Enter a quantity for ${line.itemName}.`);
-      items.push({ productId: line.productId, itemName: line.itemName, quantity, notes: line.notes.trim() || null });
+      items.push({ id: line.id, productId: line.productId, itemName: line.itemName, quantity, notes: line.notes.trim() || null });
     }
     setSaving(true);
     setError(null);
     try {
+      if (editing) {
+        const updated = await api.updateRequisition(editing.id, { notes: notes.trim() || null, items });
+        onCreated(updated.requisitionNumber);
+        return;
+      }
       const result = await api.createRequisition({
         id: requisitionId.current,
         storefrontId: storefronts ? storefrontId || null : null,
         notes: notes.trim() || null,
+        // A new requisition's lines have no ids yet (id: null) — SERVER's create schema ignores the key.
         items,
       });
       onCreated(result.requisitionNumber);
@@ -101,11 +122,15 @@ export function NewRequisitionModal({
   }
 
   return (
-    <BottomSheet title="New Requisition" subtitle="Ask for stock to be bought — a manager approves it into a purchase." onClose={onClose}>
+    <BottomSheet
+      title={editing ? `Edit ${editing.requisitionNumber}` : "New Requisition"}
+      subtitle="Ask for stock to be bought — a manager approves it into a purchase."
+      onClose={onClose}
+    >
       <div className="space-y-3">
         <SheetError message={error} />
 
-        {storefronts && storefronts.length > 0 && (
+        {!editing && storefronts && storefronts.length > 0 && (
           <SheetField label="For storefront">
             <select value={storefrontId} onChange={(e) => setStorefrontId(e.target.value)} className={sheetInputClass}>
               <option value="" disabled>
@@ -225,7 +250,7 @@ export function NewRequisitionModal({
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
         >
           {saving && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-          Send for Approval
+          {editing ? "Save Changes" : "Send for Approval"}
         </button>
       </div>
     </BottomSheet>

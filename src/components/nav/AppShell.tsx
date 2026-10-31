@@ -19,7 +19,6 @@ import { ExpensesTab } from "../tabs/ExpensesTab";
 import { InvoicesTab } from "../tabs/InvoicesTab";
 import { ProductsTab } from "../tabs/ProductsTab";
 import { PurchasesTab } from "../tabs/PurchasesTab";
-import { RequisitionsTab } from "../tabs/RequisitionsTab";
 import { QuotationsTab } from "../tabs/QuotationsTab";
 import { ReportsTab } from "../tabs/ReportsTab";
 import { RidersTab } from "../tabs/RidersTab";
@@ -214,25 +213,18 @@ export function AppShell() {
           {activeTab === "suppliers" && (
             <SuppliersTab currency={session?.currency ?? "KES"} canCreate={can("suppliers", "create")} canAdjust={can("suppliers", "edit")} />
           )}
-          {activeTab === "requisitions" && (
-            <RequisitionsTab
-              currency={session?.currency ?? "KES"}
-              viewerEmployeeId={session?.employeeId ?? null}
-              viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
-              viewerBranchId={session?.branchId ?? null}
-              vatRatePercent={session?.vatRatePercent ?? 16}
-              canCreate={can("purchase_requisitions", "create")}
-              canApprove={can("purchase_requisitions", "approve")}
-              canCreatePurchase={can("purchases", "create")}
-              canCreateProduct={can("products", "create")}
-              onOpenPurchases={() => setActiveTab("purchases")}
-            />
-          )}
           {activeTab === "purchases" && (
             <PurchasesTab
               currency={session?.currency ?? "KES"}
               canCreate={can("purchases", "create")}
               canEdit={can("purchases", "edit")}
+              canViewPurchases={can("purchases", "view")}
+              canViewRequisitions={can("purchase_requisitions", "view")}
+              canCreateRequisition={can("purchase_requisitions", "create")}
+              canApproveRequisitions={can("purchase_requisitions", "approve")}
+              canCreateProduct={can("products", "create")}
+              viewerEmployeeId={session?.employeeId ?? null}
+              vatRatePercent={session?.vatRatePercent ?? 16}
               viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               viewerBranchId={session?.branchId ?? null}
             />

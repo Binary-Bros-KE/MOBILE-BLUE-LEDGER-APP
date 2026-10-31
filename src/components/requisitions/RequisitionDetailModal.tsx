@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, Link2, Loader2, Plus, Search, ShoppingBag, XCircle } from "lucide-react";
+import { Ban, CheckCircle2, Link2, Loader2, Pencil, Plus, Search, ShoppingBag, XCircle } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { MobileCategory, MobileLocation, ProductListItem, RequisitionDetail, RequisitionItem } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
@@ -30,6 +30,7 @@ export function RequisitionDetailModal({
   onClose,
   onChanged,
   onOpenPurchases,
+  onEdit,
 }: {
   requisitionId: string;
   currency: string;
@@ -43,6 +44,8 @@ export function RequisitionDetailModal({
   onClose: () => void;
   onChanged: () => void;
   onOpenPurchases: () => void;
+  /** Re-open this pending requisition in the New Requisition sheet (requester or Super Admin). */
+  onEdit: (requisition: RequisitionDetail) => void;
 }) {
   const [detail, setDetail] = useState<RequisitionDetail | null>(null);
   const [products, setProducts] = useState<ProductListItem[] | null>(null);
@@ -160,7 +163,9 @@ export function RequisitionDetailModal({
     setApproving({ requisitionId: detail.id, requisitionNumber: detail.requisitionNumber, location, items });
   }
 
-  const canCancel = detail?.status === "pending" && (detail.requestedBy === viewerEmployeeId || canApprove);
+  // Client rule: a requisition belongs to whoever raised it — only they (or a Super Admin) edit or
+  // withdraw it; approvers act through Approve / Reject. SERVER enforces the same.
+  const canModify = detail?.status === "pending" && (detail.requestedBy === viewerEmployeeId || viewerIsSuperAdmin);
 
   return (
     <>
@@ -346,16 +351,27 @@ export function RequisitionDetailModal({
               </div>
             )}
 
-            {canCancel && !rejecting && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void cancel()}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-navy/20 py-2.5 text-sm font-bold text-navy/70 disabled:opacity-50"
-              >
-                <Ban className="size-4" aria-hidden="true" />
-                Cancel Requisition
-              </button>
+            {canModify && !rejecting && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onEdit(detail)}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-navy/20 py-2.5 text-sm font-bold text-navy disabled:opacity-50"
+                >
+                  <Pencil className="size-4" aria-hidden="true" />
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void cancel()}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-navy/20 py-2.5 text-sm font-bold text-navy/70 disabled:opacity-50"
+                >
+                  <Ban className="size-4" aria-hidden="true" />
+                  Cancel
+                </button>
+              </div>
             )}
           </div>
         )}

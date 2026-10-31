@@ -33,7 +33,10 @@ export function PurchaseCard({ purchase, onSelect }: { purchase: PurchaseListIte
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="truncate font-bold text-navy">{purchase.purchaseNumber}</p>
+          <p className="truncate font-bold text-navy">
+            {purchase.purchaseNumber}
+            {purchase.requisitionNumber && <span className="ml-1.5 text-[11px] font-semibold text-navy/40">from {purchase.requisitionNumber}</span>}
+          </p>
           <p className="flex-none font-display text-sm text-navy">{formatCents(purchase.grandTotalCents, purchase.currency)}</p>
         </div>
         <p className="truncate text-xs text-navy/50">{purchase.supplierName}</p>

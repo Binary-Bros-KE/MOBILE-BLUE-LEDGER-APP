@@ -10,6 +10,7 @@ import type {
   CreateProductInput,
   CreatePurchaseInput,
   CreateRequisitionInput,
+  UpdateRequisitionInput,
   RequisitionDetail,
   RequisitionListItem,
   CreateInvoiceRequest,
@@ -390,6 +391,8 @@ export const api = {
   countPendingRequisitions: () => request<{ pending: number }>("/mobile/requisitions/pending-count"),
   createRequisition: (body: CreateRequisitionInput) =>
     request<{ id: string; requisitionNumber: string }>("/mobile/requisitions", { method: "POST", body: JSON.stringify(body) }),
+  updateRequisition: (id: string, body: UpdateRequisitionInput) =>
+    request<RequisitionDetail>(`/mobile/requisitions/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   cancelRequisition: (id: string) => request<DocumentIdResult>(`/mobile/requisitions/${id}/cancel`, { method: "POST" }),
   rejectRequisition: (id: string, reason: string) =>
     request<DocumentIdResult>(`/mobile/requisitions/${id}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
