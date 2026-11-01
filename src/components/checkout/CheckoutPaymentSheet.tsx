@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { BookUser, Loader2, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { centsToPriceText, formatCents, priceTextToCents } from "@/lib/money";
-import type { PaymentMethodOption } from "@/lib/types";
+import type { MpesaVerificationRecord, MpesaVerifications, PaymentMethodOption } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
+import { MpesaVerifyControl, mpesaCodeKey, mpesaVerificationActive, mpesaVerificationStrict, useMpesaVerificationState } from "../mpesa/MpesaVerification";
 import { MpesaPromptPanel } from "./MpesaPromptPanel";
 
 /** DESKTOP's own seeded M-Pesa payment method code. */
@@ -51,6 +52,7 @@ export function CheckoutPaymentSheet({
   customerName,
   customerPhone,
   locationId,
+  claimKey,
   canPutOnAccount,
   submitting,
   error,
@@ -66,6 +68,8 @@ export function CheckoutPaymentSheet({
   /** Pre-fills the M-Pesa prompt's phone number. */
   customerPhone: string | null;
   locationId: string;
+  /** Reserves verified M-Pesa codes for this sale; goes on the checkout request as mpesaClaimKey. */
+  claimKey: string;
   canPutOnAccount: boolean;
   submitting: boolean;
   error: string | null;
@@ -82,9 +86,11 @@ export function CheckoutPaymentSheet({
   const hasPaidStk = rows.some((r) => r.stkPaid);
   /** Latest rows/submitting for the M-Pesa success callback — the prompt's polling timer holds the
    * callback from when it started, so reading state through it would see stale rows. */
-  const latest = useRef({ rows, submitting });
+  const verification = useMpesaVerificationState(locationId);
+  const [verifications, setVerifications] = useState<MpesaVerifications>({});
+  const latest = useRef({ rows, submitting, verification, verifications });
   useEffect(() => {
-    latest.current = { rows, submitting };
+    latest.current = { rows, submitting, verification, verifications };
   });
 
   useEffect(() => {
@@ -116,10 +122,36 @@ export function CheckoutPaymentSheet({
   /** Paid through the prompt: lock the row with its receipt and complete straight away when that
    * covers everything — a paid customer is never left with an unrecorded sale. A split with another
    * part still to pay just says what's left (handleCharge's own messages). */
-  function handleStkPaid(index: number, receipt: string): void {
+  async function handleStkPaid(index: number, receipt: string): Promise<void> {
     const next = latest.current.rows.map((r, i) => (i === index ? { ...r, reference: receipt, stkPaid: true } : r));
     setRows(next);
-    if (!latest.current.submitting) handleCharge(next);
+    const claimed = await claimStkReceipt(receipt);
+    if (!latest.current.submitting) handleCharge(next, { ...latest.current.verifications, ...claimed });
+  }
+
+  function recordVerification(code: string, record: MpesaVerificationRecord): void {
+    setLocalError(null);
+    setVerifications((prev) => ({ ...prev, [mpesaCodeKey(code)]: record }));
+  }
+
+  /** A prompt receipt is already real money on this till, so it's claimed without the cashier doing
+   * anything, before the sale completes. SERVER records the receipt a moment after reporting success,
+   * hence the one retry. A failure here costs nothing: Verify Code is still there. */
+  async function claimStkReceipt(code: string): Promise<MpesaVerifications> {
+    if (!mpesaVerificationActive(latest.current.verification)) return {};
+    const claim = { locationId, code, amountCents: null, claimKey };
+    try {
+      let result = await api.verifyMpesaCode(claim);
+      if (result.outcome === "not_found") {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        result = await api.verifyMpesaCode(claim);
+      }
+      if (result.outcome !== "verified" || !result.record) return {};
+      recordVerification(result.code, result.record);
+      return { [mpesaCodeKey(result.code)]: result.record };
+    } catch {
+      return {};
+    }
   }
 
   /** Closing would leave money already taken by M-Pesa with no sale recorded — not allowed. */
@@ -131,7 +163,7 @@ export function CheckoutPaymentSheet({
     onClose();
   }
 
-  function handleCharge(chargeRows: Row[] = rows): void {
+  function handleCharge(chargeRows: Row[] = rows, records: MpesaVerifications = verifications): void {
     if (submitting) return;
     const entries: CheckoutPaymentEntry[] = [];
     for (const row of chargeRows) {
@@ -140,6 +172,9 @@ export function CheckoutPaymentSheet({
       if (!method) return setLocalError("Choose a payment method for every row.");
       if (!amountCents || amountCents <= 0) return setLocalError(`Enter the amount paid by ${method.name}.`);
       if (method.requiresReference && !row.reference.trim()) return setLocalError(`${method.name} needs a reference.`);
+      if (method.code === MPESA_CODE && mpesaVerificationStrict(latest.current.verification) && records[mpesaCodeKey(row.reference)]?.status !== "verified") {
+        return setLocalError("This storefront requires a verified M-Pesa payment. Verify the code before completing.");
+      }
       entries.push({ paymentMethodId: method.id, amountCents, reference: row.reference.trim() });
     }
     // Worked out from chargeRows (not this render's rows) — the M-Pesa success path passes rows newer
@@ -233,7 +268,7 @@ export function CheckoutPaymentSheet({
                     currency={currency}
                     locationId={locationId}
                     defaultPhone={customerPhone ?? ""}
-                    onPaid={(receipt) => handleStkPaid(index, receipt)}
+                    onPaid={(receipt) => void handleStkPaid(index, receipt)}
                   />
                 )}
                 {method?.requiresReference && (
@@ -245,6 +280,19 @@ export function CheckoutPaymentSheet({
                     readOnly={row.stkPaid}
                     disabled={row.stkPaid}
                     className={`${sheetInputClass} mt-0`}
+                  />
+                )}
+                {method?.code === MPESA_CODE && verification && mpesaVerificationActive(verification) && (
+                  <MpesaVerifyControl
+                    locationId={locationId}
+                    state={verification}
+                    amountCents={priceTextToCents(row.amount) ?? null}
+                    code={row.reference}
+                    claimKey={claimKey}
+                    verifications={verifications}
+                    currency={currency}
+                    onUseCode={(code) => updateRow(index, { reference: code })}
+                    onVerified={recordVerification}
                   />
                 )}
                 {isCash && rows.length === 1 && (

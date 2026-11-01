@@ -225,6 +225,8 @@ export type SaleStatusFlags = {
 
 export type SaleListItem = SaleStatusFlags & {
   id: string;
+  /** Null (verification wasn't in play) shows nothing. */
+  mpesaVerification?: "verified" | "unverified" | null;
   receiptNumber: string | null;
   customerName: string | null;
   employeeName: string;
@@ -290,6 +292,9 @@ export type TaxBreakdownEntry = {
 };
 
 export type SharedDocument = Partial<SaleStatusFlags> & {
+  /** Only from /mobile/sales/:id and /mobile/quotations/:id, not the shared view-model itself. */
+  mpesaVerifications?: MpesaVerifications | null;
+  locationId?: string | null;
   documentKind: PricedDocumentKind;
   businessName: string;
   physicalAddress: string | null;
@@ -542,6 +547,8 @@ export type TransactionPartyLabel = "Customer" | "Supplier" | "Employee" | "For"
 export type TransactionRow = {
   id: string;
   transactionCode: string;
+  /** Only on an M-Pesa money-in row with verification in play; absent/null shows nothing. */
+  mpesaVerification?: "verified" | "unverified" | null;
   occurredAt: string;
   locationName: string;
   paymentMethodName: string | null;
@@ -902,7 +909,48 @@ export type ServiceChargeInput = { name: string; feeCents: number; costCents: nu
  * convention as CheckoutDeliveryModal's fee/cost fields. */
 export type ServiceChargeDraft = { name: string; fee: string; cost: string };
 
+/** Per storefront, only once till credentials are saved. off = nothing shown or recorded; loose (the
+ * default) = verification offered, a sale can complete without it; strict = must verify to complete. */
+export type MpesaVerificationMode = "off" | "loose" | "strict";
+
+export type MpesaVerificationState = {
+  /** The first check: false until this storefront has saved till credentials. */
+  available: boolean;
+  mode: MpesaVerificationMode;
+  /** Safaricom has accepted our payment-notification URLs for this till. */
+  connected: boolean;
+  connectError: string | null;
+};
+
+/** A real payment on the till that hasn't been claimed by any sale. */
+export type MpesaPaymentMatch = {
+  code: string;
+  amountCents: number;
+  payerName: string | null;
+  maskedPhone: string | null;
+  receivedAt: string;
+};
+
+export type MpesaVerificationRecord = {
+  status: "verified" | "unverified";
+  verifiedAt: string | null;
+  payerName: string | null;
+  amountCents: number | null;
+};
+
+/** Per code, on the sale. A sale with none shows no indicator (verification wasn't in play). */
+export type MpesaVerifications = Record<string, MpesaVerificationRecord>;
+
+export type MpesaVerifyResult = {
+  outcome: "verified" | "not_found" | "already_used" | "amount_mismatch" | "wrong_storefront";
+  code: string;
+  message: string;
+  record: MpesaVerificationRecord | null;
+};
+
 export type CheckoutRequest = {
+  /** Reserved through /mobile/mpesa/verify, so SERVER can confirm the code was really verified. */
+  mpesaClaimKey?: string;
   id: string;
   locationId: string;
   items: CheckoutItemInput[];
@@ -954,6 +1002,8 @@ export type DocumentIdResult = { id: string };
 export type InvoiceStockSource = "storefront" | "main_store";
 
 export type CreateInvoiceRequest = {
+  /** Reserved through /mobile/mpesa/verify, so SERVER can confirm the code was really verified. */
+  mpesaClaimKey?: string;
   /** Optional client-minted id, resent unchanged on retry so the same invoice can't be created twice. */
   id?: string;
   customerId: string;
@@ -970,7 +1020,7 @@ export type CreateInvoiceRequest = {
   locationId: string;
 };
 
-export type RecordPaymentRequest = { paymentMethodId: string; amountCents: number; reference?: string; notes?: string };
+export type RecordPaymentRequest = { paymentMethodId: string; amountCents: number; reference?: string; notes?: string; mpesaClaimKey?: string };
 
 export type MarkPaidRequest = { paymentMethodId: string; reference?: string; notes?: string };
 
@@ -1003,6 +1053,8 @@ export type QuotationStockCheckItem = {
 export type QuantityOverride = { productId: string; quantity: number };
 
 export type ConvertToSaleRequest = {
+  /** Reserved through /mobile/mpesa/verify, so SERVER can confirm the code was really verified. */
+  mpesaClaimKey?: string;
   paymentMethodId: string;
   paymentReference?: string;
   amountReceivedCents?: number | null;

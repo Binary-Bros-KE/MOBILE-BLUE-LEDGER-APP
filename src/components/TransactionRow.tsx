@@ -3,6 +3,7 @@
 import { ArrowDownLeft, ArrowUpRight, Store } from "lucide-react";
 import { formatCents } from "@/lib/money";
 import type { TransactionRow as TransactionRowType } from "@/lib/types";
+import { MpesaStatusPill } from "./mpesa/MpesaVerification";
 
 const STATUS_TONE: Record<TransactionRowType["status"], string> = {
   complete: "border-green text-green",
@@ -46,6 +47,11 @@ export function TransactionRow({ transaction }: { transaction: TransactionRowTyp
           {transaction.locationName}
         </p>
         {transaction.paymentMethodName && <p className="mt-0.5 break-words text-xs text-navy/50">{transaction.paymentMethodName}</p>}
+        {transaction.mpesaVerification && (
+          <p className="mt-1">
+            <MpesaStatusPill status={transaction.mpesaVerification} />
+          </p>
+        )}
         {transaction.partyName && (
           <p className="mt-0.5 break-words text-xs text-navy/70">
             <span className="font-bold">{transaction.partyLabel}:</span> {transaction.partyName}

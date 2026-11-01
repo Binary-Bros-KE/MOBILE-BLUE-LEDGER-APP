@@ -25,6 +25,10 @@ import type {
   RecentApprovalDecision,
   InvoiceListItem,
   MarkPaidRequest,
+  MpesaPaymentMatch,
+  MpesaVerificationMode,
+  MpesaVerificationState,
+  MpesaVerifyResult,
   MobileBusinessProfile,
   MobileCashUp,
   MobileCategory,
@@ -349,6 +353,17 @@ export const api = {
     request<MobileCashUp>(
       `/mobile/cash-up?date=${q.date}&timezoneOffsetMinutes=${q.timezoneOffsetMinutes}${q.locationId ? `&locationId=${encodeURIComponent(q.locationId)}` : ""}${q.employeeId ? `&employeeId=${encodeURIComponent(q.employeeId)}` : ""}`,
     ),
+  getMpesaVerification: (locationId: string) => request<MpesaVerificationState>(`/mobile/mpesa/verification/${encodeURIComponent(locationId)}`),
+  saveMpesaVerificationMode: (locationId: string, mode: MpesaVerificationMode) =>
+    request<MpesaVerificationState>(`/mobile/mpesa/verification/${encodeURIComponent(locationId)}`, { method: "PUT", body: JSON.stringify({ mode }) }),
+  connectMpesaVerification: (locationId: string) =>
+    request<MpesaVerificationState>(`/mobile/mpesa/verification/${encodeURIComponent(locationId)}/connect`, { method: "POST" }),
+  checkMpesaPayment: (body: { locationId: string; amountCents: number; claimKey: string }) =>
+    request<MpesaPaymentMatch[]>("/mobile/mpesa/check-payment", { method: "POST", body: JSON.stringify(body) }),
+  verifyMpesaCode: (body: { locationId: string; code: string; amountCents: number | null; claimKey: string }) =>
+    request<MpesaVerifyResult>("/mobile/mpesa/verify", { method: "POST", body: JSON.stringify(body) }),
+  verifyMpesaSaleCode: (body: { saleId: string; code: string; replacesCode: string | null }) =>
+    request<MpesaVerifyResult>("/mobile/mpesa/verify-sale", { method: "POST", body: JSON.stringify(body) }),
   isMpesaConfigured: (locationId: string) =>
     request<{ configured: boolean }>(`/mobile/mpesa/configured?locationId=${encodeURIComponent(locationId)}`),
   sendMpesaPrompt: (body: { locationId: string; phone: string; amountCents: number }) =>

@@ -7,8 +7,9 @@ import { api, ApiError } from "@/lib/api";
 import { buildCartFromEditableItems, computeCartTotals, serviceChargeDraftsToInputs, serviceChargeInputsToDrafts, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
-import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
+import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, MpesaVerifications, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
 import { CheckboxField } from "../CheckboxField";
+import { MpesaVerifyControl, mpesaCodeKey, mpesaVerificationActive, mpesaVerificationStrict, useMpesaVerificationState } from "../mpesa/MpesaVerification";
 import { ServiceChargesModal } from "../ServiceChargesModal";
 import { CheckoutCustomerPickerModal } from "../tabs/CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "../tabs/CheckoutDeliveryModal";
@@ -89,6 +90,9 @@ export function InvoiceFormModal({
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [initialPaymentAmount, setInitialPaymentAmount] = useState("");
   const [initialPaymentReference, setInitialPaymentReference] = useState("");
+  const mpesaVerification = useMpesaVerificationState(branchId);
+  const [mpesaVerifications, setMpesaVerifications] = useState<MpesaVerifications>({});
+  const [mpesaClaimKey] = useState(() => `claim_${crypto.randomUUID()}`);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -161,12 +165,21 @@ export function InvoiceFormModal({
         setSubmitError(`${selectedPaymentMethod.name} requires a reference.`);
         return;
       }
+      if (
+        selectedPaymentMethod?.code === "MPESA" &&
+        mpesaVerificationStrict(mpesaVerification) &&
+        mpesaVerifications[mpesaCodeKey(initialPaymentReference)]?.status !== "verified"
+      ) {
+        setSubmitError("This storefront requires a verified M-Pesa payment. Verify the code before saving.");
+        return;
+      }
     }
 
     setSubmitting(true);
     setSubmitError(null);
     try {
       const body = {
+        mpesaClaimKey,
         customerId,
         transactionType,
         dueDate,
@@ -468,6 +481,19 @@ export function InvoiceFormModal({
                   onChange={(e) => setInitialPaymentReference(e.target.value)}
                   placeholder={`${selectedPaymentMethod.name} reference`}
                   className="h-9 w-full rounded-lg border border-navy/15 px-2.5 text-xs font-semibold text-navy focus:border-blue focus:outline-none"
+                />
+              )}
+              {selectedPaymentMethod?.code === "MPESA" && branchId && mpesaVerification && mpesaVerificationActive(mpesaVerification) && (
+                <MpesaVerifyControl
+                  locationId={branchId}
+                  state={mpesaVerification}
+                  amountCents={initialPaymentAmount.trim() ? Math.round(Number(initialPaymentAmount) * 100) : null}
+                  code={initialPaymentReference}
+                  claimKey={mpesaClaimKey}
+                  verifications={mpesaVerifications}
+                  currency={currency}
+                  onUseCode={setInitialPaymentReference}
+                  onVerified={(code, record) => setMpesaVerifications((prev) => ({ ...prev, [mpesaCodeKey(code)]: record }))}
                 />
               )}
             </div>

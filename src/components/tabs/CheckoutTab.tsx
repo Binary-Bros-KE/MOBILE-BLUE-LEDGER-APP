@@ -120,6 +120,9 @@ export function CheckoutTab({
   // mechanism (see mobile-checkout-service.ts). Only regenerated after a sale actually completes or
   // the cart is cleared, never on every render.
   const checkoutIdRef = useRef(crypto.randomUUID());
+  /** checkoutIdRef's value as of opening the payment sheet: closing and reopening keeps the same
+   * reservation for any M-Pesa code already verified. */
+  const [paymentClaimKey, setPaymentClaimKey] = useState("");
 
   useEffect(() => {
     if (branchId) return;
@@ -384,6 +387,7 @@ export function CheckoutTab({
       return;
     }
     setSubmitError(null);
+    setPaymentClaimKey(checkoutIdRef.current);
     setPaymentSheetOpen(true);
   }
 
@@ -393,6 +397,7 @@ export function CheckoutTab({
     const primary = payments[0]!;
     const request: CheckoutRequest = {
       id: checkoutIdRef.current,
+      mpesaClaimKey: checkoutIdRef.current,
       locationId: effectiveLocationId,
       items: cartItemsPayload(),
       paymentMethodId: primary.paymentMethodId,
@@ -996,6 +1001,7 @@ export function CheckoutTab({
           customerName={customerId ? customerLabel : null}
           customerPhone={customerId ? (customers.find((c) => c.id === customerId)?.phone ?? null) : null}
           locationId={effectiveLocationId ?? ""}
+          claimKey={paymentClaimKey}
           canPutOnAccount
           submitting={submitting}
           error={submitError}
