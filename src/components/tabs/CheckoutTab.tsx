@@ -671,6 +671,7 @@ export function CheckoutTab({
                   <p className="truncate text-sm font-bold text-navy">{product.name}</p>
                   <p className="text-[11px] text-navy/50">
                     {product.sku} · {product.trackStock ? `${stockAtEffectiveLocation(product)} in stock` : "No stock count"}
+                    {product.stockSource && ` · ${product.stockSource.supplierName}`}
                   </p>
                 </div>
                 <p className="flex-none text-sm font-bold text-navy">{formatCents(product.sellingPriceCents, currency)}</p>

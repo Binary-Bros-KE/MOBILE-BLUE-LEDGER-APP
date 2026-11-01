@@ -4,6 +4,16 @@ import { Archive, ArchiveRestore, Boxes, Package, Pencil } from "lucide-react";
 import { formatCents } from "@/lib/money";
 import type { ProductListItem } from "@/lib/types";
 
+function formatStockAge(asOf: string | null): string {
+  if (!asOf) return "not yet seen online";
+  const minutes = Math.floor((Date.now() - new Date(asOf).getTime()) / 60000);
+  if (minutes < 1) return "live";
+  if (minutes < 60) return `as of ${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `as of ${hours} hr ago`;
+  return `as of ${Math.floor(hours / 24)} day${hours < 48 ? "" : "s"} ago`;
+}
+
 /** Each action is shown only when its handler is passed — ProductsTab passes them per the viewer's
  * own products.edit / inventory.edit grants. */
 export type ProductCardActions = {
@@ -30,7 +40,9 @@ export function ProductCard({ product, currency, actions }: { product: ProductLi
         ? "border-gold text-gold-text"
         : null;
   const flagLabel = archived ? "Archived" : !product.trackStock ? "No stock tracking" : product.outOfStock ? "Out of Stock" : product.lowStock ? "Low Stock" : null;
-  const hasActions = Boolean(actions?.onAdjustStock || actions?.onEdit || actions?.onToggleArchive);
+  // A dropship-linked product's stock is its supplier's, so there's no Stock action to offer.
+  const canAdjustStock = Boolean(actions?.onAdjustStock) && product.trackStock && !archived && !product.stockSource;
+  const hasActions = Boolean(canAdjustStock || actions?.onEdit || actions?.onToggleArchive);
 
   return (
     <div className={`flex w-full flex-col gap-1.5 rounded-lg bg-white p-4 shadow-sm ${archived ? "opacity-70" : ""}`}>
@@ -69,13 +81,16 @@ export function ProductCard({ product, currency, actions }: { product: ProductLi
           </span>
         )}
       </div>
+      {product.stockSource && (
+        <p className="pl-14 text-[11px] font-semibold text-navy/60">
+          {product.stockSource.supplierName} stock · {formatStockAge(product.stockSource.asOf)}
+        </p>
+      )}
       {hasActions && (
         // Full card width (not indented under the name) with equal-width buttons, so the row can never
         // be wider than the screen and push the page sideways.
         <div className="mt-1.5 flex gap-2 border-t border-dashed border-navy/15 pt-2.5">
-          {actions?.onAdjustStock && product.trackStock && !archived && (
-            <CardAction icon={Boxes} label="Stock" onClick={actions.onAdjustStock} primary />
-          )}
+          {canAdjustStock && actions?.onAdjustStock && <CardAction icon={Boxes} label="Stock" onClick={actions.onAdjustStock} primary />}
           {actions?.onEdit && <CardAction icon={Pencil} label="Edit" onClick={actions.onEdit} />}
           {actions?.onToggleArchive && (
             <CardAction icon={archived ? ArchiveRestore : Archive} label={archived ? "Restore" : "Archive"} onClick={actions.onToggleArchive} />

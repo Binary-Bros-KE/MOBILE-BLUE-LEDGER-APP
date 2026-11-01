@@ -668,6 +668,9 @@ export type ProductListItem = {
   status: string;
   /** False for a non-stock item (e.g. a service) — again only in the includeAll list. */
   trackStock: boolean;
+  /** Set when this product's stock follows a dropship supplier: the figure is the supplier's, and
+   * manual stock changes are refused. asOf = when that supplier's devices last reached the server. */
+  stockSource?: { supplierName: string; asOf: string | null } | null;
 };
 
 export type MobileCategory = { id: string; name: string };
