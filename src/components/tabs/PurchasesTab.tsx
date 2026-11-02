@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ClipboardPen, ClipboardPlus } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { MobileLocation, PurchaseDetail, PurchaseListItem, RequisitionDetail, RequisitionListItem } from "@/lib/types";
+import type { MobileLocation, PurchaseDetail, PurchaseListItem, RequisitionDetail, RequisitionListItem, SupplierType } from "@/lib/types";
 import { FilterChip } from "../FilterChip";
 import { PurchaseCard } from "../PurchaseCard";
 import { PurchaseDetailModal } from "../PurchaseDetailModal";
@@ -58,7 +58,9 @@ export function PurchasesTab({
   currency,
   canCreate,
   canEdit,
+  canReceive,
   canViewPurchases,
+  localOnly,
   canViewRequisitions,
   canCreateRequisition,
   canApproveRequisitions,
@@ -71,7 +73,11 @@ export function PurchasesTab({
   currency: string;
   canCreate: boolean;
   canEdit: boolean;
+  /** Receive Goods, which a local-credit role has without the rest of purchases.edit. */
+  canReceive: boolean;
   canViewPurchases: boolean;
+  /** local_credit_purchases without the purchases module: local suppliers only, no payment figures. */
+  localOnly: boolean;
   canViewRequisitions: boolean;
   canCreateRequisition: boolean;
   canApproveRequisitions: boolean;
@@ -91,6 +97,7 @@ export function PurchasesTab({
   const [notice, setNotice] = useState<string | null>(null);
   const [locationFilter, setLocationFilter] = useState(ALL_FILTER);
   const [stage, setStage] = useState<Stage>("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | SupplierType>("all");
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
   const [selectedRequisitionId, setSelectedRequisitionId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -163,17 +170,19 @@ export function PurchasesTab({
     for (const purchase of purchases) {
       // "All" hides cancelled purchases, same as DESKTOP; "Closed" shows them.
       if (stage === "all" ? purchase.status === "cancelled" : purchaseStageOf(purchase.status) !== stage) continue;
+      if (typeFilter !== "all" && purchase.supplierType !== typeFilter) continue;
       merged.push({ kind: "purchase", at: purchase.createdAt, purchase });
     }
     for (const requisition of requisitions) {
       // An approved requisition IS its purchase from here on — the purchase card stands in for it.
       if (requisition.purchaseId && shownPurchaseIds.has(requisition.purchaseId)) continue;
+      if (typeFilter !== "all") continue;
       if (locationFilter !== ALL_FILTER && requisition.storefrontId !== locationFilter) continue;
       if (stage === "all" ? requisition.status === "cancelled" : requisitionStageOf(requisition) !== stage) continue;
       merged.push({ kind: "requisition", at: requisition.requestedAt, requisition });
     }
     return merged.sort((a, b) => b.at.localeCompare(a.at));
-  }, [purchases, requisitions, stage, locationFilter]);
+  }, [purchases, requisitions, stage, locationFilter, typeFilter]);
 
   const pendingCount = (requisitions ?? []).filter((r) => r.status === "pending").length;
   const selectedRequisition = (requisitions ?? []).find((r) => r.id === selectedRequisitionId) ?? null;
@@ -196,8 +205,15 @@ export function PurchasesTab({
       )}
 
       <div className="px-4 py-4">
+        {canViewPurchases && !localOnly && (
+          <div className="mb-2 flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <FilterChip label="All suppliers" active={typeFilter === "all"} onClick={() => setTypeFilter("all")} />
+            <FilterChip label="Local" active={typeFilter === "local"} onClick={() => setTypeFilter("local")} />
+            <FilterChip label="International" active={typeFilter === "international"} onClick={() => setTypeFilter("international")} />
+          </div>
+        )}
         <div className="mb-3 flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {STAGES.filter((s) => canViewPurchases || !s.purchasesOnly).map((s) => (
+          {STAGES.filter((s) => (canViewPurchases || !s.purchasesOnly) && !(localOnly && s.value === "draft")).map((s) => (
             <FilterChip
               key={s.value}
               label={s.value === "requisition" && pendingCount > 0 ? `${s.label} (${pendingCount})` : s.label}
@@ -254,7 +270,7 @@ export function PurchasesTab({
                     aria-hidden="true"
                   />
                   {row.kind === "purchase" ? (
-                    <PurchaseCard purchase={row.purchase} onSelect={() => setSelectedPurchaseId(row.purchase.id)} />
+                    <PurchaseCard purchase={row.purchase} hideMoney={localOnly} onSelect={() => setSelectedPurchaseId(row.purchase.id)} />
                   ) : (
                     <RequisitionCard requisition={row.requisition} onSelect={() => setSelectedRequisitionId(row.requisition.id)} />
                   )}
@@ -269,6 +285,8 @@ export function PurchasesTab({
         <PurchaseDetailModal
           purchaseId={selectedPurchaseId}
           canEdit={canEdit}
+          canReceiveGoods={canReceive}
+          localOnly={localOnly}
           onClose={() => setSelectedPurchaseId(null)}
           onChanged={reloadAll}
           onEditDraft={(purchase) => {
@@ -282,6 +300,7 @@ export function PurchasesTab({
           locations={editingDraft ? receivingLocations : newPurchaseLocations}
           currency={currency}
           editing={editingDraft}
+          localOnly={localOnly}
           onClose={() => {
             setCreating(false);
             setEditingDraft(null);

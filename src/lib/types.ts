@@ -451,6 +451,7 @@ export type MobileCustomerDetail = {
 };
 
 export type MobileSupplierDetail = {
+  supplierType: SupplierType;
   id: string;
   supplierCode: string;
   businessName: string;
@@ -971,7 +972,12 @@ export type CheckoutRequest = {
   offlineCompletedAt?: string;
 };
 
-export type MobileSupplier = { id: string; businessName: string; phone1: string };
+/** What a local-credit-purchases role may see, and the split in what we owe. */
+export type SupplierType = "local" | "international";
+
+export const SUPPLIER_TYPE_LABEL: Record<SupplierType, string> = { local: "Local", international: "International" };
+
+export type MobileSupplier = { id: string; businessName: string; phone1: string; supplierType: SupplierType };
 
 /** Suppliers tab list item. balanceCents is signed: positive = we owe them. */
 export type MobileSupplierWithBalance = MobileSupplier & { supplierCode: string; balanceCents: number };
@@ -988,7 +994,7 @@ export type MobileSupplierBalanceEntry = {
   createdAt: string;
 };
 
-export type CreateSupplierInput = { businessName: string; contactPerson?: string; phone1: string };
+export type CreateSupplierInput = { businessName: string; contactPerson?: string; phone1: string; supplierType?: SupplierType };
 
 /** stockShortfalls: products a sale queued offline took below zero (SERVER accepts it anyway — the
  * goods already left); always empty for a normal online sale. */
@@ -1125,6 +1131,7 @@ export type MobileQuotationEditData = {
 
 export type PurchaseListItem = {
   id: string;
+  supplierType: SupplierType;
   purchaseNumber: string;
   supplierName: string;
   locationName: string;
@@ -1178,6 +1185,7 @@ export type PurchasePaymentLine = {
 };
 
 export type PurchaseDetail = {
+  supplierType: SupplierType;
   origin: PurchaseOrigin | null;
   id: string;
   purchaseNumber: string;

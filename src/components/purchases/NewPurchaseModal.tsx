@@ -45,6 +45,7 @@ export function NewPurchaseModal({
   currency,
   editing = null,
   fromRequisition = null,
+  localOnly = false,
   onClose,
   onCreated,
 }: {
@@ -54,6 +55,8 @@ export function NewPurchaseModal({
   /** A draft purchase to edit instead of creating a new one. */
   editing?: PurchaseDetail | null;
   fromRequisition?: PurchaseFromRequisition | null;
+  /** Goods on credit from a local supplier: no drafts, no price changes, no shipping expense (SERVER enforces). */
+  localOnly?: boolean;
   onClose: () => void;
   onCreated: (purchaseId: string) => void;
 }) {
@@ -319,19 +322,21 @@ export function NewPurchaseModal({
                       className={sheetInputClass}
                     />
                   </SheetField>
-                  <SheetField label="Sell price">
-                    <input
-                      inputMode="decimal"
-                      value={line.sellingPrice}
-                      onChange={(e) =>
-                        updateLine(line.productId, {
-                          sellingPrice: e.target.value,
-                        })
-                      }
-                      placeholder="Keep"
-                      className={sheetInputClass}
-                    />
-                  </SheetField>
+                  {!localOnly && (
+                    <SheetField label="Sell price">
+                      <input
+                        inputMode="decimal"
+                        value={line.sellingPrice}
+                        onChange={(e) =>
+                          updateLine(line.productId, {
+                            sellingPrice: e.target.value,
+                          })
+                        }
+                        placeholder="Keep"
+                        className={sheetInputClass}
+                      />
+                    </SheetField>
+                  )}
                 </div>
               </div>
             ))}
@@ -355,15 +360,17 @@ export function NewPurchaseModal({
                       className={sheetInputClass}
                     />
                   </SheetField>
-                  <SheetField label="Shipping cost (our expense)">
-                    <input
-                      inputMode="decimal"
-                      value={shippingCost}
-                      onChange={(e) => setShippingCost(e.target.value)}
-                      placeholder="0"
-                      className={sheetInputClass}
-                    />
-                  </SheetField>
+                  {!localOnly && (
+                    <SheetField label="Shipping cost (our expense)">
+                      <input
+                        inputMode="decimal"
+                        value={shippingCost}
+                        onChange={(e) => setShippingCost(e.target.value)}
+                        placeholder="0"
+                        className={sheetInputClass}
+                      />
+                    </SheetField>
+                  )}
                 </div>
                 <SheetField label="Notes">
                   <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={sheetInputClass} />
@@ -376,16 +383,18 @@ export function NewPurchaseModal({
               <span className="font-display text-navy">{formatCents(totalCents, currency)}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={saving !== null}
-                onClick={() => void submit("draft")}
-                className="flex items-center justify-center gap-2 rounded-lg border border-navy/20 py-3 text-sm font-bold text-navy disabled:opacity-50"
-              >
-                {saving === "draft" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-                Save Draft
-              </button>
+            <div className={`grid gap-2 ${localOnly ? "grid-cols-1" : "grid-cols-2"}`}>
+              {!localOnly && (
+                <button
+                  type="button"
+                  disabled={saving !== null}
+                  onClick={() => void submit("draft")}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-navy/20 py-3 text-sm font-bold text-navy disabled:opacity-50"
+                >
+                  {saving === "draft" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                  Save Draft
+                </button>
+              )}
               <button
                 type="button"
                 disabled={saving !== null}
@@ -402,6 +411,7 @@ export function NewPurchaseModal({
 
       {creatingSupplier && (
         <QuickCreateSupplierModal
+          canChooseType={!localOnly}
           onClose={() => setCreatingSupplier(false)}
           onCreated={(supplier) => {
             setSuppliers((prev) => [...(prev ?? []), supplier]);

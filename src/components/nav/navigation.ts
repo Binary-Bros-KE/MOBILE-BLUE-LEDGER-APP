@@ -107,6 +107,7 @@ export const navGroups: NavGroup[] = [
         ready: true,
         permissionAnyOf: [
           { module: "purchases", action: "view" },
+          { module: "local_credit_purchases", action: "view" },
           { module: "purchase_requisitions", action: "view" },
         ],
       },

@@ -2,7 +2,7 @@
 
 import { Store, Truck } from "lucide-react";
 import { formatCents } from "@/lib/money";
-import type { PurchaseListItem } from "@/lib/types";
+import { SUPPLIER_TYPE_LABEL, type PurchaseListItem } from "@/lib/types";
 
 const STATUS_TONE: Record<string, string> = {
   draft: "border-navy/30 text-navy/50",
@@ -22,7 +22,7 @@ function formatStatus(status: string): string {
   return status.replace(/_/g, " ");
 }
 
-export function PurchaseCard({ purchase, onSelect }: { purchase: PurchaseListItem; onSelect: () => void }) {
+export function PurchaseCard({ purchase, hideMoney = false, onSelect }: { purchase: PurchaseListItem; hideMoney?: boolean; onSelect: () => void }) {
   const statusTone = STATUS_TONE[purchase.status] ?? "border-navy/30 text-navy/50";
   const paymentTone = PAYMENT_TONE[purchase.paymentStatus] ?? "text-navy/50";
 
@@ -39,14 +39,19 @@ export function PurchaseCard({ purchase, onSelect }: { purchase: PurchaseListIte
           </p>
           <p className="flex-none font-display text-sm text-navy">{formatCents(purchase.grandTotalCents, purchase.currency)}</p>
         </div>
-        <p className="truncate text-xs text-navy/50">{purchase.supplierName}</p>
+        <p className="truncate text-xs text-navy/50">
+          {purchase.supplierName}
+          {!hideMoney && purchase.supplierType ? ` · ${SUPPLIER_TYPE_LABEL[purchase.supplierType]}` : ""}
+        </p>
         <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-bold text-blue">
           <Store className="size-3.5 flex-none" aria-hidden="true" />
           {purchase.locationName}
         </p>
-        <p className={`mt-0.5 text-[11px] font-bold uppercase tracking-wide ${paymentTone}`}>
-          {formatStatus(purchase.paymentStatus)} · {formatCents(purchase.amountPaidCents, purchase.currency)} paid
-        </p>
+        {!hideMoney && (
+          <p className={`mt-0.5 text-[11px] font-bold uppercase tracking-wide ${paymentTone}`}>
+            {formatStatus(purchase.paymentStatus)} · {formatCents(purchase.amountPaidCents, purchase.currency)} paid
+          </p>
+        )}
       </div>
       <span className={`flex-none rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${statusTone}`}>
         {formatStatus(purchase.status)}
