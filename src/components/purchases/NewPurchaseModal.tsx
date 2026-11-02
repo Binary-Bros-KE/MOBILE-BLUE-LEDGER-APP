@@ -55,7 +55,7 @@ export function NewPurchaseModal({
   /** A draft purchase to edit instead of creating a new one. */
   editing?: PurchaseDetail | null;
   fromRequisition?: PurchaseFromRequisition | null;
-  /** Goods on credit from a local supplier: no drafts, no price changes, no shipping expense (SERVER enforces). */
+  /** Goods on credit from a local supplier: buying price only, no drafts or shipping expense (SERVER enforces). */
   localOnly?: boolean;
   onClose: () => void;
   onCreated: (purchaseId: string) => void;
