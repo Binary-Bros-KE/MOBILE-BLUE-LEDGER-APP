@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { UnitSwitch } from "../UnitSwitch";
+import { allowsDecimals, amountToBase, baseToAmount, type ProductUnitConfig, unitChoices, unitFactor } from "@/lib/product-units";
 import { ChevronDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { centsToPriceText, formatCents, priceTextToCents } from "@/lib/money";
+import { centsToPriceText, formatCents, priceTextToCents, priceTextToExactCents } from "@/lib/money";
 import type { MobileLocation, MobileSupplier, ProductListItem, PurchaseDetail } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
@@ -13,10 +15,27 @@ type Line = {
   name: string;
   sku: string;
   taxType: string;
+  /** quantity, unitCost and sellingPrice are all typed in this unit — see lib/product-units.ts. */
+  unitOfMeasure?: string | null;
+  unitConfig?: ProductUnitConfig | null;
+  unitCode?: string | null;
   quantity: string;
   unitCost: string;
   sellingPrice: string;
 };
+
+/** Text fields of a purchase line re-expressed in another unit: 25000 g at 0.14 -> 25 kg at 140. */
+function lineInUnit(line: Line, baseQuantity: number, baseCostCents: number | null, baseSellCents: number | null, code: string | null): Line {
+  const config = line.unitConfig ?? null;
+  const factor = unitFactor(config, code);
+  return {
+    ...line,
+    unitCode: code,
+    quantity: String(baseToAmount(baseQuantity, config, code)),
+    unitCost: baseCostCents === null ? "" : centsToPriceText(Math.round(baseCostCents * factor)),
+    sellingPrice: baseSellCents === null ? "" : centsToPriceText(Math.round(baseSellCents * factor)),
+  };
+}
 
 /**
  * New purchase order — supplier, where the goods will be received, and the product lines (quantity,
@@ -101,25 +120,31 @@ export function NewPurchaseModal({
   const purchaseId = useRef(`purchase_${crypto.randomUUID()}`);
 
   useEffect(() => {
-    Promise.all([api.listSuppliers(), api.listProducts()])
-      .then(([s, p]) => {
+    // Costs are pre-fill only — without access to buying prices the lines just start blank.
+    Promise.all([api.listSuppliers(), api.listProducts(), api.listProductCosts().catch((): Record<string, number> => ({}))])
+      .then(([s, p, loaded]) => {
         setSuppliers(s);
         setProducts(p);
+        setCosts(loaded);
+        const byId = new Map(p.map((product) => [product.id, product]));
+        const editedById = new Map((editing?.items ?? []).map((item) => [item.productId, item]));
+        const requestedById = new Map((fromRequisition?.items ?? []).map((item) => [item.productId, item]));
+        // Lines from a draft or requisition start in base units; put them in each product's usual unit.
+        // Requisition lines also arrive without a cost — start each at the product's last buying price.
+        setLines((prev) =>
+          prev.map((line) => {
+            const product = byId.get(line.productId);
+            const edited = editedById.get(line.productId);
+            const requested = requestedById.get(line.productId);
+            const baseCost = edited ? edited.unitCostCents : (loaded[line.productId] ?? null);
+            const baseSell = edited ? edited.sellingPriceCents : (requested?.sellingPriceCents ?? null);
+            const baseQuantity = edited ? edited.orderedQuantity : (requested?.quantity ?? Number.parseInt(line.quantity, 10));
+            const withUnits = { ...line, unitOfMeasure: product?.unitOfMeasure ?? null, unitConfig: product?.unitConfig ?? null };
+            return lineInUnit(withUnits, baseQuantity, baseCost, baseSell, product?.unitConfig?.defaultSaleUnit ?? null);
+          }),
+        );
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load suppliers and products."));
-    // Pre-fill only — without access to buying prices the lines just start blank.
-    api
-      .listProductCosts()
-      .then((loaded) => {
-        setCosts(loaded);
-        // Requisition lines arrive without a cost — start each at the product's last buying price.
-        if (fromRequisition) {
-          setLines((prev) =>
-            prev.map((l) => (l.unitCost || !loaded[l.productId] ? l : { ...l, unitCost: centsToPriceText(loaded[l.productId]!) })),
-          );
-        }
-      })
-      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -130,24 +155,35 @@ export function NewPurchaseModal({
     return products.filter((p) => p.trackStock && !inCart.has(p.id) && `${p.name} ${p.sku}`.toLowerCase().includes(term)).slice(0, 6);
   }, [products, search, lines]);
 
-  const totalCents = lines.reduce((sum, l) => sum + (priceTextToCents(l.unitCost) ?? 0) * (Number.parseInt(l.quantity, 10) || 0), 0);
+  const totalCents = lines.reduce((sum, l) => sum + Math.round((priceTextToCents(l.unitCost) ?? 0) * (Number.parseFloat(l.quantity) || 0)), 0);
 
   function addLine(product: ProductListItem): void {
-    setLines((prev) => [
-      ...prev,
-      {
-        productId: product.id,
-        name: product.name,
-        sku: product.sku,
-        taxType: product.taxType,
-        quantity: "1",
-        unitCost: costs[product.id] ? centsToPriceText(costs[product.id]!) : "",
-        // The current selling price, so buying vs selling is visible side by side — edit it right here
-        // when the cost has moved. Left as-is, the order just re-saves the same price.
-        sellingPrice: product.sellingPriceCents > 0 ? centsToPriceText(product.sellingPriceCents) : "",
-      },
-    ]);
+    const code = product.unitConfig?.defaultSaleUnit ?? null;
+    const blank: Line = {
+      productId: product.id,
+      name: product.name,
+      sku: product.sku,
+      taxType: product.taxType,
+      unitOfMeasure: product.unitOfMeasure,
+      unitConfig: product.unitConfig,
+      quantity: "1",
+      unitCost: "",
+      sellingPrice: "",
+    };
+    // The current selling price, so buying vs selling is visible side by side — edit it right here
+    // when the cost has moved. Left as-is, the order just re-saves the same price.
+    const line = lineInUnit(blank, unitFactor(product.unitConfig, code), costs[product.id] ?? null, product.sellingPriceCents > 0 ? product.sellingPriceCents : null, code);
+    setLines((prev) => [...prev, line]);
     setSearch("");
+  }
+
+  /** Same amounts, new unit: 25 kg at 140 becomes 25000 g at 0.14. */
+  function switchLineUnit(line: Line, next: string | null): void {
+    const current = unitFactor(line.unitConfig ?? null, line.unitCode);
+    const baseQuantity = Math.round((Number.parseFloat(line.quantity) || 0) * current);
+    const baseCost = priceTextToExactCents(line.unitCost);
+    const baseSell = priceTextToExactCents(line.sellingPrice);
+    updateLine(line.productId, lineInUnit(line, baseQuantity, baseCost === null ? null : baseCost / current, baseSell === null ? null : baseSell / current, next));
   }
 
   function updateLine(productId: string, patch: Partial<Line>): void {
@@ -160,15 +196,18 @@ export function NewPurchaseModal({
     if (lines.length === 0) return setError("Add at least one product.");
     const items = [];
     for (const line of lines) {
-      const orderedQuantity = Number.parseInt(line.quantity, 10);
-      const unitCostCents = priceTextToCents(line.unitCost);
+      // Typed per the line's unit; SERVER stores whole base units and the price per base unit.
+      const factor = unitFactor(line.unitConfig ?? null, line.unitCode);
+      const orderedQuantity = amountToBase(line.quantity, line.unitConfig ?? null, line.unitCode ?? null);
+      const typedCostCents = priceTextToExactCents(line.unitCost);
+      const typedSellCents = line.sellingPrice.trim() ? priceTextToExactCents(line.sellingPrice) : null;
       if (!orderedQuantity || orderedQuantity <= 0) return setError(`Enter a quantity for ${line.name}.`);
-      if (unitCostCents === null) return setError(`Enter the unit cost for ${line.name}.`);
+      if (typedCostCents === null) return setError(`Enter the unit cost for ${line.name}.`);
       items.push({
         productId: line.productId,
         orderedQuantity,
-        unitCostCents,
-        sellingPriceCents: line.sellingPrice.trim() ? priceTextToCents(line.sellingPrice) : null,
+        unitCostCents: typedCostCents / factor,
+        sellingPriceCents: typedSellCents === null ? null : typedSellCents / factor,
         taxType: line.taxType,
       });
     }
@@ -301,20 +340,30 @@ export function NewPurchaseModal({
                     <Trash2 className="size-4" aria-hidden="true" />
                   </button>
                 </div>
+                {line.unitConfig && (
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-navy/50">Buying in</span>
+                    <UnitSwitch
+                      choices={unitChoices(line.unitOfMeasure ?? null, line.unitConfig)}
+                      value={line.unitCode ?? null}
+                      onChange={(next) => switchLineUnit(line, next)}
+                    />
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-2">
-                  <SheetField label="Qty">
+                  <SheetField label={line.unitCode ? `Qty (${line.unitCode})` : "Qty"}>
                     <input
-                      inputMode="numeric"
+                      inputMode={allowsDecimals(line.unitConfig ?? null, line.unitCode ?? null) ? "decimal" : "numeric"}
                       value={line.quantity}
                       onChange={(e) =>
                         updateLine(line.productId, {
-                          quantity: e.target.value.replace(/\D/g, ""),
+                          quantity: allowsDecimals(line.unitConfig ?? null, line.unitCode ?? null) ? e.target.value.replace(/[^\d.]/g, "") : e.target.value.replace(/\D/g, ""),
                         })
                       }
                       className={sheetInputClass}
                     />
                   </SheetField>
-                  <SheetField label="Unit cost">
+                  <SheetField label={line.unitCode ? `Cost/${line.unitCode}` : "Unit cost"}>
                     <input
                       inputMode="decimal"
                       value={line.unitCost}
@@ -323,7 +372,7 @@ export function NewPurchaseModal({
                     />
                   </SheetField>
                   {!localOnly && (
-                    <SheetField label="Sell price">
+                    <SheetField label={line.unitCode ? `Sell/${line.unitCode}` : "Sell price"}>
                       <input
                         inputMode="decimal"
                         value={line.sellingPrice}

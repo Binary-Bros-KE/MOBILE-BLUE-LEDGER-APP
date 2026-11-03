@@ -1,3 +1,4 @@
+import type { ProductUnitConfig } from "./product-units";
 export type MobilePeriod = "today" | "week" | "month";
 
 export type PaymentMethodBreakdownEntry = {
@@ -17,6 +18,8 @@ export type SalesTopProduct = {
 /** One row of the Sales Report's "Products Sold" list (DESKTOP's SalesProductSold). */
 export type SalesProductSold = SalesTopProduct & {
   unitOfMeasure: string | null;
+  /** quantitySold when the product has several units ("12.5 kg"); null otherwise. */
+  quantityLabel: string | null;
   costCents: number;
   marginCents: number;
   marginPercent: number;
@@ -384,6 +387,8 @@ export type MobileDeliveryNote = {
  * getSaleReturnableItems (mobile-sales-service.ts) for the full doc comment on why this is a
  * separate raw lookup, not the display-only SharedDocument shape. */
 export type MobileReturnableItem = {
+  unitOfMeasure: string | null;
+  unitConfig: ProductUnitConfig | null;
   saleItemId: string;
   productId: string;
   productName: string;
@@ -641,6 +646,9 @@ export type MobileTaxReport = {
 };
 
 export type ProductListItem = {
+  /** Base unit + selling in several units — see lib/product-units.ts. */
+  unitOfMeasure: string | null;
+  unitConfig: ProductUnitConfig | null;
   id: string;
   name: string;
   sku: string;
@@ -729,6 +737,8 @@ export type ProductInput = {
   categoryId: string | null;
   storefrontId: string | null;
   unitOfMeasure: string | null;
+  /** Selling in several units — see lib/product-units.ts. */
+  unitConfig: ProductUnitConfig | null;
   description: string | null;
   buyingPriceCents: number;
   sellingPriceCents: number;
@@ -804,7 +814,7 @@ export type StockValueReport = {
     lowStockCount: number;
     outOfStockCount: number;
   }>;
-  topProducts: Array<{ productId: string; name: string; sku: string; units: number; costValueCents: number; retailValueCents: number }>;
+  topProducts: Array<{ productId: string; name: string; sku: string; units: number; unitsLabel: string; costValueCents: number; retailValueCents: number }>;
 };
 
 export type ProductPerformanceReport = {
@@ -839,6 +849,12 @@ export type MpesaStatusResult = { status: string; message: string; mpesaReceiptN
  * only fields that actually reach SERVER (see CheckoutRequest below); unitPriceCents/lineTotalCents
  * here exist purely to show the cashier a running total before they submit. */
 export type CheckoutCartLine = {
+  /** Selling in several units (lib/product-units.ts): quantity and unitPriceCents below stay in the
+   * base unit; these say how to show them. Optional so a parked sale saved before units still loads. */
+  unitOfMeasure?: string | null;
+  unitConfig?: ProductUnitConfig | null;
+  /** The unit this line is being sold in; null = the base unit. */
+  unitCode?: string | null;
   /** Line identity — the product id, or product id + variant key (lib/variants.ts cartLineId), so
    * the same product in two colours is two lines. Every per-line handler matches on this. */
   lineId: string;
@@ -1080,6 +1096,8 @@ export type ConvertToInvoiceRequest = {
  * with no productId/taxType/isLocallySourced). Returned by GET /mobile/invoices/:id/edit and
  * GET /mobile/quotations/:id/edit, same shape items[] already sends on create/update. */
 export type MobileEditableItem = {
+  /** The unit the line was sold in — see lib/product-units.ts. */
+  unitCode?: string | null;
   productId: string;
   variantKey?: string | null;
   variantLabel?: string | null;
@@ -1159,6 +1177,8 @@ export type PurchaseOrigin = {
 };
 
 export type PurchaseItemLine = {
+  unitOfMeasure?: string | null;
+  unitConfig?: ProductUnitConfig | null;
   /** purchase_items id — what Receive Goods sends back per line. */
   id: string;
   productId: string;
@@ -1296,6 +1316,9 @@ export type StockMovementRow = {
   locationName: string;
   movementType: StockMovementType;
   quantityChange: number;
+  /** quantityChange / balanceAfter in the units people think in ("-1.5 kg"). */
+  quantityLabel: string;
+  balanceLabel: string | null;
   /** That location's stock right after this movement — null on older rows. */
   balanceAfter: number | null;
   valueCents: number;

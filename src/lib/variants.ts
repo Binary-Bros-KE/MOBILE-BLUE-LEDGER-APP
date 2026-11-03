@@ -1,4 +1,5 @@
 import type { CheckoutCartLine, ProductListItem } from "./types";
+import { unitFactor } from "./product-units";
 
 // Product variants in the Owner App (SERVER lib/variants.ts, DESKTOP docs/VARIANTS.md).
 //  - shared stock: one product, one stock — a cart line carries the variant's key; SERVER prices it
@@ -55,7 +56,11 @@ export function newCartLine(pick: VariantPick): CheckoutCartLine {
     name: pick.label ? `${product.name} — ${pick.label}` : product.name,
     sku: product.sku,
     unitPriceCents: pick.priceCents,
-    quantity: 1,
+    // Starts at one of the product's usual selling unit: 1 kg is 1000 of a g-based product.
+    quantity: unitFactor(product.unitConfig, product.unitConfig?.defaultSaleUnit),
+    unitOfMeasure: product.unitOfMeasure,
+    unitConfig: product.unitConfig,
+    unitCode: product.unitConfig?.defaultSaleUnit ?? null,
     discountAmountCents: 0,
     taxType: product.taxType,
     pricesTaxInclusive: product.pricesTaxInclusive,
@@ -74,6 +79,6 @@ export function newCartLine(pick: VariantPick): CheckoutCartLine {
 export function addPickToCart(cart: CheckoutCartLine[], pick: VariantPick): CheckoutCartLine[] {
   const lineId = cartLineId(pick.product.id, pick.variantKey);
   return cart.some((line) => line.lineId === lineId)
-    ? cart.map((line) => (line.lineId === lineId ? { ...line, quantity: line.quantity + 1 } : line))
+    ? cart.map((line) => (line.lineId === lineId ? { ...line, quantity: line.quantity + unitFactor(line.unitConfig ?? null, line.unitCode) } : line))
     : [...cart, newCartLine(pick)];
 }

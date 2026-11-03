@@ -173,7 +173,7 @@ export function ReportsTab({ viewerIsSuperAdmin }: { viewerIsSuperAdmin: boolean
               {stock.topProducts.map((p) => (
                 <div key={p.productId} className="flex justify-between gap-2 text-sm">
                   <span className="min-w-0 truncate text-navy/70">
-                    {p.name} <span className="text-xs text-navy/40">×{p.units}</span>
+                    {p.name} <span className="text-xs text-navy/40">{p.unitsLabel}</span>
                   </span>
                   <span className="flex-none font-semibold text-navy">{formatCents(p.costValueCents, stock.currency)}</span>
                 </div>

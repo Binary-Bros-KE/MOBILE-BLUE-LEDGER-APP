@@ -1,15 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { displayPriceCents, formatQuantity, priceUnitSuffix } from "@/lib/product-units";
 import { Plus, Search, Store, Trash2 } from "lucide-react";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
-import { computeCartLineTaxResults, naturalUnitPriceCents } from "@/lib/cart-totals";
+import { computeCartLineTaxResults, effectiveUnitPriceCents, lineAmountInSaleUnit, linePriceInSaleUnitCents, naturalUnitPriceCents } from "@/lib/cart-totals";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileSupplier, ProductListItem } from "@/lib/types";
 import { addPickToCart, needsVariantPicker, plainPick, type VariantPick } from "@/lib/variants";
 import { VariantPickerSheet } from "../VariantPickerSheet";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
-import { QuantityInput } from "../QuantityInput";
+import { CartLineQuantity } from "../CartLineQuantity";
 
 /** The product-search-and-add + cart-line-list UI shared by the Invoice and Quotation create/edit
  * forms — price override (mark-up, floored at the product's own minimumPriceCents), discount, and
@@ -83,11 +84,6 @@ export function CartItemsEditor({
     onCartChange(cart.map((line) => (line.lineId === lineId ? { ...line, ...patch } : line)));
   }
 
-  function updateQuantity(lineId: string, quantity: number): void {
-    if (quantity < 1) return;
-    updateLine(lineId, { quantity });
-  }
-
   function toggleLocallySourced(line: CheckoutCartLine): void {
     updateLine(line.lineId, {
       isLocallySourced: !line.isLocallySourced,
@@ -123,10 +119,13 @@ export function CartItemsEditor({
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-navy">{product.name}</p>
                 <p className="text-[11px] text-navy/50">
-                  {product.sku} · {product.trackStock ? `${stockAtLocation(product)} in stock` : "No stock count"}
+                  {product.sku} · {product.trackStock ? `${formatQuantity(stockAtLocation(product), product.unitOfMeasure, product.unitConfig)} in stock` : "No stock count"}
                 </p>
               </div>
-              <p className="flex-none text-sm font-bold text-navy">{formatCents(product.sellingPriceCents, currency)}</p>
+              <p className="flex-none text-sm font-bold text-navy">
+                {formatCents(displayPriceCents(product.sellingPriceCents, product.unitConfig), currency)}
+                {priceUnitSuffix(product.unitConfig)}
+              </p>
             </button>
           ))}
         </div>
@@ -141,7 +140,7 @@ export function CartItemsEditor({
           <div className="space-y-2">
             {cart.map((line, index) => {
               const priceBelowMinimum =
-                line.priceOverride.trim() && line.minimumPriceCents !== null && Math.round(Number(line.priceOverride) * 100) < line.minimumPriceCents;
+                line.priceOverride.trim() && line.minimumPriceCents !== null && effectiveUnitPriceCents(line) < line.minimumPriceCents;
               const naturalPriceCents = naturalUnitPriceCents(line);
               const wholesaleActive = naturalPriceCents !== line.unitPriceCents;
               return (
@@ -150,7 +149,8 @@ export function CartItemsEditor({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-navy">{line.name}</p>
                       <p className="text-[11px] text-navy/50">
-                        @ {formatCents(naturalPriceCents, currency)}
+                        @ {formatCents(linePriceInSaleUnitCents(line, naturalPriceCents), currency)}
+                        {line.unitCode ? `/${line.unitCode}` : ""}
                         {wholesaleActive && <span className="ml-1 font-bold text-blue">Wholesale</span>}
                       </p>
                     </div>
@@ -160,7 +160,7 @@ export function CartItemsEditor({
                   </div>
 
                   <div className="mt-2 flex items-center gap-2">
-                    <QuantityInput value={line.quantity} onChange={(quantity) => updateQuantity(line.lineId, quantity)} />
+                    <CartLineQuantity line={line} onChange={(patch) => updateLine(line.lineId, patch)} />
                     <label className="flex flex-1 items-center gap-1.5 text-[11px] font-semibold text-navy/50">
                       Price
                       <input
@@ -169,7 +169,7 @@ export function CartItemsEditor({
                         step="0.01"
                         value={line.priceOverride}
                         onChange={(e) => updateLine(line.lineId, { priceOverride: e.target.value })}
-                        placeholder={(naturalPriceCents / 100).toFixed(2)}
+                        placeholder={(linePriceInSaleUnitCents(line, naturalPriceCents) / 100).toFixed(2)}
                         className={`w-full min-w-0 rounded-md border px-1.5 py-1 text-right text-xs font-semibold focus:outline-none ${
                           priceBelowMinimum ? "border-red text-red" : "border-navy/15 text-navy focus:border-blue"
                         }`}
@@ -236,7 +236,7 @@ export function CartItemsEditor({
                       </label>
                       {line.localCost.trim() && (
                         <p className="text-[10px] font-semibold text-navy/40">
-                          Total for {line.quantity}: {formatCents(unitCostToTotalCents(line.localCost, line.quantity), currency)}
+                          Total for {lineAmountInSaleUnit(line)}: {formatCents(unitCostToTotalCents(line.localCost, lineAmountInSaleUnit(line)), currency)}
                         </p>
                       )}
                       <div>

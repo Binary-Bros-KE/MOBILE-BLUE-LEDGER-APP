@@ -38,8 +38,7 @@ export function StockMovementRow({ movement }: { movement: StockMovementRowType 
         <div className="flex items-start justify-between gap-2">
           <p className="truncate font-bold text-navy">{movement.productName}</p>
           <p className={`flex-none font-display text-sm ${changeTone}`}>
-            {movement.quantityChange > 0 ? "+" : ""}
-            {movement.quantityChange}
+            {movement.quantityLabel}
           </p>
         </div>
         <p className="truncate text-xs text-navy/50">
@@ -52,7 +51,7 @@ export function StockMovementRow({ movement }: { movement: StockMovementRowType 
         </p>
         {movement.balanceAfter !== null && (
           <p className="mt-0.5 truncate text-xs text-navy/60">
-            Balance after: <span className="font-bold text-navy">{movement.balanceAfter}</span>
+            Balance after: <span className="font-bold text-navy">{movement.balanceLabel}</span>
           </p>
         )}
         <p className="mt-0.5 truncate text-xs text-navy/50">
