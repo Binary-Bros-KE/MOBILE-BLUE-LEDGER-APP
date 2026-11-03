@@ -211,7 +211,7 @@ export function AppShell() {
             />
           )}
           {activeTab === "suppliers" && (
-            <SuppliersTab currency={session?.currency ?? "KES"} canCreate={can("suppliers", "create")} canAdjust={can("suppliers", "edit")} />
+            <SuppliersTab currency={session?.currency ?? "KES"} canCreate={can("suppliers", "create")} canAdjust={can("suppliers", "edit")} seesInternational={can("international_suppliers", "view")} />
           )}
           {activeTab === "purchases" && (
             <PurchasesTab
@@ -221,6 +221,7 @@ export function AppShell() {
               canReceive={can("purchases", "edit") || can("local_credit_purchases", "edit")}
               canViewPurchases={can("purchases", "view") || can("local_credit_purchases", "view")}
               localOnly={!can("purchases", "view") && can("local_credit_purchases", "view")}
+              seesInternational={can("international_suppliers", "view")}
               canViewRequisitions={can("purchase_requisitions", "view")}
               canCreateRequisition={can("purchase_requisitions", "create")}
               canApproveRequisitions={can("purchase_requisitions", "approve")}

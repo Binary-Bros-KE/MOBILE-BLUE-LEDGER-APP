@@ -22,7 +22,17 @@ function formatStatus(status: string): string {
   return status.replace(/_/g, " ");
 }
 
-export function PurchaseCard({ purchase, hideMoney = false, onSelect }: { purchase: PurchaseListItem; hideMoney?: boolean; onSelect: () => void }) {
+export function PurchaseCard({
+  purchase,
+  hideMoney = false,
+  hideSupplierType = false,
+  onSelect,
+}: {
+  purchase: PurchaseListItem;
+  hideMoney?: boolean;
+  hideSupplierType?: boolean;
+  onSelect: () => void;
+}) {
   const statusTone = STATUS_TONE[purchase.status] ?? "border-navy/30 text-navy/50";
   const paymentTone = PAYMENT_TONE[purchase.paymentStatus] ?? "text-navy/50";
 
@@ -41,7 +51,7 @@ export function PurchaseCard({ purchase, hideMoney = false, onSelect }: { purcha
         </div>
         <p className="truncate text-xs text-navy/50">
           {purchase.supplierName}
-          {!hideMoney && purchase.supplierType ? ` · ${SUPPLIER_TYPE_LABEL[purchase.supplierType]}` : ""}
+          {!hideSupplierType && purchase.supplierType ? ` · ${SUPPLIER_TYPE_LABEL[purchase.supplierType]}` : ""}
         </p>
         <p className="mt-0.5 flex items-center gap-1 truncate text-xs font-bold text-blue">
           <Store className="size-3.5 flex-none" aria-hidden="true" />

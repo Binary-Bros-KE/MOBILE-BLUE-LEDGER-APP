@@ -46,6 +46,7 @@ export function NewPurchaseModal({
   editing = null,
   fromRequisition = null,
   localOnly = false,
+  canChooseSupplierType = true,
   onClose,
   onCreated,
 }: {
@@ -57,6 +58,7 @@ export function NewPurchaseModal({
   fromRequisition?: PurchaseFromRequisition | null;
   /** Goods on credit from a local supplier: buying price only, no drafts or shipping expense (SERVER enforces). */
   localOnly?: boolean;
+  canChooseSupplierType?: boolean;
   onClose: () => void;
   onCreated: (purchaseId: string) => void;
 }) {
@@ -411,7 +413,7 @@ export function NewPurchaseModal({
 
       {creatingSupplier && (
         <QuickCreateSupplierModal
-          canChooseType={!localOnly}
+          canChooseType={canChooseSupplierType}
           onClose={() => setCreatingSupplier(false)}
           onCreated={(supplier) => {
             setSuppliers((prev) => [...(prev ?? []), supplier]);

@@ -12,7 +12,18 @@ import { SupplierEditModal } from "../suppliers/SupplierEditModal";
 
 /** Supplier directory with what's owed to each — biggest balance first. Tap a supplier for its
  * balance history and (suppliers.edit) Adjust Balance. Same grants as DESKTOP's Suppliers screen. */
-export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: string; canCreate: boolean; canAdjust: boolean }) {
+export function SuppliersTab({
+  currency,
+  canCreate,
+  canAdjust,
+  seesInternational,
+}: {
+  currency: string;
+  canCreate: boolean;
+  canAdjust: boolean;
+  /** Without it SERVER only sends local suppliers, so there's nothing to tell apart. */
+  seesInternational: boolean;
+}) {
   const [suppliers, setSuppliers] = useState<MobileSupplierWithBalance[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -65,22 +76,26 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
 
       <div className="px-4 py-4">
         {owedLocalCents + owedInternationalCents > 0 && (
-          <div className="mb-3 grid grid-cols-2 gap-2">
+          <div className={`mb-3 grid gap-2 ${seesInternational ? "grid-cols-2" : "grid-cols-1"}`}>
             <div className="rounded-lg bg-white p-3 shadow-sm">
               <p className="text-[10px] font-extrabold tracking-wide text-navy/50 uppercase">We owe locally</p>
               <p className="mt-0.5 font-display text-sm text-red">{formatCents(owedLocalCents, currency)}</p>
             </div>
-            <div className="rounded-lg bg-white p-3 shadow-sm">
-              <p className="text-[10px] font-extrabold tracking-wide text-navy/50 uppercase">We owe internationally</p>
-              <p className="mt-0.5 font-display text-sm text-red">{formatCents(owedInternationalCents, currency)}</p>
-            </div>
+            {seesInternational && (
+              <div className="rounded-lg bg-white p-3 shadow-sm">
+                <p className="text-[10px] font-extrabold tracking-wide text-navy/50 uppercase">We owe internationally</p>
+                <p className="mt-0.5 font-display text-sm text-red">{formatCents(owedInternationalCents, currency)}</p>
+              </div>
+            )}
           </div>
         )}
-        <div className="mb-3 flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <FilterChip label="All" active={typeFilter === "all"} onClick={() => setTypeFilter("all")} />
-          <FilterChip label="Local" active={typeFilter === "local"} onClick={() => setTypeFilter("local")} />
-          <FilterChip label="International" active={typeFilter === "international"} onClick={() => setTypeFilter("international")} />
-        </div>
+        {seesInternational && (
+          <div className="mb-3 flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <FilterChip label="All" active={typeFilter === "all"} onClick={() => setTypeFilter("all")} />
+            <FilterChip label="Local" active={typeFilter === "local"} onClick={() => setTypeFilter("local")} />
+            <FilterChip label="International" active={typeFilter === "international"} onClick={() => setTypeFilter("international")} />
+          </div>
+        )}
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
         {!suppliers && !error && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
         {filtered && filtered.length === 0 && <p className="py-10 text-center text-sm text-navy/50">No suppliers match.</p>}
@@ -103,7 +118,7 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
                     <Phone className="size-3 flex-none" aria-hidden="true" />
                     {supplier.phone1}
                   </p>
-                  <p className="text-[10px] font-bold tracking-wide text-navy/40 uppercase">{SUPPLIER_TYPE_LABEL[supplier.supplierType]}</p>
+                  {seesInternational && <p className="text-[10px] font-bold tracking-wide text-navy/40 uppercase">{SUPPLIER_TYPE_LABEL[supplier.supplierType]}</p>}
                 </div>
                 {supplier.balanceCents !== 0 ? (
                   <span className={`flex-none font-display text-sm ${supplier.balanceCents > 0 ? "text-red" : "text-green"}`}>
@@ -122,7 +137,7 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
 
       {createOpen && (
         <QuickCreateSupplierModal
-          canChooseType
+          canChooseType={seesInternational}
           onClose={() => setCreateOpen(false)}
           onCreated={() => {
             setCreateOpen(false);
@@ -150,6 +165,7 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
       {editId && (
         <SupplierEditModal
           supplierId={editId}
+          canChooseType={seesInternational}
           onClose={() => setEditId(null)}
           onSaved={() => {
             setEditId(null);
