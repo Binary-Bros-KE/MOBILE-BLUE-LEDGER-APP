@@ -4,12 +4,22 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Loader2, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { MobileSupplier } from "@/lib/types";
+import type { MobileSupplier, SupplierType } from "@/lib/types";
 
 /** The fast path for adding a supplier mid-checkout — mirrors DESKTOP's own
  * QuickCreateSupplierModal: business name + phone required, contact person optional (everything
  * else is editable later from DESKTOP's Suppliers screen). */
-export function QuickCreateSupplierModal({ onClose, onCreated }: { onClose: () => void; onCreated: (supplier: MobileSupplier) => void }) {
+export function QuickCreateSupplierModal({
+  canChooseType = false,
+  onClose,
+  onCreated,
+}: {
+  /** Without it the supplier is simply Local (SERVER forces that for a role without suppliers.create). */
+  canChooseType?: boolean;
+  onClose: () => void;
+  onCreated: (supplier: MobileSupplier) => void;
+}) {
+  const [supplierType, setSupplierType] = useState<SupplierType>("local");
   const [businessName, setBusinessName] = useState("");
   const [contactPerson, setContactPerson] = useState("");
   const [phone1, setPhone1] = useState("");
@@ -25,6 +35,7 @@ export function QuickCreateSupplierModal({ onClose, onCreated }: { onClose: () =
         businessName: businessName.trim(),
         contactPerson: contactPerson.trim() || undefined,
         phone1: phone1.trim(),
+        supplierType,
       });
       onCreated(supplier);
     } catch (err) {
@@ -56,6 +67,19 @@ export function QuickCreateSupplierModal({ onClose, onCreated }: { onClose: () =
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {error && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{error}</p>}
+          {canChooseType && (
+            <label className="block">
+              <span className="text-[11px] font-semibold text-navy/50">Type</span>
+              <select
+                value={supplierType}
+                onChange={(e) => setSupplierType(e.target.value as SupplierType)}
+                className="mt-1 w-full rounded-lg border border-navy/15 bg-white px-3 py-2 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
+              >
+                <option value="local">Local</option>
+                <option value="international">International</option>
+              </select>
+            </label>
+          )}
           <label className="block">
             <span className="text-[11px] font-semibold text-navy/50">Business Name</span>
             <input

@@ -98,7 +98,19 @@ export const navGroups: NavGroup[] = [
     title: "Inventory & Costs",
     items: [
       { key: "products", label: "Products", icon: Package, ready: true, permission: { module: "products", action: "view" } },
-      { key: "purchases", label: "Purchases", icon: Truck, ready: true, permission: { module: "purchases", action: "view" } },
+      // One tab for the whole Requisition → Received document (client request): a requisition-only
+      // role (e.g. Cashier) gets it too, with everything purchase-side hidden — see PurchasesTab.
+      {
+        key: "purchases",
+        label: "Purchases",
+        icon: Truck,
+        ready: true,
+        permissionAnyOf: [
+          { module: "purchases", action: "view" },
+          { module: "local_credit_purchases", action: "view" },
+          { module: "purchase_requisitions", action: "view" },
+        ],
+      },
       // Same module DESKTOP's own Suppliers screen requires — a Cashier deliberately doesn't have it
       // (see DESKTOP's role-service.ts), so they never see supplier balances here either.
       { key: "suppliers", label: "Suppliers", icon: Store, ready: true, permission: { module: "suppliers", action: "view" } },

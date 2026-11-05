@@ -9,6 +9,10 @@ import type {
   CreateEmployeeInput,
   CreateProductInput,
   CreatePurchaseInput,
+  CreateRequisitionInput,
+  UpdateRequisitionInput,
+  RequisitionDetail,
+  RequisitionListItem,
   CreateInvoiceRequest,
   CreateQuotationRequest,
   CreateRiderInput,
@@ -21,6 +25,10 @@ import type {
   RecentApprovalDecision,
   InvoiceListItem,
   MarkPaidRequest,
+  MpesaPaymentMatch,
+  MpesaVerificationMode,
+  MpesaVerificationState,
+  MpesaVerifyResult,
   MobileBusinessProfile,
   MobileCashUp,
   MobileCategory,
@@ -345,6 +353,17 @@ export const api = {
     request<MobileCashUp>(
       `/mobile/cash-up?date=${q.date}&timezoneOffsetMinutes=${q.timezoneOffsetMinutes}${q.locationId ? `&locationId=${encodeURIComponent(q.locationId)}` : ""}${q.employeeId ? `&employeeId=${encodeURIComponent(q.employeeId)}` : ""}`,
     ),
+  getMpesaVerification: (locationId: string) => request<MpesaVerificationState>(`/mobile/mpesa/verification/${encodeURIComponent(locationId)}`),
+  saveMpesaVerificationMode: (locationId: string, mode: MpesaVerificationMode) =>
+    request<MpesaVerificationState>(`/mobile/mpesa/verification/${encodeURIComponent(locationId)}`, { method: "PUT", body: JSON.stringify({ mode }) }),
+  connectMpesaVerification: (locationId: string) =>
+    request<MpesaVerificationState>(`/mobile/mpesa/verification/${encodeURIComponent(locationId)}/connect`, { method: "POST" }),
+  checkMpesaPayment: (body: { locationId: string; amountCents: number; claimKey: string }) =>
+    request<MpesaPaymentMatch[]>("/mobile/mpesa/check-payment", { method: "POST", body: JSON.stringify(body) }),
+  verifyMpesaCode: (body: { locationId: string; code: string; amountCents: number | null; claimKey: string }) =>
+    request<MpesaVerifyResult>("/mobile/mpesa/verify", { method: "POST", body: JSON.stringify(body) }),
+  verifyMpesaSaleCode: (body: { saleId: string; code: string; replacesCode: string | null }) =>
+    request<MpesaVerifyResult>("/mobile/mpesa/verify-sale", { method: "POST", body: JSON.stringify(body) }),
   isMpesaConfigured: (locationId: string) =>
     request<{ configured: boolean }>(`/mobile/mpesa/configured?locationId=${encodeURIComponent(locationId)}`),
   sendMpesaPrompt: (body: { locationId: string; phone: string; amountCents: number }) =>
@@ -381,6 +400,22 @@ export const api = {
   cancelPurchase: (id: string) => request<DocumentIdResult>(`/mobile/purchases/${id}/cancel`, { method: "POST" }),
   receivePurchaseGoods: (id: string, items: Array<{ purchaseItemId: string; receivingQuantity: number }>) =>
     request<DocumentIdResult>(`/mobile/purchases/${id}/receive`, { method: "POST", body: JSON.stringify({ items }) }),
+  listRequisitions: () => request<RequisitionListItem[]>("/mobile/requisitions"),
+  getRequisition: (id: string) => request<RequisitionDetail>(`/mobile/requisitions/${id}`),
+  /** purchase_requisitions.approve only — the badge on the Requisitions tab. */
+  countPendingRequisitions: () => request<{ pending: number }>("/mobile/requisitions/pending-count"),
+  createRequisition: (body: CreateRequisitionInput) =>
+    request<{ id: string; requisitionNumber: string }>("/mobile/requisitions", { method: "POST", body: JSON.stringify(body) }),
+  updateRequisition: (id: string, body: UpdateRequisitionInput) =>
+    request<RequisitionDetail>(`/mobile/requisitions/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  cancelRequisition: (id: string) => request<DocumentIdResult>(`/mobile/requisitions/${id}/cancel`, { method: "POST" }),
+  rejectRequisition: (id: string, reason: string) =>
+    request<DocumentIdResult>(`/mobile/requisitions/${id}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
+  linkRequisitionItem: (id: string, itemId: string, productId: string) =>
+    request<RequisitionDetail>(`/mobile/requisitions/${id}/link-item`, { method: "POST", body: JSON.stringify({ itemId, productId }) }),
+  /** Same body as createPurchase — SERVER creates the purchase and approves the requisition together. */
+  approveRequisition: (id: string, body: CreatePurchaseInput) =>
+    request<{ id: string; purchaseId: string }>(`/mobile/requisitions/${id}/approve`, { method: "POST", body: JSON.stringify(body) }),
   recordPurchasePayment: (id: string, body: PurchasePaymentInput) =>
     request<DocumentIdResult>(`/mobile/purchases/${id}/payments`, { method: "POST", body: JSON.stringify(body) }),
   listExpenseCategories: () => request<MobileExpenseCategory[]>("/mobile/expense-categories"),

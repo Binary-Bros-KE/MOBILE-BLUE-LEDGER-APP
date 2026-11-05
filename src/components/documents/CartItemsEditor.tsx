@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Minus, Plus, Search, Store, Trash2 } from "lucide-react";
+import { Plus, Search, Store, Trash2 } from "lucide-react";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeCartLineTaxResults, naturalUnitPriceCents } from "@/lib/cart-totals";
 import type { TenantTaxConfig } from "@/lib/tax";
@@ -9,6 +9,7 @@ import type { CheckoutCartLine, MobileSupplier, ProductListItem } from "@/lib/ty
 import { addPickToCart, needsVariantPicker, plainPick, type VariantPick } from "@/lib/variants";
 import { VariantPickerSheet } from "../VariantPickerSheet";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
+import { QuantityInput } from "../QuantityInput";
 
 /** The product-search-and-add + cart-line-list UI shared by the Invoice and Quotation create/edit
  * forms — price override (mark-up, floored at the product's own minimumPriceCents), discount, and
@@ -159,24 +160,7 @@ export function CartItemsEditor({
                   </div>
 
                   <div className="mt-2 flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(line.lineId, line.quantity - 1)}
-                        disabled={line.quantity <= 1}
-                        className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60 disabled:opacity-30"
-                      >
-                        <Minus className="size-3" aria-hidden="true" />
-                      </button>
-                      <span className="w-8 text-center text-sm font-bold text-navy">{line.quantity}</span>
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(line.lineId, line.quantity + 1)}
-                        className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60"
-                      >
-                        <Plus className="size-3" aria-hidden="true" />
-                      </button>
-                    </div>
+                    <QuantityInput value={line.quantity} onChange={(quantity) => updateQuantity(line.lineId, quantity)} />
                     <label className="flex flex-1 items-center gap-1.5 text-[11px] font-semibold text-navy/50">
                       Price
                       <input

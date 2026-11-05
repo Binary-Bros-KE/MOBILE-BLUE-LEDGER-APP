@@ -3,6 +3,7 @@
 import { Receipt, Store, User } from "lucide-react";
 import { formatCents } from "@/lib/money";
 import type { SaleListItem } from "@/lib/types";
+import { MpesaStatusPill } from "./mpesa/MpesaVerification";
 
 /** The list card's whole job is "good info at a glance" — date/time, who recorded it, which
  * storefront, the amount — tapping it opens the full document in SaleDetailModal for view/download/
@@ -17,7 +18,7 @@ export function SaleCard({ sale, onSelect }: { sale: SaleListItem; onSelect: () 
   });
 
   const hasAnyStatus =
-    sale.hasDeliveryNote || sale.approvedVoid || sale.approvedReturn || sale.pendingVoid || sale.pendingReturn || sale.rejectedVoid || sale.rejectedReturn;
+    Boolean(sale.mpesaVerification) || sale.hasDeliveryNote || sale.approvedVoid || sale.approvedReturn || sale.pendingVoid || sale.pendingReturn || sale.rejectedVoid || sale.rejectedReturn;
 
   return (
     <button type="button" onClick={onSelect} className="flex w-full flex-col gap-2 rounded-lg bg-white p-4 text-left shadow-sm">
@@ -46,6 +47,7 @@ export function SaleCard({ sale, onSelect }: { sale: SaleListItem; onSelect: () 
       </div>
       {hasAnyStatus && (
         <div className="flex flex-wrap gap-1.5 pl-14">
+          <MpesaStatusPill status={sale.mpesaVerification} />
           {sale.hasDeliveryNote && (
             <span
               className={`rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${

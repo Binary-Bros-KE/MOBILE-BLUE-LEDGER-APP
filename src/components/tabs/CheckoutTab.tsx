@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Minus, PauseCircle, Plus, Receipt, ScanLine, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
+import { ChevronRight, PauseCircle, Plus, Receipt, ScanLine, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError, isOfflineError } from "@/lib/api";
 import { effectiveUnitPriceCents, naturalUnitPriceCents, serviceChargeDraftsToInputs, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
@@ -19,6 +19,7 @@ import { DocumentDetailModal } from "../DocumentDetailModal";
 import { VariantPickerSheet } from "../VariantPickerSheet";
 import { ServiceChargesModal } from "../ServiceChargesModal";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
+import { QuantityInput } from "../QuantityInput";
 import { CheckoutCustomerPickerModal } from "./CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "./CheckoutDeliveryModal";
 
@@ -120,6 +121,9 @@ export function CheckoutTab({
   // mechanism (see mobile-checkout-service.ts). Only regenerated after a sale actually completes or
   // the cart is cleared, never on every render.
   const checkoutIdRef = useRef(crypto.randomUUID());
+  /** checkoutIdRef's value as of opening the payment sheet: closing and reopening keeps the same
+   * reservation for any M-Pesa code already verified. */
+  const [paymentClaimKey, setPaymentClaimKey] = useState("");
 
   useEffect(() => {
     if (branchId) return;
@@ -384,6 +388,7 @@ export function CheckoutTab({
       return;
     }
     setSubmitError(null);
+    setPaymentClaimKey(checkoutIdRef.current);
     setPaymentSheetOpen(true);
   }
 
@@ -393,6 +398,7 @@ export function CheckoutTab({
     const primary = payments[0]!;
     const request: CheckoutRequest = {
       id: checkoutIdRef.current,
+      mpesaClaimKey: checkoutIdRef.current,
       locationId: effectiveLocationId,
       items: cartItemsPayload(),
       paymentMethodId: primary.paymentMethodId,
@@ -712,24 +718,7 @@ export function CheckoutTab({
                   </div>
 
                   <div className="mt-2 flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(line.lineId, line.quantity - 1)}
-                        disabled={line.quantity <= 1}
-                        className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60 disabled:opacity-30"
-                      >
-                        <Minus className="size-3" aria-hidden="true" />
-                      </button>
-                      <span className="w-8 text-center text-sm font-bold text-navy">{line.quantity}</span>
-                      <button
-                        type="button"
-                        onClick={() => updateQuantity(line.lineId, line.quantity + 1)}
-                        className="grid size-7 place-items-center rounded-md border border-navy/15 text-navy/60"
-                      >
-                        <Plus className="size-3" aria-hidden="true" />
-                      </button>
-                    </div>
+                    <QuantityInput value={line.quantity} onChange={(quantity) => updateQuantity(line.lineId, quantity)} />
                     <label className="flex flex-1 items-center gap-1.5 text-[11px] font-semibold text-navy/50">
                       Price
                       <input
@@ -997,6 +986,7 @@ export function CheckoutTab({
           customerName={customerId ? customerLabel : null}
           customerPhone={customerId ? (customers.find((c) => c.id === customerId)?.phone ?? null) : null}
           locationId={effectiveLocationId ?? ""}
+          claimKey={paymentClaimKey}
           canPutOnAccount
           submitting={submitting}
           error={submitError}

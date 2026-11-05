@@ -32,12 +32,18 @@ function formatStatus(status: string): string {
 export function PurchaseDetailModal({
   purchaseId,
   canEdit = false,
+  canReceiveGoods = canEdit,
+  localOnly = false,
   onClose,
   onChanged,
   onEditDraft,
 }: {
   purchaseId: string;
   canEdit?: boolean;
+  /** A local-credit role can receive goods without the rest of purchases.edit. */
+  canReceiveGoods?: boolean;
+  /** That same role sees no payment figures (SERVER doesn't send them either). */
+  localOnly?: boolean;
   onClose: () => void;
   onChanged?: () => void;
   /** Re-open this draft in the purchase form (the tab closes this modal first). */
@@ -87,7 +93,7 @@ export function PurchaseDetailModal({
 
   const canOrder = canEdit && doc?.status === "draft";
   const canCancel = canEdit && (doc?.status === "draft" || doc?.status === "ordered");
-  const canReceive = canEdit && (doc?.status === "ordered" || doc?.status === "partially_received");
+  const canReceive = canReceiveGoods && (doc?.status === "ordered" || doc?.status === "partially_received");
   const canPay = canEdit && doc !== null && doc.status !== "cancelled" && doc.balanceDueCents > 0;
 
   const money = (cents: number) => (doc ? formatCents(cents, doc.currency) : "-");
@@ -155,6 +161,20 @@ export function PurchaseDetailModal({
         {doc && (
           <div className="rounded-lg border border-dashed border-navy/15 bg-cream-dark/40 p-4 text-sm">
             <div className="space-y-0.5 text-xs text-navy/70">
+              {doc.origin && (
+                <>
+                  <Row
+                    label="Requested"
+                    value={`${doc.origin.requisitionNumber} · ${doc.origin.requestedByName} · ${new Date(doc.origin.requestedAt).toLocaleDateString()}`}
+                  />
+                  {doc.origin.approvedByName && (
+                    <Row
+                      label="Approved"
+                      value={`${doc.origin.approvedByName}${doc.origin.approvedAt ? ` · ${new Date(doc.origin.approvedAt).toLocaleDateString()}` : ""}`}
+                    />
+                  )}
+                </>
+              )}
               <Row label="Storefront" value={doc.locationName} />
               {doc.supplierPhone && <Row label="Supplier Phone" value={doc.supplierPhone} />}
               {doc.supplierInvoiceNumber && <Row label="Supplier Invoice #" value={doc.supplierInvoiceNumber} />}
@@ -191,8 +211,8 @@ export function PurchaseDetailModal({
               {doc.shippingCostCents > 0 && <Row label="Shipping Fee" value={money(doc.shippingCostCents)} />}
               <Row label="Total" value={money(doc.grandTotalCents)} strong />
               {doc.receivedValueCents > 0 && doc.status !== "received" && <Row label="Received so far" value={money(doc.receivedValueCents)} />}
-              <Row label="Paid" value={money(doc.amountPaidCents)} />
-              {doc.balanceDueCents > 0 && <Row label="Due now" value={money(doc.balanceDueCents)} strong />}
+              {!localOnly && <Row label="Paid" value={money(doc.amountPaidCents)} />}
+              {!localOnly && doc.balanceDueCents > 0 && <Row label="Due now" value={money(doc.balanceDueCents)} strong />}
             </div>
 
             {doc.taxBreakdown.length > 0 && (

@@ -225,6 +225,8 @@ export type SaleStatusFlags = {
 
 export type SaleListItem = SaleStatusFlags & {
   id: string;
+  /** Null (verification wasn't in play) shows nothing. */
+  mpesaVerification?: "verified" | "unverified" | null;
   receiptNumber: string | null;
   customerName: string | null;
   employeeName: string;
@@ -290,6 +292,9 @@ export type TaxBreakdownEntry = {
 };
 
 export type SharedDocument = Partial<SaleStatusFlags> & {
+  /** Only from /mobile/sales/:id and /mobile/quotations/:id, not the shared view-model itself. */
+  mpesaVerifications?: MpesaVerifications | null;
+  locationId?: string | null;
   documentKind: PricedDocumentKind;
   businessName: string;
   physicalAddress: string | null;
@@ -446,6 +451,7 @@ export type MobileCustomerDetail = {
 };
 
 export type MobileSupplierDetail = {
+  supplierType: SupplierType;
   id: string;
   supplierCode: string;
   businessName: string;
@@ -542,6 +548,8 @@ export type TransactionPartyLabel = "Customer" | "Supplier" | "Employee" | "For"
 export type TransactionRow = {
   id: string;
   transactionCode: string;
+  /** Only on an M-Pesa money-in row with verification in play; absent/null shows nothing. */
+  mpesaVerification?: "verified" | "unverified" | null;
   occurredAt: string;
   locationName: string;
   paymentMethodName: string | null;
@@ -905,7 +913,48 @@ export type ServiceChargeInput = { name: string; feeCents: number; costCents: nu
  * convention as CheckoutDeliveryModal's fee/cost fields. */
 export type ServiceChargeDraft = { name: string; fee: string; cost: string };
 
+/** Per storefront, only once till credentials are saved. off = nothing shown or recorded; loose (the
+ * default) = verification offered, a sale can complete without it; strict = must verify to complete. */
+export type MpesaVerificationMode = "off" | "loose" | "strict";
+
+export type MpesaVerificationState = {
+  /** The first check: false until this storefront has saved till credentials. */
+  available: boolean;
+  mode: MpesaVerificationMode;
+  /** Safaricom has accepted our payment-notification URLs for this till. */
+  connected: boolean;
+  connectError: string | null;
+};
+
+/** A real payment on the till that hasn't been claimed by any sale. */
+export type MpesaPaymentMatch = {
+  code: string;
+  amountCents: number;
+  payerName: string | null;
+  maskedPhone: string | null;
+  receivedAt: string;
+};
+
+export type MpesaVerificationRecord = {
+  status: "verified" | "unverified";
+  verifiedAt: string | null;
+  payerName: string | null;
+  amountCents: number | null;
+};
+
+/** Per code, on the sale. A sale with none shows no indicator (verification wasn't in play). */
+export type MpesaVerifications = Record<string, MpesaVerificationRecord>;
+
+export type MpesaVerifyResult = {
+  outcome: "verified" | "not_found" | "already_used" | "amount_mismatch" | "wrong_storefront";
+  code: string;
+  message: string;
+  record: MpesaVerificationRecord | null;
+};
+
 export type CheckoutRequest = {
+  /** Reserved through /mobile/mpesa/verify, so SERVER can confirm the code was really verified. */
+  mpesaClaimKey?: string;
   id: string;
   locationId: string;
   items: CheckoutItemInput[];
@@ -926,7 +975,12 @@ export type CheckoutRequest = {
   offlineCompletedAt?: string;
 };
 
-export type MobileSupplier = { id: string; businessName: string; phone1: string };
+/** What a local-credit-purchases role may see, and the split in what we owe. */
+export type SupplierType = "local" | "international";
+
+export const SUPPLIER_TYPE_LABEL: Record<SupplierType, string> = { local: "Local", international: "International" };
+
+export type MobileSupplier = { id: string; businessName: string; phone1: string; supplierType: SupplierType };
 
 /** Suppliers tab list item. balanceCents is signed: positive = we owe them. */
 export type MobileSupplierWithBalance = MobileSupplier & { supplierCode: string; balanceCents: number };
@@ -943,7 +997,7 @@ export type MobileSupplierBalanceEntry = {
   createdAt: string;
 };
 
-export type CreateSupplierInput = { businessName: string; contactPerson?: string; phone1: string };
+export type CreateSupplierInput = { businessName: string; contactPerson?: string; phone1: string; supplierType?: SupplierType };
 
 /** stockShortfalls: products a sale queued offline took below zero (SERVER accepts it anyway — the
  * goods already left); always empty for a normal online sale. */
@@ -957,6 +1011,8 @@ export type DocumentIdResult = { id: string };
 export type InvoiceStockSource = "storefront" | "main_store";
 
 export type CreateInvoiceRequest = {
+  /** Reserved through /mobile/mpesa/verify, so SERVER can confirm the code was really verified. */
+  mpesaClaimKey?: string;
   /** Optional client-minted id, resent unchanged on retry so the same invoice can't be created twice. */
   id?: string;
   customerId: string;
@@ -973,7 +1029,7 @@ export type CreateInvoiceRequest = {
   locationId: string;
 };
 
-export type RecordPaymentRequest = { paymentMethodId: string; amountCents: number; reference?: string; notes?: string };
+export type RecordPaymentRequest = { paymentMethodId: string; amountCents: number; reference?: string; notes?: string; mpesaClaimKey?: string };
 
 export type MarkPaidRequest = { paymentMethodId: string; reference?: string; notes?: string };
 
@@ -1006,6 +1062,8 @@ export type QuotationStockCheckItem = {
 export type QuantityOverride = { productId: string; quantity: number };
 
 export type ConvertToSaleRequest = {
+  /** Reserved through /mobile/mpesa/verify, so SERVER can confirm the code was really verified. */
+  mpesaClaimKey?: string;
   paymentMethodId: string;
   paymentReference?: string;
   amountReceivedCents?: number | null;
@@ -1076,6 +1134,7 @@ export type MobileQuotationEditData = {
 
 export type PurchaseListItem = {
   id: string;
+  supplierType: SupplierType;
   purchaseNumber: string;
   supplierName: string;
   locationName: string;
@@ -1088,6 +1147,18 @@ export type PurchaseListItem = {
   receivedAt: string | null;
   createdAt: string;
   currency: string;
+  /** The requisition this purchase was approved from ("from REQ-…"), null for a direct purchase. */
+  requisitionNumber: string | null;
+};
+
+/** Where a purchase came from — shown as the Requested → Approved part of its history. */
+export type PurchaseOrigin = {
+  requisitionId: string;
+  requisitionNumber: string;
+  requestedByName: string;
+  requestedAt: string;
+  approvedByName: string | null;
+  approvedAt: string | null;
 };
 
 export type PurchaseItemLine = {
@@ -1117,6 +1188,8 @@ export type PurchasePaymentLine = {
 };
 
 export type PurchaseDetail = {
+  supplierType: SupplierType;
+  origin: PurchaseOrigin | null;
   id: string;
   purchaseNumber: string;
   supplierId: string;
@@ -1309,4 +1382,59 @@ export type WorkingHoursUpsertInput = {
   manuallyLocked: boolean;
   timezoneOffsetMinutes: number;
   schedule: WorkingHoursSchedule;
+};
+
+/** Purchase requisitions — SERVER's mobile-requisitions-service.ts. pending → approved (became
+ * purchaseId) | rejected | cancelled. A line is a catalog product or a free-text item (productId null)
+ * an approver links before converting. */
+export type RequisitionStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+export type RequisitionListItem = {
+  id: string;
+  requisitionNumber: string;
+  storefrontId: string;
+  storefrontName: string;
+  status: RequisitionStatus;
+  itemCount: number;
+  totalQuantityRequested: number;
+  unlinkedItemCount: number;
+  notes: string | null;
+  rejectionReason: string | null;
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: string;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  purchaseId: string | null;
+  purchaseNumber: string | null;
+  purchaseStatus: string | null;
+};
+
+export type RequisitionItem = {
+  id: string;
+  productId: string | null;
+  itemName: string;
+  productName: string | null;
+  sku: string | null;
+  taxType: string | null;
+  sellingPriceCents: number | null;
+  trackStock: boolean | null;
+  quantityRequested: number;
+  notes: string | null;
+};
+
+export type RequisitionDetail = RequisitionListItem & { items: RequisitionItem[] };
+
+/** Editing a pending requisition (requester or Super Admin): the full line list; `id` keeps a line. */
+export type UpdateRequisitionInput = {
+  notes: string | null;
+  items: Array<{ id: string | null; productId: string | null; itemName: string; quantity: number; notes: string | null }>;
+};
+
+export type CreateRequisitionInput = {
+  /** Minted client-side once per form, resent unchanged on retry. */
+  id: string;
+  storefrontId: string | null;
+  notes: string | null;
+  items: Array<{ productId: string | null; itemName: string; quantity: number; notes: string | null }>;
 };

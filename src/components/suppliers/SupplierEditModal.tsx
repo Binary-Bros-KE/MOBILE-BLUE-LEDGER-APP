@@ -39,6 +39,7 @@ export function SupplierEditModal({ supplierId, onClose, onSaved }: { supplierId
           kraPin: d.kraPin ?? "",
           town: d.town ?? "",
           physicalAddress: d.physicalAddress ?? "",
+          supplierType: d.supplierType,
           paymentOption: d.paymentOption,
           mpesaName: d.mpesaName ?? "",
           mpesaNumber: d.mpesaNumber ?? "",
@@ -69,6 +70,7 @@ export function SupplierEditModal({ supplierId, onClose, onSaved }: { supplierId
         kraPin: text("kraPin"),
         town: text("town"),
         physicalAddress: text("physicalAddress"),
+        supplierType: form.supplierType as MobileSupplierDetail["supplierType"],
         paymentOption: form.paymentOption as MobileSupplierDetail["paymentOption"],
         mpesaName: text("mpesaName"),
         mpesaNumber: text("mpesaNumber"),
@@ -96,6 +98,12 @@ export function SupplierEditModal({ supplierId, onClose, onSaved }: { supplierId
           <SheetError message={error} />
           <SheetField label="Business name">
             <input value={form.businessName} onChange={(e) => set("businessName", e.target.value)} required className={sheetInputClass} />
+          </SheetField>
+          <SheetField label="Type">
+            <select value={form.supplierType} onChange={(e) => set("supplierType", e.target.value)} className={sheetInputClass}>
+              <option value="local">Local</option>
+              <option value="international">International</option>
+            </select>
           </SheetField>
           <SheetField label="Contact person">
             <input value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} className={sheetInputClass} />

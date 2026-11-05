@@ -30,10 +30,22 @@ type Line = {
  * prices never reach staff who can't buy stock). With `editing` set, the same form re-opens a DRAFT
  * purchase and saves over it (Save Draft) or places it (Place Order).
  */
+/** Opening the sheet to APPROVE a requisition: lines pre-filled from it, "Receive into" locked to its
+ * storefront, and saving goes through approveRequisition so the purchase and the approval are
+ * recorded together on SERVER. Everything else (supplier, costs, prices) works like a new purchase. */
+export type PurchaseFromRequisition = {
+  requisitionId: string;
+  requisitionNumber: string;
+  location: MobileLocation;
+  items: Array<{ productId: string; name: string; sku: string; taxType: string; sellingPriceCents: number | null; quantity: number }>;
+};
+
 export function NewPurchaseModal({
   locations,
   currency,
   editing = null,
+  fromRequisition = null,
+  localOnly = false,
   onClose,
   onCreated,
 }: {
@@ -42,6 +54,9 @@ export function NewPurchaseModal({
   currency: string;
   /** A draft purchase to edit instead of creating a new one. */
   editing?: PurchaseDetail | null;
+  fromRequisition?: PurchaseFromRequisition | null;
+  /** Goods on credit from a local supplier: buying price only, no drafts or shipping expense (SERVER enforces). */
+  localOnly?: boolean;
   onClose: () => void;
   onCreated: (purchaseId: string) => void;
 }) {
@@ -49,9 +64,22 @@ export function NewPurchaseModal({
   const [products, setProducts] = useState<ProductListItem[] | null>(null);
   const [costs, setCosts] = useState<Record<string, number>>({});
   const [supplierId, setSupplierId] = useState(editing?.supplierId ?? "");
-  const [locationId, setLocationId] = useState(editing?.locationId ?? (locations.length === 1 ? locations[0]!.id : ""));
+  const sheetLocations = fromRequisition ? [fromRequisition.location] : locations;
+  const [locationId, setLocationId] = useState(
+    fromRequisition?.location.id ?? editing?.locationId ?? (locations.length === 1 ? locations[0]!.id : ""),
+  );
   const [lines, setLines] = useState<Line[]>(() =>
-    (editing?.items ?? []).map((item) => ({
+    fromRequisition
+      ? fromRequisition.items.map((item) => ({
+          productId: item.productId,
+          name: item.name,
+          sku: item.sku,
+          taxType: item.taxType,
+          quantity: String(item.quantity),
+          unitCost: "",
+          sellingPrice: centsToPriceText(item.sellingPriceCents),
+        }))
+      : (editing?.items ?? []).map((item) => ({
       productId: item.productId,
       name: item.productName,
       sku: item.sku ?? "",
@@ -65,7 +93,7 @@ export function NewPurchaseModal({
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState(editing?.supplierInvoiceNumber ?? "");
   const [shippingFee, setShippingFee] = useState(editing && editing.shippingCostCents > 0 ? centsToPriceText(editing.shippingCostCents) : "");
   const [shippingCost, setShippingCost] = useState(editing && editing.shippingExpenseCents > 0 ? centsToPriceText(editing.shippingExpenseCents) : "");
-  const [notes, setNotes] = useState(editing?.notes ?? "");
+  const [notes, setNotes] = useState(editing?.notes ?? (fromRequisition ? `From requisition ${fromRequisition.requisitionNumber}` : ""));
   const [showMore, setShowMore] = useState(false);
   const [creatingSupplier, setCreatingSupplier] = useState(false);
   const [saving, setSaving] = useState<"draft" | "ordered" | null>(null);
@@ -82,8 +110,17 @@ export function NewPurchaseModal({
     // Pre-fill only — without access to buying prices the lines just start blank.
     api
       .listProductCosts()
-      .then(setCosts)
+      .then((loaded) => {
+        setCosts(loaded);
+        // Requisition lines arrive without a cost — start each at the product's last buying price.
+        if (fromRequisition) {
+          setLines((prev) =>
+            prev.map((l) => (l.unitCost || !loaded[l.productId] ? l : { ...l, unitCost: centsToPriceText(loaded[l.productId]!) })),
+          );
+        }
+      })
       .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const matches = useMemo(() => {
@@ -149,6 +186,11 @@ export function NewPurchaseModal({
         items,
         intent,
       };
+      if (fromRequisition) {
+        const result = await api.approveRequisition(fromRequisition.requisitionId, { ...body, id: purchaseId.current });
+        onCreated(result.purchaseId);
+        return;
+      }
       const result = editing ? await api.updateDraftPurchase(editing.id, body) : await api.createPurchase({ ...body, id: purchaseId.current });
       onCreated(result.id);
     } catch (err) {
@@ -161,8 +203,10 @@ export function NewPurchaseModal({
   return (
     <>
       <BottomSheet
-        title={editing ? `Edit Draft ${editing.purchaseNumber}` : "New Purchase"}
-        subtitle="Stock is added when you receive the goods."
+        title={
+          fromRequisition ? `Approve ${fromRequisition.requisitionNumber}` : editing ? `Edit Draft ${editing.purchaseNumber}` : "New Purchase"
+        }
+        subtitle={fromRequisition ? "Choose the supplier and costs — this becomes the purchase." : "Stock is added when you receive the goods."}
         onClose={onClose}
       >
         {!suppliers || !products ? (
@@ -201,11 +245,11 @@ export function NewPurchaseModal({
             </div>
 
             <SheetField label="Receive into">
-              <select value={locationId} onChange={(e) => setLocationId(e.target.value)} disabled={locations.length === 1} className={sheetInputClass}>
+              <select value={locationId} onChange={(e) => setLocationId(e.target.value)} disabled={sheetLocations.length === 1} className={sheetInputClass}>
                 <option value="" disabled>
                   Choose a location
                 </option>
-                {locations.map((l) => (
+                {sheetLocations.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.locationName}
                   </option>
@@ -278,19 +322,21 @@ export function NewPurchaseModal({
                       className={sheetInputClass}
                     />
                   </SheetField>
-                  <SheetField label="Sell price">
-                    <input
-                      inputMode="decimal"
-                      value={line.sellingPrice}
-                      onChange={(e) =>
-                        updateLine(line.productId, {
-                          sellingPrice: e.target.value,
-                        })
-                      }
-                      placeholder="Keep"
-                      className={sheetInputClass}
-                    />
-                  </SheetField>
+                  {!localOnly && (
+                    <SheetField label="Sell price">
+                      <input
+                        inputMode="decimal"
+                        value={line.sellingPrice}
+                        onChange={(e) =>
+                          updateLine(line.productId, {
+                            sellingPrice: e.target.value,
+                          })
+                        }
+                        placeholder="Keep"
+                        className={sheetInputClass}
+                      />
+                    </SheetField>
+                  )}
                 </div>
               </div>
             ))}
@@ -314,15 +360,17 @@ export function NewPurchaseModal({
                       className={sheetInputClass}
                     />
                   </SheetField>
-                  <SheetField label="Shipping cost (our expense)">
-                    <input
-                      inputMode="decimal"
-                      value={shippingCost}
-                      onChange={(e) => setShippingCost(e.target.value)}
-                      placeholder="0"
-                      className={sheetInputClass}
-                    />
-                  </SheetField>
+                  {!localOnly && (
+                    <SheetField label="Shipping cost (our expense)">
+                      <input
+                        inputMode="decimal"
+                        value={shippingCost}
+                        onChange={(e) => setShippingCost(e.target.value)}
+                        placeholder="0"
+                        className={sheetInputClass}
+                      />
+                    </SheetField>
+                  )}
                 </div>
                 <SheetField label="Notes">
                   <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={sheetInputClass} />
@@ -335,16 +383,18 @@ export function NewPurchaseModal({
               <span className="font-display text-navy">{formatCents(totalCents, currency)}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={saving !== null}
-                onClick={() => void submit("draft")}
-                className="flex items-center justify-center gap-2 rounded-lg border border-navy/20 py-3 text-sm font-bold text-navy disabled:opacity-50"
-              >
-                {saving === "draft" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-                Save Draft
-              </button>
+            <div className={`grid gap-2 ${localOnly ? "grid-cols-1" : "grid-cols-2"}`}>
+              {!localOnly && (
+                <button
+                  type="button"
+                  disabled={saving !== null}
+                  onClick={() => void submit("draft")}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-navy/20 py-3 text-sm font-bold text-navy disabled:opacity-50"
+                >
+                  {saving === "draft" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                  Save Draft
+                </button>
+              )}
               <button
                 type="button"
                 disabled={saving !== null}
@@ -361,6 +411,7 @@ export function NewPurchaseModal({
 
       {creatingSupplier && (
         <QuickCreateSupplierModal
+          canChooseType={!localOnly}
           onClose={() => setCreatingSupplier(false)}
           onCreated={(supplier) => {
             setSuppliers((prev) => [...(prev ?? []), supplier]);

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Phone, Plus, Search, Truck } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { formatCents } from "@/lib/money";
-import type { MobileSupplierWithBalance } from "@/lib/types";
+import { SUPPLIER_TYPE_LABEL, type MobileSupplierWithBalance, type SupplierType } from "@/lib/types";
+import { FilterChip } from "../FilterChip";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
 import { SupplierBalanceModal } from "../suppliers/SupplierBalanceModal";
 import { SupplierEditModal } from "../suppliers/SupplierEditModal";
@@ -15,6 +16,7 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
   const [suppliers, setSuppliers] = useState<MobileSupplierWithBalance[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | SupplierType>("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<MobileSupplierWithBalance | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
@@ -28,14 +30,17 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
 
   useEffect(loadSuppliers, [loadSuppliers]);
 
-  const totalOwedCents = useMemo(() => (suppliers ?? []).reduce((sum, s) => sum + Math.max(0, s.balanceCents), 0), [suppliers]);
+  const owedTo = (type: SupplierType) => (suppliers ?? []).filter((s) => s.supplierType === type).reduce((sum, s) => sum + Math.max(0, s.balanceCents), 0);
+  const owedLocalCents = owedTo("local");
+  const owedInternationalCents = owedTo("international");
 
   const filtered = useMemo(() => {
     if (!suppliers) return null;
     const term = search.trim().toLowerCase();
-    if (!term) return suppliers;
-    return suppliers.filter((s) => `${s.businessName} ${s.phone1} ${s.supplierCode}`.toLowerCase().includes(term));
-  }, [suppliers, search]);
+    const ofType = typeFilter === "all" ? suppliers : suppliers.filter((s) => s.supplierType === typeFilter);
+    if (!term) return ofType;
+    return ofType.filter((s) => `${s.businessName} ${s.phone1} ${s.supplierCode}`.toLowerCase().includes(term));
+  }, [suppliers, search, typeFilter]);
 
   return (
     <div className="pb-10">
@@ -59,11 +64,23 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
       </div>
 
       <div className="px-4 py-4">
-        {totalOwedCents > 0 && (
-          <p className="mb-3 text-xs text-navy/60">
-            We owe suppliers <span className="font-bold text-red">{formatCents(totalOwedCents, currency)}</span>
-          </p>
+        {owedLocalCents + owedInternationalCents > 0 && (
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-white p-3 shadow-sm">
+              <p className="text-[10px] font-extrabold tracking-wide text-navy/50 uppercase">We owe locally</p>
+              <p className="mt-0.5 font-display text-sm text-red">{formatCents(owedLocalCents, currency)}</p>
+            </div>
+            <div className="rounded-lg bg-white p-3 shadow-sm">
+              <p className="text-[10px] font-extrabold tracking-wide text-navy/50 uppercase">We owe internationally</p>
+              <p className="mt-0.5 font-display text-sm text-red">{formatCents(owedInternationalCents, currency)}</p>
+            </div>
+          </div>
         )}
+        <div className="mb-3 flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <FilterChip label="All" active={typeFilter === "all"} onClick={() => setTypeFilter("all")} />
+          <FilterChip label="Local" active={typeFilter === "local"} onClick={() => setTypeFilter("local")} />
+          <FilterChip label="International" active={typeFilter === "international"} onClick={() => setTypeFilter("international")} />
+        </div>
         {error && <div className="rounded border border-red/30 bg-red/10 px-4 py-3 text-sm font-semibold text-red">{error}</div>}
         {!suppliers && !error && <p className="py-10 text-center text-sm text-navy/50">Loading…</p>}
         {filtered && filtered.length === 0 && <p className="py-10 text-center text-sm text-navy/50">No suppliers match.</p>}
@@ -86,6 +103,7 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
                     <Phone className="size-3 flex-none" aria-hidden="true" />
                     {supplier.phone1}
                   </p>
+                  <p className="text-[10px] font-bold tracking-wide text-navy/40 uppercase">{SUPPLIER_TYPE_LABEL[supplier.supplierType]}</p>
                 </div>
                 {supplier.balanceCents !== 0 ? (
                   <span className={`flex-none font-display text-sm ${supplier.balanceCents > 0 ? "text-red" : "text-green"}`}>
@@ -104,6 +122,7 @@ export function SuppliersTab({ currency, canCreate, canAdjust }: { currency: str
 
       {createOpen && (
         <QuickCreateSupplierModal
+          canChooseType
           onClose={() => setCreateOpen(false)}
           onCreated={() => {
             setCreateOpen(false);

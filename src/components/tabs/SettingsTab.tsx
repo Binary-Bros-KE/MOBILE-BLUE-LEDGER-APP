@@ -5,6 +5,7 @@ import { Building2, ChevronRight, CreditCard, Loader2, Plus, Receipt } from "luc
 import { api, ApiError } from "@/lib/api";
 import type { MobileBusinessProfile, MobilePaymentMethodAdmin, MobileSettings, MobileStorefrontDetails } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
+import { MpesaVerificationSettings } from "../mpesa/MpesaVerification";
 
 /**
  * Business Profile, each storefront's receipt details, and payment methods — the day-to-day subset
@@ -347,6 +348,7 @@ function StorefrontSheet({ storefront, onClose, onSaved }: { storefront: MobileS
         </SheetField>
         <SaveButton saving={saving} label="Save" />
       </form>
+      <MpesaVerificationSettings locationId={storefront.id} />
     </BottomSheet>
   );
 }

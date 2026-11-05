@@ -216,8 +216,17 @@ export function AppShell() {
           {activeTab === "purchases" && (
             <PurchasesTab
               currency={session?.currency ?? "KES"}
-              canCreate={can("purchases", "create")}
+              canCreate={can("purchases", "create") || can("local_credit_purchases", "create")}
               canEdit={can("purchases", "edit")}
+              canReceive={can("purchases", "edit") || can("local_credit_purchases", "edit")}
+              canViewPurchases={can("purchases", "view") || can("local_credit_purchases", "view")}
+              localOnly={!can("purchases", "view") && can("local_credit_purchases", "view")}
+              canViewRequisitions={can("purchase_requisitions", "view")}
+              canCreateRequisition={can("purchase_requisitions", "create")}
+              canApproveRequisitions={can("purchase_requisitions", "approve")}
+              canCreateProduct={can("products", "create")}
+              viewerEmployeeId={session?.employeeId ?? null}
+              vatRatePercent={session?.vatRatePercent ?? 16}
               viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               viewerBranchId={session?.branchId ?? null}
             />

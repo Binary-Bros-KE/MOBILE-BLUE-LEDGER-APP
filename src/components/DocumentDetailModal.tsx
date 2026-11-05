@@ -7,8 +7,9 @@ import { api, ApiError, getShareDownloadUrl } from "@/lib/api";
 import { groupItemsBySections } from "@/lib/document-sections";
 import { formatCents } from "@/lib/money";
 import { taxBreakdownLabel } from "@/lib/tax";
-import type { InvoiceStockSource, MobileCustomer, PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
+import type { InvoiceStockSource, MobileCustomer, MpesaVerifications, PaymentMethodOption, QuotationStatusValue, QuotationStockCheckItem, SharedDocument } from "@/lib/types";
 import { CheckboxField } from "./CheckboxField";
+import { MpesaSaleCodeActions, MpesaVerifyControl, mpesaCodeKey, mpesaVerificationActive, mpesaVerificationStrict, useMpesaVerificationState } from "./mpesa/MpesaVerification";
 import { canPrintReceipts, getPrinterSettings, printDocument, printerErrorMessage, type PrinterSettings } from "@/lib/printer";
 import { DeliveryNoteModal } from "./DeliveryNoteModal";
 import { PrinterSetupSheet } from "./PrinterSetupSheet";
@@ -154,6 +155,35 @@ export function DocumentDetailModal({
   const [billCustomerId, setBillCustomerId] = useState<string | null>(null);
   const [billPickerOpen, setBillPickerOpen] = useState(false);
   const [convertDueDate, setConvertDueDate] = useState("");
+  const mpesaVerification = useMpesaVerificationState(doc?.locationId);
+  /** Codes verified in the Record Payment / Convert forms, reserved under this key until they're used. */
+  const [formVerifications, setFormVerifications] = useState<MpesaVerifications>({});
+  const [mpesaClaimKey] = useState(() => `claim_${crypto.randomUUID()}`);
+
+  /** True (and says so) when strict needs a verified code this form doesn't have. */
+  function mpesaStrictUnmet(methodCode: string | null | undefined, reference: string): boolean {
+    if (methodCode !== "MPESA" || !mpesaVerificationStrict(mpesaVerification)) return false;
+    if (formVerifications[mpesaCodeKey(reference)]?.status === "verified") return false;
+    setActionError("This storefront requires a verified M-Pesa payment. Verify the code first.");
+    return true;
+  }
+
+  function renderMpesaVerify(methodCode: string | null | undefined, amountCents: number | null, code: string, onUseCode: (code: string) => void) {
+    if (methodCode !== "MPESA" || !doc?.locationId || !mpesaVerification || !mpesaVerificationActive(mpesaVerification)) return null;
+    return (
+      <MpesaVerifyControl
+        locationId={doc.locationId}
+        state={mpesaVerification}
+        amountCents={amountCents}
+        code={code}
+        claimKey={mpesaClaimKey}
+        verifications={formVerifications}
+        currency={doc.currency}
+        onUseCode={onUseCode}
+        onVerified={(verifiedCode, record) => setFormVerifications((prev) => ({ ...prev, [mpesaCodeKey(verifiedCode)]: record }))}
+      />
+    );
+  }
 
   function reload(): void {
     const fetchDoc = kind === "quotation" ? api.getQuotation(saleId) : api.getSale(saleId);
@@ -248,20 +278,28 @@ export function DocumentDetailModal({
     }
   }
 
+  function handleCodeVerified(): void {
+    reload();
+    onChanged?.();
+  }
+
   async function handleRecordPayment(): Promise<void> {
     if (!paymentMethodId || !paymentAmount.trim()) {
       setActionError("Choose a payment method and amount.");
       return;
     }
+    if (mpesaStrictUnmet(paymentMethods?.find((m) => m.id === paymentMethodId)?.code, paymentReference)) return;
     await runAction("payment", async () => {
       await api.recordInvoicePayment(saleId, {
         paymentMethodId,
         amountCents: Math.round(Number(paymentAmount) * 100),
         reference: paymentReference.trim() || undefined,
+        mpesaClaimKey,
       });
       setPaymentModalOpen(false);
       setPaymentAmount("");
       setPaymentReference("");
+      setFormVerifications({});
       reload();
     });
   }
@@ -323,6 +361,7 @@ export function DocumentDetailModal({
       setActionError(`Enter the ${convertMethod.name} reference.`);
       return;
     }
+    if (mpesaStrictUnmet(convertMethod.code, convertReference)) return;
     if (doc && convertCashCents !== null && convertCashCents < doc.grandTotalCents) {
       setActionError("Cash received can't be less than the total — a sale is paid in full.");
       return;
@@ -332,6 +371,7 @@ export function DocumentDetailModal({
         paymentMethodId: convertPaymentMethodId,
         paymentReference: convertMethod.requiresReference ? convertReference.trim() : undefined,
         amountReceivedCents: convertCashCents,
+        mpesaClaimKey,
       });
       setConvertSaleOpen(false);
       setNotice("Converted to a completed sale — find it in your Sales list.");
@@ -592,6 +632,9 @@ export function DocumentDetailModal({
                           <p className="text-[10px] text-navy/50">
                             {new Date(payment.receivedAt).toLocaleString()} · {payment.receivedByName}
                           </p>
+                          {payment.reference && (
+                            <MpesaSaleCodeActions saleId={saleId} code={payment.reference} verifications={doc.mpesaVerifications} canReplace={canApprove} onChanged={handleCodeVerified} />
+                          )}
                         </div>
                         <p className="flex-none text-xs font-bold text-green">{money(payment.amountCents)}</p>
                       </div>
@@ -606,6 +649,18 @@ export function DocumentDetailModal({
                   <div className="space-y-0.5 text-xs text-navy/70">
                     {doc.paymentMethodName && <Row label="Payment" value={doc.paymentMethodName} />}
                     {doc.paymentReference && <Row label="Ref" value={doc.paymentReference} />}
+                    {doc.documentKind === "receipt" &&
+                      Object.keys(doc.mpesaVerifications ?? {}).map((code, _index, codes) => (
+                        <MpesaSaleCodeActions
+                          key={code}
+                          saleId={saleId}
+                          code={code}
+                          verifications={doc.mpesaVerifications}
+                          canReplace={canApprove}
+                          showCode={codes.length > 1}
+                          onChanged={handleCodeVerified}
+                        />
+                      ))}
                   </div>
                 </>
               )}
@@ -1035,6 +1090,12 @@ export function DocumentDetailModal({
                 placeholder="Reference (if required)"
                 className="h-10 w-full rounded-lg border border-navy/15 px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
               />
+              {renderMpesaVerify(
+                paymentMethods?.find((m) => m.id === paymentMethodId)?.code,
+                paymentAmount.trim() ? Math.round(Number(paymentAmount) * 100) : null,
+                paymentReference,
+                setPaymentReference,
+              )}
               {actionError && <p className="rounded border border-red/30 bg-red/10 px-3 py-2 text-xs font-semibold text-red">{actionError}</p>}
               <button
                 type="button"
@@ -1204,6 +1265,7 @@ export function DocumentDetailModal({
                   className="h-10 w-full rounded-lg border border-navy/15 px-2.5 text-sm font-semibold text-navy focus:border-blue focus:outline-none"
                 />
               )}
+              {renderMpesaVerify(convertMethod?.code, doc.grandTotalCents, convertReference, setConvertReference)}
               {convertIsCash && (
                 <>
                   <input

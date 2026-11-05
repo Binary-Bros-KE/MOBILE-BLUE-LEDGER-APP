@@ -6,7 +6,7 @@
 
 const PREFIX = "bl_cache_";
 
-export type OfflineCacheKey = "products" | "paymentMethods" | "customers" | "riders" | "suppliers" | "storefronts" | "me";
+export type OfflineCacheKey = "products" | "paymentMethods" | "customers" | "riders" | "suppliers" | "storefronts" | "me" | `mpesaVerification:${string}`;
 
 export function saveOfflineCache<T>(key: OfflineCacheKey, data: T): void {
   try {
