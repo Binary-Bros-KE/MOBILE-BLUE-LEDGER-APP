@@ -254,6 +254,9 @@ export function ProductFormModal({
     const buyingPriceCents = toBaseCents(form.buyingPrice) ?? 0;
     const wholesalePriceCents = form.wholesalePrice.trim() ? toBaseCents(form.wholesalePrice) : null;
     const minimumPriceCents = form.minimumPrice.trim() ? toBaseCents(form.minimumPrice) : null;
+    if (buyingPriceCents > sellingPriceCents) {
+      return setError("Buying price can't be higher than the selling price — every sale would be a loss.");
+    }
     if (minimumPriceCents !== null && minimumPriceCents > sellingPriceCents) {
       return setError("Minimum price can't be higher than the selling price.");
     }

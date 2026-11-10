@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { centsForCsv, exportCsv } from "@/lib/csv-export";
 import { formatCents } from "@/lib/money";
 import { defaultAnchorForMode } from "@/lib/period";
 import { taxBreakdownLabel } from "@/lib/tax";
@@ -71,38 +69,39 @@ const percent = (value: number) => `${value.toFixed(1)}%`;
 
 /** DESKTOP's "Products Sold" table as a stacked list: every distinct product sold in the period,
  * most revenue first — units and share of revenue on the left, revenue and margin on the right. */
-function ProductsSoldCard({ products, currency, startDate, endDate }: { products: SalesProductSold[]; currency: string; startDate: string; endDate: string }) {
+type ProductsSoldSort = "revenue" | "margin" | "units";
+
+const PRODUCTS_SOLD_SORTS: Array<{ key: ProductsSoldSort; label: string }> = [
+  { key: "revenue", label: "By revenue" },
+  { key: "margin", label: "By margin" },
+  { key: "units", label: "By units sold" },
+];
+
+function ProductsSoldCard({ products, currency }: { products: SalesProductSold[]; currency: string }) {
   const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? products : products.slice(0, PRODUCTS_SOLD_PREVIEW);
+  const [sortKey, setSortKey] = useState<ProductsSoldSort>("revenue");
+  // "By margin" puts the best earners first — a product selling at a loss sinks to the bottom.
+  const sorted = [...products].sort((a, b) =>
+    sortKey === "margin" ? b.marginCents - a.marginCents : sortKey === "units" ? b.quantitySold - a.quantitySold : b.revenueCents - a.revenueCents,
+  );
+  const visible = showAll ? sorted : sorted.slice(0, PRODUCTS_SOLD_PREVIEW);
 
   return (
     <div className="rounded-lg bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="text-[11px] font-bold tracking-wide text-navy/50 uppercase">Products Sold ({products.length})</p>
-        <button
-          type="button"
-          aria-label="Export products sold as CSV"
-          onClick={() =>
-            void exportCsv(
-              `products-sold-${startDate}-to-${endDate}.csv`,
-              ["Product", "Quantity Sold", "Unit", "Revenue", "Cost", "Margin", "Margin %", "% of Revenue"],
-              products.map((p) => [
-                p.productName,
-                p.quantitySold,
-                p.unitOfMeasure ?? "",
-                centsForCsv(p.revenueCents),
-                centsForCsv(p.costCents),
-                centsForCsv(p.marginCents),
-                p.marginPercent.toFixed(1),
-                p.percentOfRevenue.toFixed(1),
-              ]),
-            )
-          }
-          className="flex flex-none items-center gap-1 rounded-md border border-navy/15 px-2 py-1 text-[11px] font-bold text-navy/70"
+        <select
+          value={sortKey}
+          onChange={(e) => setSortKey(e.target.value as ProductsSoldSort)}
+          aria-label="Sort products sold"
+          className="flex-none rounded-md border border-navy/15 bg-white px-2 py-1 text-[11px] font-bold text-navy/70 focus:border-blue focus:outline-none"
         >
-          <Download className="size-3.5" aria-hidden="true" />
-          CSV
-        </button>
+          {PRODUCTS_SOLD_SORTS.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {visible.map((p, index) => (
@@ -274,8 +273,6 @@ export function SalesReportSection({ locationId }: { locationId?: string }) {
               key={requestKey}
               products={overview.productsSold}
               currency={overview.currency}
-              startDate={overview.startDate}
-              endDate={overview.endDate}
             />
           )}
 
