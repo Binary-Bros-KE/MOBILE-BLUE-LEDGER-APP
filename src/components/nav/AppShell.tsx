@@ -15,6 +15,7 @@ import { CheckoutTab } from "../tabs/CheckoutTab";
 import { CustomersTab } from "../tabs/CustomersTab";
 import { DashboardTab } from "../tabs/DashboardTab";
 import { EmployeesTab } from "../tabs/EmployeesTab";
+import { RolesTab } from "../tabs/RolesTab";
 import { ExpensesTab } from "../tabs/ExpensesTab";
 import { InvoicesTab } from "../tabs/InvoicesTab";
 import { ProductsTab } from "../tabs/ProductsTab";
@@ -151,6 +152,7 @@ export function AppShell() {
               canEdit={can("employees", "edit")}
             />
           )}
+          {activeTab === "roles" && <RolesTab canCreate={can("roles", "create")} canEdit={can("roles", "edit")} />}
           {activeTab === "sales" && (
             <SalesTab canManageDelivery={can("sales", "edit")} canApprove={can("approvals", "approve")} />
           )}
