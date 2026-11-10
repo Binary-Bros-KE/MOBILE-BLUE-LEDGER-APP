@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { displayPriceCents, formatQuantity, priceUnitSuffix } from "@/lib/product-units";
 import { motion } from "framer-motion";
 import { Ban, Loader2, PackageCheck, Pencil, Send, Wallet, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
@@ -189,7 +190,9 @@ export function PurchaseDetailModal({
                   <div className="min-w-0">
                     <p className="truncate font-bold text-navy">{item.productName}</p>
                     <p className="text-navy/40">
-                      {item.receivedQuantity}/{item.orderedQuantity} received · {money(item.unitCostCents)} each
+                      {item.unitConfig
+                        ? `${formatQuantity(item.receivedQuantity, item.unitOfMeasure ?? null, item.unitConfig)} of ${formatQuantity(item.orderedQuantity, item.unitOfMeasure ?? null, item.unitConfig)} received · ${money(displayPriceCents(item.unitCostCents, item.unitConfig))}${priceUnitSuffix(item.unitConfig)}`
+                        : `${item.receivedQuantity}/${item.orderedQuantity} received · ${money(item.unitCostCents)} each`}
                     </p>
                   </div>
                   <p className="flex-none font-bold text-navy">{money(item.lineTotalCents)}</p>

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { type PackRow, UnitsSetup, type UnitsKind } from "./UnitsSetup";
+import { MEASURE_FAMILIES, priceConversionRatio, type ProductUnitConfig, unitFactor } from "@/lib/product-units";
 import { ChevronDown, Loader2, Plus, ScanLine } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { centsToPriceText, priceTextToCents } from "@/lib/money";
+import { centsToPriceText, priceTextToCents, priceTextToExactCents } from "@/lib/money";
 import type { MobileCategory, ProductInput, ProductTaxTypeValue } from "@/lib/types";
 import { BarcodeScannerSheet, cameraScanSupported } from "../BarcodeScannerSheet";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
@@ -102,6 +104,10 @@ export function ProductFormModal({
   const [hasVariants, setHasVariants] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState<string | null>(null);
+  const [unitsKind, setUnitsKind] = useState<UnitsKind>("");
+  const [packRows, setPackRows] = useState<PackRow[]>([]);
+  const [packDefaultUnit, setPackDefaultUnit] = useState<string | null>(null);
+  const [conversionNotice, setConversionNotice] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +119,18 @@ export function ProductFormModal({
       .getProductEditData(productId)
       .then((p) => {
         setHasVariants(p.hasVariants);
+        // Everything in the form reads per the price unit (per kg), so scale the stored per-base values.
+        const loadedConfig = p.unitConfig;
+        const factor = unitFactor(loadedConfig, loadedConfig?.priceUnit);
+        const inPriceUnit = (cents: number | null) => (cents === null ? null : Math.round(cents * factor));
+        const countInPriceUnit = (count: number) => (count > 0 ? String(Math.round((count / factor) * 1000) / 1000) : "");
+        if (loadedConfig?.kind === "pack") {
+          setUnitsKind("pack");
+          setPackDefaultUnit(loadedConfig.defaultSaleUnit);
+          setPackRows(loadedConfig.units.map((u) => ({ code: u.code, factor: String(u.factor), price: centsToPriceText(u.priceCents) })));
+        } else if (loadedConfig?.kind === "measure") {
+          setUnitsKind(MEASURE_FAMILIES.find((f) => f.base === p.unitOfMeasure)?.key ?? "");
+        }
         setForm({
           name: p.name,
           sku: p.sku,
@@ -121,14 +139,14 @@ export function ProductFormModal({
           storefrontId: singleStorefront ? ALL_STOREFRONTS : (p.storefrontId ?? ALL_STOREFRONTS),
           unitOfMeasure: p.unitOfMeasure ?? "",
           description: p.description ?? "",
-          sellingPrice: centsToPriceText(p.sellingPriceCents),
-          buyingPrice: centsToPriceText(p.buyingPriceCents),
-          wholesalePrice: centsToPriceText(p.wholesalePriceCents),
-          wholesaleMinQuantity: p.wholesaleMinQuantity > 0 ? String(p.wholesaleMinQuantity) : "",
-          minimumPrice: centsToPriceText(p.minimumPriceCents),
+          sellingPrice: centsToPriceText(inPriceUnit(p.sellingPriceCents)),
+          buyingPrice: centsToPriceText(inPriceUnit(p.buyingPriceCents)),
+          wholesalePrice: centsToPriceText(inPriceUnit(p.wholesalePriceCents)),
+          wholesaleMinQuantity: countInPriceUnit(p.wholesaleMinQuantity),
+          minimumPrice: centsToPriceText(inPriceUnit(p.minimumPriceCents)),
           taxType: (["vat", "exempted", "zero_rated"].includes(p.taxType) ? p.taxType : "vat") as ProductTaxTypeValue,
           taxMode: p.pricesTaxInclusive === null ? "inherit" : p.pricesTaxInclusive ? "inclusive" : "exclusive",
-          reorderLevel: p.reorderLevel > 0 ? String(p.reorderLevel) : "",
+          reorderLevel: countInPriceUnit(p.reorderLevel),
           trackStock: p.trackStock,
           allowNegativeStock: p.allowNegativeStock,
           openingLocationId: "",
@@ -158,13 +176,84 @@ export function ProductFormModal({
     }
   }
 
+  /** The unit the form's prices currently read in: the measure's larger unit, else the product's own. */
+  function priceUnitOf(kind: UnitsKind, baseUnit: string): string | null {
+    return MEASURE_FAMILIES.find((f) => f.key === kind)?.units[0]?.code ?? (baseUnit || null);
+  }
+
+  /** Switching how a product is sold re-expresses what's typed so it means the same: KES 0.26 per mL
+   * becomes KES 260 per L, and says so, so the owner can check it before saving. */
+  function changeUnitsKind(next: UnitsKind): void {
+    const family = MEASURE_FAMILIES.find((f) => f.key === next);
+    const nextBase = family ? family.base : form.unitOfMeasure;
+    const fromUnit = priceUnitOf(unitsKind, form.unitOfMeasure);
+    const toUnit = priceUnitOf(next, nextBase);
+    const ratio = priceConversionRatio(fromUnit, toUnit);
+    const scalePrice = (text: string) => {
+      const cents = priceTextToExactCents(text);
+      return cents === null || !text.trim() ? text : centsToPriceText(Math.round(cents * ratio));
+    };
+    const scaleCount = (text: string) => {
+      const count = Number.parseFloat(text);
+      return Number.isFinite(count) ? String(Math.round((count / ratio) * 1000) / 1000) : text;
+    };
+    if (ratio !== 1 && form.sellingPrice.trim()) {
+      setConversionNotice(`Price converted: ${form.sellingPrice} per ${fromUnit} is ${scalePrice(form.sellingPrice)} per ${toUnit}. Check it before saving.`);
+    } else {
+      setConversionNotice(null);
+    }
+    setUnitsKind(next);
+    if (next === "pack" && packRows.length === 0) setPackRows([{ code: "", factor: "", price: "" }]);
+    setForm((prev) => ({
+      ...prev,
+      unitOfMeasure: nextBase,
+      sellingPrice: scalePrice(prev.sellingPrice),
+      buyingPrice: scalePrice(prev.buyingPrice),
+      wholesalePrice: scalePrice(prev.wholesalePrice),
+      minimumPrice: scalePrice(prev.minimumPrice),
+      reorderLevel: scaleCount(prev.reorderLevel),
+      wholesaleMinQuantity: scaleCount(prev.wholesaleMinQuantity),
+      openingQuantity: scaleCount(prev.openingQuantity),
+    }));
+  }
+
+  /** What's in the form as a unit config; a string is what's wrong with it. */
+  function buildUnitConfig(): ProductUnitConfig | null | string {
+    const family = MEASURE_FAMILIES.find((f) => f.key === unitsKind);
+    if (family) {
+      const unit = family.units[0]!;
+      return { kind: "measure", priceUnit: unit.code, defaultSaleUnit: unit.code, units: family.units.map((u) => ({ code: u.code, factor: u.factor, priceCents: null })) };
+    }
+    if (unitsKind !== "pack") return null;
+    const rows = packRows.filter((row) => row.code.trim() || row.factor.trim() || row.price.trim());
+    if (rows.length === 0) return "Add a pack size, or choose One unit only.";
+    const units = [];
+    for (const row of rows) {
+      const factor = Number.parseInt(row.factor, 10);
+      if (!row.code.trim()) return "Give each pack size a name.";
+      if (!factor || factor < 2) return `Enter how many are in one ${row.code.trim()} (at least 2).`;
+      units.push({ code: row.code.trim(), factor, priceCents: row.price.trim() ? priceTextToCents(row.price) : null });
+    }
+    const defaultSaleUnit = units.some((u) => u.code === packDefaultUnit) ? packDefaultUnit : null;
+    return { kind: "pack", priceUnit: null, defaultSaleUnit, units };
+  }
+
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
-    const sellingPriceCents = priceTextToCents(form.sellingPrice);
+    const unitConfig = buildUnitConfig();
+    if (typeof unitConfig === "string") return setError(unitConfig);
+    // The form reads per the price unit (per kg); SERVER keeps everything per base unit (per g).
+    const priceFactor = unitFactor(unitConfig, unitConfig?.priceUnit);
+    const toBaseCents = (text: string) => {
+      const cents = priceTextToExactCents(text);
+      return cents === null ? null : cents / priceFactor;
+    };
+    const toBaseCount = (text: string) => Math.round((Number.parseFloat(text) || 0) * priceFactor);
+    const sellingPriceCents = toBaseCents(form.sellingPrice);
     if (sellingPriceCents === null) return setError("Enter a selling price.");
-    const buyingPriceCents = priceTextToCents(form.buyingPrice) ?? 0;
-    const wholesalePriceCents = form.wholesalePrice.trim() ? priceTextToCents(form.wholesalePrice) : null;
-    const minimumPriceCents = form.minimumPrice.trim() ? priceTextToCents(form.minimumPrice) : null;
+    const buyingPriceCents = toBaseCents(form.buyingPrice) ?? 0;
+    const wholesalePriceCents = form.wholesalePrice.trim() ? toBaseCents(form.wholesalePrice) : null;
+    const minimumPriceCents = form.minimumPrice.trim() ? toBaseCents(form.minimumPrice) : null;
     if (minimumPriceCents !== null && minimumPriceCents > sellingPriceCents) {
       return setError("Minimum price can't be higher than the selling price.");
     }
@@ -176,15 +265,16 @@ export function ProductFormModal({
       categoryId: form.categoryId || null,
       storefrontId: form.storefrontId === ALL_STOREFRONTS ? null : form.storefrontId,
       unitOfMeasure: form.unitOfMeasure || null,
+      unitConfig,
       description: form.description.trim() || null,
       buyingPriceCents,
       sellingPriceCents,
       wholesalePriceCents,
-      wholesaleMinQuantity: Number.parseInt(form.wholesaleMinQuantity, 10) || 0,
+      wholesaleMinQuantity: toBaseCount(form.wholesaleMinQuantity),
       minimumPriceCents,
       taxType: form.taxType,
       pricesTaxInclusive: form.taxMode === "inherit" ? null : form.taxMode === "inclusive",
-      reorderLevel: Number.parseInt(form.reorderLevel, 10) || 0,
+      reorderLevel: toBaseCount(form.reorderLevel),
       trackStock: form.trackStock,
       allowNegativeStock: form.allowNegativeStock,
     };
@@ -196,7 +286,7 @@ export function ProductFormModal({
         await api.updateProduct(productId, body);
         onSaved();
       } else {
-        const openingQuantity = Number.parseInt(form.openingQuantity, 10) || 0;
+        const openingQuantity = toBaseCount(form.openingQuantity);
         const created = await api.createProduct({
           ...body,
           openingStock: form.trackStock && openingQuantity > 0 && form.openingLocationId ? { locationId: form.openingLocationId, quantity: openingQuantity } : null,
@@ -210,6 +300,11 @@ export function ProductFormModal({
     }
   }
 
+  // Labels and typing for the price unit ("per kg") and measured stock amounts ("1.5").
+  const measuredFamily = MEASURE_FAMILIES.find((f) => f.key === unitsKind);
+  const priceUnitLabel = measuredFamily ? ` (per ${measuredFamily.units[0]!.code})` : "";
+  const countUnitLabel = measuredFamily ? ` (${measuredFamily.units[0]!.code})` : "";
+  const countFilter = (text: string) => (measuredFamily ? text.replace(/[^\d.]/g, "") : text.replace(/\D/g, ""));
   const storefronts = storefrontLocations(options);
   const openingLocations = stockLocations(options);
   const openingLocationFixed = openingStockLocation(options) !== null;
@@ -244,10 +339,10 @@ export function ProductFormModal({
           </SheetField>
 
           <div className="grid grid-cols-2 gap-3">
-            <SheetField label="Selling price">
+            <SheetField label={`Selling price${priceUnitLabel}`}>
               <input inputMode="decimal" value={form.sellingPrice} onChange={(e) => set("sellingPrice", e.target.value)} required className={sheetInputClass} />
             </SheetField>
-            <SheetField label="Buying price">
+            <SheetField label={`Buying price${priceUnitLabel}`}>
               <input inputMode="decimal" value={form.buyingPrice} onChange={(e) => set("buyingPrice", e.target.value)} placeholder="0" className={sheetInputClass} />
             </SheetField>
           </div>
@@ -314,7 +409,7 @@ export function ProductFormModal({
 
           <div className="grid grid-cols-2 gap-3">
             <SheetField label="Unit">
-              <select value={form.unitOfMeasure} onChange={(e) => set("unitOfMeasure", e.target.value)} className={sheetInputClass}>
+              <select value={form.unitOfMeasure} onChange={(e) => set("unitOfMeasure", e.target.value)} disabled={measuredFamily !== undefined} className={sheetInputClass}>
                 <option value="">—</option>
                 {UNIT_OF_MEASURE_OPTIONS.map((u) => (
                   <option key={u.value} value={u.value}>
@@ -331,6 +426,19 @@ export function ProductFormModal({
               </select>
             </SheetField>
           </div>
+
+          {!hasVariants && (
+            <UnitsSetup
+              kind={unitsKind}
+              onKindChange={changeUnitsKind}
+              packRows={packRows}
+              onPackRowsChange={setPackRows}
+              defaultSaleUnit={packDefaultUnit}
+              onDefaultSaleUnitChange={setPackDefaultUnit}
+              baseUnit={form.unitOfMeasure}
+            />
+          )}
+          {conversionNotice && <p className="rounded border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold-text">{conversionNotice}</p>}
 
           <SheetField label="Sold at">
             <select
@@ -351,8 +459,8 @@ export function ProductFormModal({
           <div className="grid grid-cols-2 items-end gap-3">
             <Toggle label="Track stock" checked={form.trackStock} onChange={(v) => set("trackStock", v)} />
             {form.trackStock && (
-              <SheetField label="Low-stock alert at">
-                <input inputMode="numeric" value={form.reorderLevel} onChange={(e) => set("reorderLevel", e.target.value.replace(/\D/g, ""))} placeholder="0 = off" className={sheetInputClass} />
+              <SheetField label={`Low-stock alert at${countUnitLabel}`}>
+                <input inputMode={measuredFamily ? "decimal" : "numeric"} value={form.reorderLevel} onChange={(e) => set("reorderLevel", countFilter(e.target.value))} placeholder="0 = off" className={sheetInputClass} />
               </SheetField>
             )}
           </div>
@@ -374,11 +482,11 @@ export function ProductFormModal({
                   ))}
                 </select>
               </SheetField>
-              <SheetField label="Quantity">
+              <SheetField label={`Quantity${countUnitLabel}`}>
                 <input
-                  inputMode="numeric"
+                  inputMode={measuredFamily ? "decimal" : "numeric"}
                   value={form.openingQuantity}
-                  onChange={(e) => set("openingQuantity", e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => set("openingQuantity", countFilter(e.target.value))}
                   disabled={!form.openingLocationId}
                   className={sheetInputClass}
                 />
@@ -394,14 +502,14 @@ export function ProductFormModal({
           {showMore && (
             <div className="space-y-3 rounded-lg bg-cream-dark/50 p-3">
               <div className="grid grid-cols-2 gap-3">
-                <SheetField label="Wholesale price">
+                <SheetField label={`Wholesale price${priceUnitLabel}`}>
                   <input inputMode="decimal" value={form.wholesalePrice} onChange={(e) => set("wholesalePrice", e.target.value)} className={sheetInputClass} />
                 </SheetField>
-                <SheetField label="From quantity">
-                  <input inputMode="numeric" value={form.wholesaleMinQuantity} onChange={(e) => set("wholesaleMinQuantity", e.target.value.replace(/\D/g, ""))} className={sheetInputClass} />
+                <SheetField label={`From quantity${countUnitLabel}`}>
+                  <input inputMode="numeric" value={form.wholesaleMinQuantity} onChange={(e) => set("wholesaleMinQuantity", countFilter(e.target.value))} className={sheetInputClass} />
                 </SheetField>
               </div>
-              <SheetField label="Minimum selling price (discount floor)">
+              <SheetField label={`Minimum selling price${priceUnitLabel} (discount floor)`}>
                 <input inputMode="decimal" value={form.minimumPrice} onChange={(e) => set("minimumPrice", e.target.value)} placeholder="No floor" className={sheetInputClass} />
               </SheetField>
               <SheetField label="Price includes tax?">

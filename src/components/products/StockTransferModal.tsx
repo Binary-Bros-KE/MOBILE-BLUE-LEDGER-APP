@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { UnitSwitch } from "../UnitSwitch";
+import { allowsDecimals, amountToBase, baseToAmount, formatQuantity, unitChoices } from "@/lib/product-units";
 import { ArrowDown, Loader2, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { ProductListItem } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
 import { MAIN_STORE_TYPE, type ProductManageOptions, stockLocations } from "./manage-options";
 
-type Line = { productId: string; name: string; quantity: string };
+type Line = { productId: string; name: string; quantity: string; unitCode?: string | null };
 
 /**
  * Move stock between storefronts and the Main Store — several products in one go. Recorded exactly
@@ -65,7 +67,8 @@ export function StockTransferModal({
     if (lines.length === 0) return setError("Add at least one product.");
     const items = [];
     for (const line of lines) {
-      const quantity = Number.parseInt(line.quantity, 10);
+      const product = productById.get(line.productId);
+      const quantity = amountToBase(line.quantity, product?.unitConfig ?? null, line.unitCode ?? null);
       if (!quantity || quantity <= 0) return setError(`Enter how many ${line.name} to move.`);
       items.push({ productId: line.productId, quantity });
     }
@@ -129,7 +132,7 @@ export function StockTransferModal({
                   key={p.id}
                   type="button"
                   onClick={() => {
-                    setLines((prev) => [...prev, { productId: p.id, name: p.name, quantity: "1" }]);
+                    setLines((prev) => [...prev, { productId: p.id, name: p.name, quantity: "1", unitCode: p.unitConfig?.defaultSaleUnit ?? null }]);
                     setSearch("");
                   }}
                   className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-cream-dark"
@@ -144,21 +147,31 @@ export function StockTransferModal({
 
         {lines.map((line) => {
           const available = availableAtSource(line.productId);
+          const product = productById.get(line.productId);
+          const config = product?.unitConfig ?? null;
+          const code = line.unitCode ?? null;
+          const decimals = allowsDecimals(config, code);
           return (
             <div key={line.productId} className="flex items-center gap-2 rounded-lg border border-navy/15 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-navy">{line.name}</p>
-                {available !== null && <p className="text-[11px] text-navy/50">{available} available to move</p>}
+                {available !== null && <p className="text-[11px] text-navy/50">{formatQuantity(available, product?.unitOfMeasure ?? null, config)} available to move</p>}
+                <UnitSwitch
+                  choices={unitChoices(product?.unitOfMeasure ?? null, config)}
+                  value={code}
+                  onChange={(next) => setLines((prev) => prev.map((l) => (l.productId === line.productId ? { ...l, unitCode: next, quantity: "" } : l)))}
+                />
               </div>
               {/* Fixed-width wrapper — sheetInputClass is w-full, see ReceiveGoodsModal. */}
               <div className="w-16 flex-none">
                 <input
-                  inputMode="numeric"
+                  inputMode={decimals ? "decimal" : "numeric"}
                   aria-label={`Quantity of ${line.name}`}
                   value={line.quantity}
                   onChange={(e) => {
-                    const digits = e.target.value.replace(/\D/g, "");
-                    const capped = available !== null && digits && Number(digits) > available ? String(available) : digits;
+                    const digits = decimals ? e.target.value.replace(/[^\d.]/g, "") : e.target.value.replace(/\D/g, "");
+                    const typed = amountToBase(digits, config, code);
+                    const capped = available !== null && typed !== null && typed > available ? String(baseToAmount(available, config, code)) : digits;
                     setLines((prev) => prev.map((l) => (l.productId === line.productId ? { ...l, quantity: capped } : l)));
                   }}
                   className={`${sheetInputClass} mt-0 text-center`}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronRight, Loader2, Receipt, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { buildCartFromEditableItems, computeCartTotals, serviceChargeDraftsToInputs, serviceChargeInputsToDrafts, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
+import { buildCartFromEditableItems, computeCartTotals, lineAmountInSaleUnit, linePriceOverrideCents, serviceChargeDraftsToInputs, serviceChargeInputsToDrafts, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import type { TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, MobileCustomer, MobileEditableDelivery, MobileRider, MobileSupplier, ProductListItem, ServiceChargeDraft } from "@/lib/types";
@@ -137,12 +137,13 @@ export function QuotationFormModal({
           sectionLabel: line.sectionLabel,
           quantity: line.quantity,
           discountAmountCents: line.discountAmountCents,
-          unitPriceCents: line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : undefined,
+          unitPriceCents: linePriceOverrideCents(line),
+          unitCode: line.unitCode ?? null,
           isLocallySourced: line.isLocallySourced,
           // line.localCost is what the user typed as the PER-UNIT cost — localCostCents itself is
           // still stored/reported as the line's total (see money.ts's own doc comment), so multiply
           // here rather than changing anything downstream.
-          localCostCents: line.isLocallySourced && line.localCost.trim() ? unitCostToTotalCents(line.localCost, line.quantity) : undefined,
+          localCostCents: line.isLocallySourced && line.localCost.trim() ? unitCostToTotalCents(line.localCost, lineAmountInSaleUnit(line)) : undefined,
           localSupplierId: line.isLocallySourced ? (line.localSupplierId ?? undefined) : undefined,
         })),
         delivery: delivery

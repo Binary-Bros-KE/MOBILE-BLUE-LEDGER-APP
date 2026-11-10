@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { displayPriceCents, formatQuantity, priceUnitSuffix } from "@/lib/product-units";
 import { ChevronRight, PauseCircle, Plus, Receipt, ScanLine, Search, ShoppingCart, Store, Trash2, Truck, UserRound, X } from "lucide-react";
 import { api, ApiError, isOfflineError } from "@/lib/api";
-import { effectiveUnitPriceCents, naturalUnitPriceCents, serviceChargeDraftsToInputs, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
+import { effectiveUnitPriceCents, lineAmountInSaleUnit, linePriceInSaleUnitCents, linePriceOverrideCents, naturalUnitPriceCents, serviceChargeDraftsToInputs, sumServiceChargeDraftFeeCents } from "@/lib/cart-totals";
 import { formatCents, unitCostToTotalCents } from "@/lib/money";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "@/lib/tax";
 import type { CheckoutCartLine, CheckoutRequest, MobileCustomer, MobileLocation, MobileRider, MobileSupplier, PaymentMethodOption, ProductListItem, ServiceChargeDraft } from "@/lib/types";
@@ -19,7 +20,7 @@ import { DocumentDetailModal } from "../DocumentDetailModal";
 import { VariantPickerSheet } from "../VariantPickerSheet";
 import { ServiceChargesModal } from "../ServiceChargesModal";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
-import { QuantityInput } from "../QuantityInput";
+import { CartLineQuantity } from "../CartLineQuantity";
 import { CheckoutCustomerPickerModal } from "./CheckoutCustomerPickerModal";
 import { CheckoutDeliveryModal, emptyDeliveryDraft, type DeliveryDraft } from "./CheckoutDeliveryModal";
 
@@ -174,7 +175,7 @@ export function CheckoutTab({
   // (not duplicated locally) so this can never drift from what CartItemsEditor's Invoice/Quotation
   // forms compute for the identical line shape.
   const lineTaxResults = cart.map((line) => {
-    const taxableCents = effectiveUnitPriceCents(line) * line.quantity - line.discountAmountCents;
+    const taxableCents = Math.round(effectiveUnitPriceCents(line) * line.quantity) - line.discountAmountCents;
     const productTaxConfig = resolveProductTaxConfig({ pricesTaxInclusive: line.pricesTaxInclusive }, tenantTaxConfig);
     return computeLineTax(taxableCents, line.taxType, productTaxConfig);
   });
@@ -260,9 +261,8 @@ export function CheckoutTab({
     }
   }
 
-  function updateQuantity(lineId: string, quantity: number): void {
-    if (quantity < 1) return;
-    setCart((prev) => prev.map((line) => (line.lineId === lineId ? { ...line, quantity } : line)));
+  function updateLinePatch(lineId: string, patch: Partial<CheckoutCartLine>): void {
+    setCart((prev) => prev.map((line) => (line.lineId === lineId ? { ...line, ...patch } : line)));
   }
 
   function updateDiscount(lineId: string, discountText: string): void {
@@ -353,12 +353,13 @@ export function CheckoutTab({
           variantKey: line.variantKey,
           quantity: line.quantity,
           discountAmountCents: line.discountAmountCents,
-          unitPriceCents: line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : undefined,
+          unitPriceCents: linePriceOverrideCents(line),
+          unitCode: line.unitCode ?? null,
           isLocallySourced: line.isLocallySourced,
           // line.localCost is what the cashier typed as the PER-UNIT cost — localCostCents itself is
           // still stored/reported as the line's total (see money.ts's own doc comment), so multiply
           // here rather than changing anything downstream.
-          localCostCents: line.isLocallySourced && line.localCost.trim() ? unitCostToTotalCents(line.localCost, line.quantity) : undefined,
+          localCostCents: line.isLocallySourced && line.localCost.trim() ? unitCostToTotalCents(line.localCost, lineAmountInSaleUnit(line)) : undefined,
           localSupplierId: line.isLocallySourced ? (line.localSupplierId ?? undefined) : undefined,
     }));
   }
@@ -447,7 +448,7 @@ export function CheckoutTab({
       queuedOffline: true,
       offlineCompletedAt: new Date().toISOString(),
     };
-    const label = `${customerId ? customerLabel : "Walk-in"} · ${cart.reduce((sum, l) => sum + l.quantity, 0)} item(s)`;
+    const label = `${customerId ? customerLabel : "Walk-in"} · ${cart.length} item(s)`;
     if (!enqueueSale(pinned, { label, totalCents: grandTotalCents })) {
       setSubmitError("You're offline and this phone couldn't save the sale — don't hand over the goods until it goes through.");
       return;
@@ -676,11 +677,14 @@ export function CheckoutTab({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-navy">{product.name}</p>
                   <p className="text-[11px] text-navy/50">
-                    {product.sku} · {product.trackStock ? `${stockAtEffectiveLocation(product)} in stock` : "No stock count"}
+                    {product.sku} · {product.trackStock ? `${formatQuantity(stockAtEffectiveLocation(product), product.unitOfMeasure, product.unitConfig)} in stock` : "No stock count"}
                     {product.stockSource && ` · ${product.stockSource.supplierName}`}
                   </p>
                 </div>
-                <p className="flex-none text-sm font-bold text-navy">{formatCents(product.sellingPriceCents, currency)}</p>
+                <p className="flex-none text-sm font-bold text-navy">
+                  {formatCents(displayPriceCents(product.sellingPriceCents, product.unitConfig), currency)}
+                  {priceUnitSuffix(product.unitConfig)}
+                </p>
               </button>
             ))}
           </div>
@@ -699,7 +703,7 @@ export function CheckoutTab({
               const priceBelowMinimum =
                 line.priceOverride.trim() &&
                 line.minimumPriceCents !== null &&
-                Math.round(Number(line.priceOverride) * 100) < line.minimumPriceCents;
+                effectiveUnitPriceCents(line) < line.minimumPriceCents;
               const naturalPriceCents = naturalUnitPriceCents(line);
               const wholesaleActive = naturalPriceCents !== line.unitPriceCents;
               return (
@@ -708,7 +712,8 @@ export function CheckoutTab({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-navy">{line.name}</p>
                       <p className="text-[11px] text-navy/50">
-                        @ {formatCents(naturalPriceCents, currency)}
+                        @ {formatCents(linePriceInSaleUnitCents(line, naturalPriceCents), currency)}
+                        {line.unitCode ? `/${line.unitCode}` : ""}
                         {wholesaleActive && <span className="ml-1 font-bold text-blue">Wholesale</span>}
                       </p>
                     </div>
@@ -718,7 +723,7 @@ export function CheckoutTab({
                   </div>
 
                   <div className="mt-2 flex items-center gap-2">
-                    <QuantityInput value={line.quantity} onChange={(quantity) => updateQuantity(line.lineId, quantity)} />
+                    <CartLineQuantity line={line} onChange={(patch) => updateLinePatch(line.lineId, patch)} />
                     <label className="flex flex-1 items-center gap-1.5 text-[11px] font-semibold text-navy/50">
                       Price
                       <input
@@ -727,7 +732,7 @@ export function CheckoutTab({
                         step="0.01"
                         value={line.priceOverride}
                         onChange={(e) => updatePriceOverride(line.lineId, e.target.value)}
-                        placeholder={(naturalPriceCents / 100).toFixed(2)}
+                        placeholder={(linePriceInSaleUnitCents(line, naturalPriceCents) / 100).toFixed(2)}
                         className={`w-full min-w-0 rounded-md border px-1.5 py-1 text-right text-xs font-semibold focus:outline-none ${
                           priceBelowMinimum ? "border-red text-red" : "border-navy/15 text-navy focus:border-blue"
                         }`}
@@ -783,7 +788,7 @@ export function CheckoutTab({
                       </label>
                       {line.localCost.trim() && (
                         <p className="text-[10px] font-semibold text-navy/40">
-                          Total for {line.quantity}: {formatCents(unitCostToTotalCents(line.localCost, line.quantity), currency)}
+                          Total for {lineAmountInSaleUnit(line)}: {formatCents(unitCostToTotalCents(line.localCost, lineAmountInSaleUnit(line)), currency)}
                         </p>
                       )}
                       <div>

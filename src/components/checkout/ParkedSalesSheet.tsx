@@ -27,7 +27,7 @@ export function ParkedSalesSheet({
         {sales.map((sale) => {
           const items = sale.cart.reduce((sum, line) => sum + line.quantity, 0);
           // Preview only — the real total is recomputed by SERVER when the sale is completed.
-          const previewCents = sale.cart.reduce((sum, line) => sum + line.unitPriceCents * line.quantity - line.discountAmountCents, 0);
+          const previewCents = sale.cart.reduce((sum, line) => sum + Math.round(line.unitPriceCents * line.quantity) - line.discountAmountCents, 0);
           return (
             <div key={sale.id} className="flex items-center gap-2 rounded-lg border border-navy/15 p-3">
               <button type="button" onClick={() => onResume(sale.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">

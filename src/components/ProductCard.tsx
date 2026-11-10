@@ -1,6 +1,7 @@
 "use client";
 
 import { Archive, ArchiveRestore, Boxes, Package, Pencil } from "lucide-react";
+import { displayPriceCents, formatQuantity, priceUnitSuffix } from "@/lib/product-units";
 import { formatCents } from "@/lib/money";
 import type { ProductListItem } from "@/lib/types";
 
@@ -39,6 +40,8 @@ export function ProductCard({ product, currency, actions }: { product: ProductLi
       : product.lowStock
         ? "border-gold text-gold-text"
         : null;
+  // A plain product still shows just the number; one with units shows "25 kg", never 25000.
+  const quantityText = (quantity: number) => (product.unitConfig ? formatQuantity(quantity, product.unitOfMeasure, product.unitConfig) : String(quantity));
   const flagLabel = archived ? "Archived" : !product.trackStock ? "No stock tracking" : product.outOfStock ? "Out of Stock" : product.lowStock ? "Low Stock" : null;
   // A dropship-linked product's stock is its supplier's, so there's no Stock action to offer.
   const canAdjustStock = Boolean(actions?.onAdjustStock) && product.trackStock && !archived && !product.stockSource;
@@ -53,7 +56,10 @@ export function ProductCard({ product, currency, actions }: { product: ProductLi
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <p className="break-words font-bold text-navy">{product.name}</p>
-            <p className="flex-none font-display text-sm text-navy">{formatCents(product.sellingPriceCents, currency)}</p>
+            <p className="flex-none font-display text-sm text-navy">
+              {formatCents(displayPriceCents(product.sellingPriceCents, product.unitConfig), currency)}
+              {priceUnitSuffix(product.unitConfig)}
+            </p>
           </div>
           <p className="text-xs text-navy/50">
             {product.sku}
@@ -61,11 +67,11 @@ export function ProductCard({ product, currency, actions }: { product: ProductLi
           </p>
           <div className="mt-1.5 space-y-0.5 text-[11px] text-navy/70">
             <p>
-              Main Store: <span className="font-bold text-navy">{product.mainStoreQuantity ?? "—"}</span>
+              Main Store: <span className="font-bold text-navy">{product.mainStoreQuantity === null || product.mainStoreQuantity === undefined ? "—" : quantityText(product.mainStoreQuantity)}</span>
             </p>
             {(product.storefrontBreakdown ?? []).map((entry) => (
               <p key={entry.locationId}>
-                {entry.locationName}: <span className="font-bold text-navy">{entry.quantity}</span>
+                {entry.locationName}: <span className="font-bold text-navy">{quantityText(entry.quantity)}</span>
               </p>
             ))}
           </div>
@@ -73,7 +79,7 @@ export function ProductCard({ product, currency, actions }: { product: ProductLi
       </div>
       <div className="flex items-center justify-between gap-2 pl-14">
         <p className={`font-display text-xs font-black leading-none ${product.totalQuantity > 0 ? "text-green" : "text-red"}`}>
-          STOCK: {product.totalQuantity}
+          STOCK: {quantityText(product.totalQuantity)}
         </p>
         {flagLabel && (
           <span className={`flex-none rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${flagTone ?? "border-navy/30 text-navy/50"}`}>

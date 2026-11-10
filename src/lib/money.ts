@@ -36,6 +36,13 @@ export function priceTextToCents(text: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : null;
 }
 
+/** Like priceTextToCents, but keeps a fraction of a cent: a price converted to per-base-unit (KES 175/kg
+ * = 17.5 cents per gram) must survive being stored — see lib/product-units.ts. */
+export function priceTextToExactCents(text: string): number | null {
+  const parsed = Number.parseFloat(text.replace(/,/g, ""));
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 1_000_000) / 10_000 : null;
+}
+
 export function centsToPriceText(cents: number | null): string {
   if (cents === null) return "";
   return cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);

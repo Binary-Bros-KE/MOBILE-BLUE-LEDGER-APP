@@ -1,4 +1,5 @@
 import { totalCentsToUnitCostText } from "./money";
+import { baseToAmount, findUnit, unitFactor } from "./product-units";
 import { computeLineTax, resolveProductTaxConfig, type TenantTaxConfig } from "./tax";
 import type { CheckoutCartLine, MobileEditableItem, ProductListItem, ServiceChargeDraft, ServiceChargeInput } from "./types";
 import { cartLineId } from "./variants";
@@ -9,6 +10,9 @@ export type CartLineTaxResult = { grossCents: number; netCents: number; taxCents
  * wholesale threshold swaps the retail unitPriceCents for wholesalePriceCents, matching SERVER's own
  * prepareMobileCart condition exactly. */
 export function naturalUnitPriceCents(line: CheckoutCartLine): number {
+  // A pack with its own price beats wholesale, same as SERVER.
+  const unit = findUnit(line.unitConfig ?? null, line.unitCode);
+  if (unit?.priceCents != null) return unit.priceCents / unit.factor;
   if (line.wholesalePriceCents !== null && line.wholesaleMinQuantity > 0 && line.quantity >= line.wholesaleMinQuantity) {
     return line.wholesalePriceCents;
   }
@@ -20,12 +24,33 @@ export function naturalUnitPriceCents(line: CheckoutCartLine): number {
  * three read the identical "effective price" a cart line is actually charging. An explicit override
  * always wins over wholesale, same as SERVER. */
 export function effectiveUnitPriceCents(line: CheckoutCartLine): number {
-  return line.priceOverride.trim() ? Math.round(Number(line.priceOverride) * 100) : naturalUnitPriceCents(line);
+  return linePriceOverrideCents(line) ?? naturalUnitPriceCents(line);
+}
+
+/** The typed price per base unit, or undefined. It's typed per the unit the line is sold in. */
+export function linePriceOverrideCents(line: CheckoutCartLine): number | undefined {
+  if (!line.priceOverride.trim()) return undefined;
+  return Math.round(Number(line.priceOverride) * 100) / unitFactor(line.unitConfig ?? null, line.unitCode);
+}
+
+/** A per-base price as shown on this line: per kg when it's sold by the kg. */
+export function linePriceInSaleUnitCents(line: CheckoutCartLine, basePriceCents: number): number {
+  return Math.round(basePriceCents * unitFactor(line.unitConfig ?? null, line.unitCode));
+}
+
+/** How much of the sale unit this line is: 1.5 for 1500 g sold by the kg. */
+export function lineAmountInSaleUnit(line: CheckoutCartLine): number {
+  return baseToAmount(line.quantity, line.unitConfig ?? null, line.unitCode ?? null);
+}
+
+/** " kg" or " carton" after a quantity or price; empty when sold in the base unit. */
+export function lineSaleUnitLabel(line: CheckoutCartLine): string {
+  return line.unitCode ?? "";
 }
 
 export function computeCartLineTaxResults(cart: CheckoutCartLine[], tenantTaxConfig: TenantTaxConfig): CartLineTaxResult[] {
   return cart.map((line) => {
-    const taxableCents = effectiveUnitPriceCents(line) * line.quantity - line.discountAmountCents;
+    const taxableCents = Math.round(effectiveUnitPriceCents(line) * line.quantity) - line.discountAmountCents;
     const productTaxConfig = resolveProductTaxConfig({ pricesTaxInclusive: line.pricesTaxInclusive }, tenantTaxConfig);
     return computeLineTax(taxableCents, line.taxType, productTaxConfig);
   });
@@ -90,7 +115,12 @@ export function buildCartFromEditableItems(items: MobileEditableItem[], products
     // A shared-stock variant's own price is its natural price (same as SERVER's prepareMobileCart).
     const variant = item.variantKey && product?.variants?.mode === "shared" ? product.variants.shared.find((v) => v.key === item.variantKey) : undefined;
     const basePriceCents = variant?.priceCents ?? product?.sellingPriceCents;
-    const naturalPriceCents = (useWholesale ? wholesalePriceCents : basePriceCents) ?? item.unitPriceCents;
+    const unitConfig = product?.unitConfig ?? null;
+    const saleUnit = findUnit(unitConfig, item.unitCode);
+    const unitCode = saleUnit?.code ?? null;
+    const factor = saleUnit?.factor ?? 1;
+    const naturalPriceCents =
+      (saleUnit?.priceCents != null ? saleUnit.priceCents / factor : useWholesale ? wholesalePriceCents : basePriceCents) ?? item.unitPriceCents;
     const label = variant?.label ?? item.variantLabel ?? null;
     return {
       lineId: cartLineId(item.productId, item.variantKey),
@@ -101,17 +131,21 @@ export function buildCartFromEditableItems(items: MobileEditableItem[], products
       sku: product?.sku ?? "",
       unitPriceCents: basePriceCents ?? item.unitPriceCents,
       quantity: item.quantity,
+      unitOfMeasure: product?.unitOfMeasure ?? null,
+      unitConfig,
+      unitCode,
       discountAmountCents: item.discountAmountCents,
       taxType: product?.taxType ?? "vat",
       pricesTaxInclusive: product?.pricesTaxInclusive ?? null,
       minimumPriceCents: product?.minimumPriceCents ?? null,
       wholesalePriceCents,
       wholesaleMinQuantity,
-      priceOverride: item.unitPriceCents !== naturalPriceCents ? (item.unitPriceCents / 100).toFixed(2) : "",
+      // Compared with a tolerance — a fractional per-base price can differ in the last float digits.
+      priceOverride: Math.abs(item.unitPriceCents - naturalPriceCents) > 1e-6 ? ((item.unitPriceCents * factor) / 100).toFixed(2) : "",
       isLocallySourced: item.isLocallySourced,
       // item.localCostCents is stored as the TOTAL for this line — back it out to the per-unit
       // figure this field shows (see money.ts's own doc comment on the pair).
-      localCost: totalCentsToUnitCostText(item.localCostCents, item.quantity),
+      localCost: totalCentsToUnitCostText(item.localCostCents, item.quantity / factor),
       localSupplierId: item.localSupplierId,
       stockSource: item.stockSource,
     };

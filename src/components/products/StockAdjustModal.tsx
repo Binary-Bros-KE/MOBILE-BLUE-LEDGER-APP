@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { UnitSwitch } from "../UnitSwitch";
+import { allowsDecimals, amountToBase, formatQuantity, unitChoices } from "@/lib/product-units";
 import { Loader2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { ProductListItem, StockAdjustmentMode } from "@/lib/types";
@@ -49,6 +51,8 @@ export function StockAdjustModal({
   const [locationId, setLocationId] = useState(fixedLocationId ?? options.branchScope ?? "");
   const [addReason, setAddReason] = useState<AddReason>("purchase");
   const [quantity, setQuantity] = useState("");
+  const [unitCode, setUnitCode] = useState<string | null>(product.unitConfig?.defaultSaleUnit ?? null);
+  const showQuantity = (value: number) => (product.unitConfig ? formatQuantity(value, product.unitOfMeasure, product.unitConfig) : String(value));
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +65,8 @@ export function StockAdjustModal({
     return product.storefrontBreakdown.find((s) => s.locationId === locationId)?.quantity ?? 0;
   }, [locations, locationId, product]);
 
-  const qty = Number.parseInt(quantity, 10);
+  // Typed in the chosen unit; everything below is whole base units.
+  const qty = amountToBase(quantity, product.unitConfig, unitCode) ?? Number.NaN;
   const preview =
     currentQuantity === null || !Number.isFinite(qty)
       ? null
@@ -87,7 +92,7 @@ export function StockAdjustModal({
         quantity: qty,
         notes: notes.trim() || null,
       });
-      onSaved(`${product.name}: ${result.previousQuantity} → ${result.newQuantity}`);
+      onSaved(`${product.name}: ${showQuantity(result.previousQuantity)} → ${showQuantity(result.newQuantity)}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to update stock.");
     } finally {
@@ -139,23 +144,26 @@ export function StockAdjustModal({
         )}
 
         <SheetField label={mode === "count" ? "Counted quantity on the shelf" : mode === "add" ? "Quantity to add" : "Quantity damaged / lost"}>
-          <input
-            autoFocus
-            inputMode="numeric"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value.replace(/\D/g, ""))}
-            required
-            className={sheetInputClass}
-          />
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              inputMode={allowsDecimals(product.unitConfig, unitCode) ? "decimal" : "numeric"}
+              value={quantity}
+              onChange={(e) => setQuantity(allowsDecimals(product.unitConfig, unitCode) ? e.target.value.replace(/[^\d.]/g, "") : e.target.value.replace(/\D/g, ""))}
+              required
+              className={`min-w-0 ${sheetInputClass}`}
+            />
+            <UnitSwitch choices={unitChoices(product.unitOfMeasure, product.unitConfig)} value={unitCode} onChange={setUnitCode} />
+          </div>
         </SheetField>
 
         {currentQuantity !== null && (
           <p className="text-xs text-navy/60">
-            Now: <span className="font-bold text-navy">{currentQuantity}</span>
+            Now: <span className="font-bold text-navy">{showQuantity(currentQuantity)}</span>
             {preview !== null && (
               <>
                 {" "}
-                → after: <span className={`font-bold ${preview < 0 ? "text-red" : "text-navy"}`}>{preview}</span>
+                → after: <span className={`font-bold ${preview < 0 ? "text-red" : "text-navy"}`}>{showQuantity(preview)}</span>
               </>
             )}
           </p>

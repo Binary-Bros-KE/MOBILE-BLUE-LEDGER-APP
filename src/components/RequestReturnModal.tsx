@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { displayPriceCents, formatQuantity } from "@/lib/product-units";
 import { motion } from "framer-motion";
 import { Loader2, Undo2, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
@@ -111,7 +112,8 @@ export function RequestReturnModal({
                     <p className="truncate text-sm font-bold text-navy">{item.productName}</p>
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <p className="text-[11px] text-navy/50">
-                        Sold {item.quantitySold} · {item.remainingQuantity} eligible for return
+                        Sold {formatQuantity(item.quantitySold, item.unitOfMeasure, item.unitConfig)} · {formatQuantity(item.remainingQuantity, item.unitOfMeasure, item.unitConfig)} eligible for return
+                        {item.unitConfig ? ` (enter in ${item.unitOfMeasure ?? "units"})` : ""}
                       </p>
                       <input
                         type="number"
@@ -125,7 +127,7 @@ export function RequestReturnModal({
                         className="h-8 w-16 flex-none rounded-md border border-navy/15 px-2 text-right text-xs font-semibold text-navy focus:border-blue focus:outline-none disabled:bg-navy/5 disabled:text-navy/30"
                       />
                     </div>
-                    <p className="mt-0.5 text-[10px] text-navy/40">{formatCents(item.unitPriceCents, currency)} each</p>
+                    <p className="mt-0.5 text-[10px] text-navy/40">{formatCents(displayPriceCents(item.unitPriceCents, item.unitConfig), currency)}{item.unitConfig?.priceUnit ? `/${item.unitConfig.priceUnit}` : " each"}</p>
                   </div>
                 ))}
               </div>

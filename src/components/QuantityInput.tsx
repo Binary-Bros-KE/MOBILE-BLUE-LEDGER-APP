@@ -7,14 +7,15 @@ import { Minus, Plus } from "lucide-react";
  * the buttons. `draft` only exists while typing, so the field can be emptied on the way to a new number
  * without the line ever holding 0; anything that isn't a valid quantity goes back to the last one on
  * blur. Whole numbers only, same as SERVER's checkout schema. */
-export function QuantityInput({ value, onChange }: { value: number; onChange: (quantity: number) => void }) {
+export function QuantityInput({ value, onChange, decimals = false }: { value: number; onChange: (quantity: number) => void; decimals?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
 
   function handleType(text: string): void {
-    const digits = text.replace(/\D/g, "");
+    // `decimals`: a measured unit can be split — 1.5 kg, 0.25 L.
+    const digits = decimals ? text.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1") : text.replace(/\D/g, "");
     setDraft(digits);
     const quantity = Number(digits);
-    if (quantity >= 1) onChange(quantity);
+    if (quantity > 0 && Number.isFinite(quantity)) onChange(quantity);
   }
 
   return (
@@ -30,7 +31,7 @@ export function QuantityInput({ value, onChange }: { value: number; onChange: (q
       </button>
       <input
         type="text"
-        inputMode="numeric"
+        inputMode={decimals ? "decimal" : "numeric"}
         maxLength={7}
         value={draft ?? String(value)}
         onChange={(e) => handleType(e.target.value)}

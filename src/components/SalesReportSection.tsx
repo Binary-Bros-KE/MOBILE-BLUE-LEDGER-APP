@@ -113,7 +113,7 @@ function ProductsSoldCard({ products, currency, startDate, endDate }: { products
               <p className="truncate font-bold text-navy">{p.productName}</p>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="rounded-full bg-blue/50 px-2.5 py-0.5 text-xs font-extrabold text-white">
-                  {formatQuantityWithUnit(p.quantitySold, p.unitOfMeasure)}
+                  {p.quantityLabel ?? formatQuantityWithUnit(p.quantitySold, p.unitOfMeasure)}
                 </span>
                 <span className="text-navy/50">{percent(p.percentOfRevenue)} of revenue</span>
               </div>
