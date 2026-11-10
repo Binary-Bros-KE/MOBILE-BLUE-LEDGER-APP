@@ -155,6 +155,18 @@ export type EmployeeStatusValue = "active" | "suspended" | "terminated";
 
 export type MobileRole = { id: string; roleName: string; isSuperAdmin: boolean };
 
+/** Roles & Permissions — one role with what it can do (SERVER mobile-roles-service.ts). */
+export type MobileRoleDetail = MobileRole & {
+  description: string | null;
+  permissions: Record<string, string[]>;
+  isSystemRole: boolean;
+  employeeCount: number;
+  /** What "Restore defaults" sets it back to; null for a custom role or Super Admin. */
+  defaultPermissions: Record<string, string[]> | null;
+};
+
+export type RoleInput = { roleName: string; description: string | null; permissions: Record<string, string[]> };
+
 /** The optional profile fields (DESKTOP's Employee form minus photo/salary defaults). */
 export type EmployeeProfileInput = {
   middleName: string | null;

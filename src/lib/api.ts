@@ -46,6 +46,8 @@ import type {
   MobileReturnableItem,
   MobileRider,
   MobileRole,
+  MobileRoleDetail,
+  RoleInput,
   MobilePaymentMethodAdmin,
   MobileSettings,
   MobileStorefrontDetails,
@@ -222,6 +224,9 @@ export const api = {
   listEmployees: () => request<Employee[]>("/mobile/employees"),
   getEmployeeSalaries: (employeeId: string) => request<Salary[]>(`/mobile/employees/${employeeId}/salaries`),
   listRoles: () => request<MobileRole[]>("/mobile/roles"),
+  listManagedRoles: () => request<MobileRoleDetail[]>("/mobile/roles/manage"),
+  createRole: (body: RoleInput) => request<{ id: string }>("/mobile/roles", { method: "POST", body: JSON.stringify(body) }),
+  updateRole: (id: string, body: RoleInput) => request<{ id: string }>(`/mobile/roles/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   createEmployee: (body: CreateEmployeeInput) => request<DocumentIdResult>("/mobile/employees", { method: "POST", body: JSON.stringify(body) }),
   updateEmployeeDetails: (employeeId: string, body: UpdateEmployeeDetailsInput) =>
     request<DocumentIdResult>(`/mobile/employees/${employeeId}/details`, { method: "PATCH", body: JSON.stringify(body) }),

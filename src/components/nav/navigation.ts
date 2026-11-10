@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Package,
   Settings,
+  ShieldCheck,
   ShoppingCart,
   Store,
   Truck,
@@ -35,6 +36,7 @@ export type TabKey =
   | "expenses"
   | "stockLedger"
   | "employees"
+  | "roles"
   | "customers"
   | "riders"
   | "approvals"
@@ -125,7 +127,11 @@ export const navGroups: NavGroup[] = [
   },
   {
     title: "Team",
-    items: [{ key: "employees", label: "Employees", icon: Users, ready: true, permission: { module: "employees", action: "view" } }],
+    items: [
+      { key: "employees", label: "Employees", icon: Users, ready: true, permission: { module: "employees", action: "view" } },
+      // Same roles.view DESKTOP's own Roles & Permissions screen needs.
+      { key: "roles", label: "Roles & Permissions", icon: ShieldCheck, ready: true, permission: { module: "roles", action: "view" } },
+    ],
   },
   {
     title: "Business",
