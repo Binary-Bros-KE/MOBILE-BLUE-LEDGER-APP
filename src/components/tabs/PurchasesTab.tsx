@@ -61,6 +61,7 @@ export function PurchasesTab({
   canReceive,
   canViewPurchases,
   localOnly,
+  seesInternational,
   canViewRequisitions,
   canCreateRequisition,
   canApproveRequisitions,
@@ -78,6 +79,8 @@ export function PurchasesTab({
   canViewPurchases: boolean;
   /** local_credit_purchases without the purchases module: local suppliers only, no payment figures. */
   localOnly: boolean;
+  /** Without it SERVER only sends purchases from local suppliers. */
+  seesInternational: boolean;
   canViewRequisitions: boolean;
   canCreateRequisition: boolean;
   canApproveRequisitions: boolean;
@@ -205,7 +208,7 @@ export function PurchasesTab({
       )}
 
       <div className="px-4 py-4">
-        {canViewPurchases && !localOnly && (
+        {canViewPurchases && seesInternational && (
           <div className="mb-2 flex gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <FilterChip label="All suppliers" active={typeFilter === "all"} onClick={() => setTypeFilter("all")} />
             <FilterChip label="Local" active={typeFilter === "local"} onClick={() => setTypeFilter("local")} />
@@ -270,7 +273,7 @@ export function PurchasesTab({
                     aria-hidden="true"
                   />
                   {row.kind === "purchase" ? (
-                    <PurchaseCard purchase={row.purchase} hideMoney={localOnly} onSelect={() => setSelectedPurchaseId(row.purchase.id)} />
+                    <PurchaseCard purchase={row.purchase} hideMoney={localOnly} hideSupplierType={!seesInternational} onSelect={() => setSelectedPurchaseId(row.purchase.id)} />
                   ) : (
                     <RequisitionCard requisition={row.requisition} onSelect={() => setSelectedRequisitionId(row.requisition.id)} />
                   )}
@@ -301,6 +304,7 @@ export function PurchasesTab({
           currency={currency}
           editing={editingDraft}
           localOnly={localOnly}
+          canChooseSupplierType={seesInternational}
           onClose={() => {
             setCreating(false);
             setEditingDraft(null);

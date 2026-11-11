@@ -17,7 +17,18 @@ const PAYMENT_OPTIONS = [
 /** Edit a supplier's details — contacts, how you pay them (M-Pesa or bank details shown for the
  * chosen option), credit limit — or deactivate them. DESKTOP's supplier form minus country/county/
  * website, which a mobile save leaves untouched. Name must stay unique (SERVER enforces). */
-export function SupplierEditModal({ supplierId, onClose, onSaved }: { supplierId: string; onClose: () => void; onSaved: () => void }) {
+export function SupplierEditModal({
+  supplierId,
+  canChooseType,
+  onClose,
+  onSaved,
+}: {
+  supplierId: string;
+  /** Without it this supplier stays Local (SERVER forces that too). */
+  canChooseType: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [detail, setDetail] = useState<MobileSupplierDetail | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [active, setActive] = useState(true);
@@ -99,12 +110,14 @@ export function SupplierEditModal({ supplierId, onClose, onSaved }: { supplierId
           <SheetField label="Business name">
             <input value={form.businessName} onChange={(e) => set("businessName", e.target.value)} required className={sheetInputClass} />
           </SheetField>
-          <SheetField label="Type">
-            <select value={form.supplierType} onChange={(e) => set("supplierType", e.target.value)} className={sheetInputClass}>
-              <option value="local">Local</option>
-              <option value="international">International</option>
-            </select>
-          </SheetField>
+          {canChooseType && (
+            <SheetField label="Type">
+              <select value={form.supplierType} onChange={(e) => set("supplierType", e.target.value)} className={sheetInputClass}>
+                <option value="local">Local</option>
+                <option value="international">International</option>
+              </select>
+            </SheetField>
+          )}
           <SheetField label="Contact person">
             <input value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} className={sheetInputClass} />
           </SheetField>
