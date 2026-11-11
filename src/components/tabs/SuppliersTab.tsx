@@ -41,7 +41,7 @@ export function SuppliersTab({
 
   useEffect(loadSuppliers, [loadSuppliers]);
 
-  const owedTo = (type: SupplierType) => (suppliers ?? []).filter((s) => s.supplierType === type).reduce((sum, s) => sum + Math.max(0, s.balanceCents), 0);
+  const owedTo = (type: SupplierType) => (suppliers ?? []).filter((s) => s.supplierType === type).reduce((sum, s) => sum + s.balanceCents, 0);
   const owedLocalCents = owedTo("local");
   const owedInternationalCents = owedTo("international");
 
