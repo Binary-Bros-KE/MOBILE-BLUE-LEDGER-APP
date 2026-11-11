@@ -45,6 +45,7 @@ import type {
   MobileQuotationEditData,
   MobileReturnableItem,
   MobileRider,
+  MobileCreditNoteListItem,
   MobileRole,
   MobileRoleDetail,
   RoleInput,
@@ -269,6 +270,9 @@ export const api = {
   listPendingSaleAdjustments: () => request<MobilePendingSaleAdjustment[]>("/mobile/approvals/sale-adjustments"),
   decideSaleAdjustment: (kind: "void" | "return", id: string, decision: "approve" | "reject", notes?: string) =>
     request<{ id: string; saleId: string }>(`/mobile/approvals/sale-adjustments/${kind}/${id}/${decision}`, { method: "POST", body: JSON.stringify({ notes }) }),
+  listSaleCreditNotes: (saleId: string) => request<MobileCreditNoteListItem[]>(`/mobile/sales/${saleId}/credit-notes`),
+  issueCreditNote: (returnId: string) =>
+    request<{ id: string; creditNoteNumber: string }>(`/mobile/returns/${returnId}/credit-note`, { method: "POST" }),
   requestSaleReturn: (id: string, body: RequestSaleReturnInput) =>
     request<DocumentIdResult>(`/mobile/sales/${id}/request-return`, { method: "POST", body: JSON.stringify(body) }),
   listInvoices: (locationId?: string) =>

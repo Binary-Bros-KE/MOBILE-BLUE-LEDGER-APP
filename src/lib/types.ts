@@ -364,7 +364,8 @@ export type SharedDocument = Partial<SaleStatusFlags> & {
   quotationStatus: string | null;
 };
 
-export type ShareDocumentEntity = "sale" | "quotation" | "customer_statement" | "sale_delivery" | "quotation_delivery";
+/** "credit_note": entityId is the return (SERVER builds the credit note from it). */
+export type ShareDocumentEntity = "sale" | "quotation" | "customer_statement" | "sale_delivery" | "quotation_delivery" | "credit_note";
 
 /** The customer a document is shared to — pre-fills the Share sheet (mobile /share-recipient). */
 export type ShareRecipient = { name: string | null; phone: string | null; email: string | null };
@@ -433,6 +434,8 @@ export type MobilePendingSaleAdjustment = {
   requestedAt: string;
   lines: string[];
   currency: string;
+  /** Against an invoice: a return there is a credit note. */
+  isInvoice: boolean;
 };
 
 export type InvoiceListItem = {
@@ -1353,6 +1356,7 @@ export type RecentApprovalDecision = {
   status: "approved" | "rejected";
   decidedByName: string | null;
   decidedAt: string | null;
+  creditNoteNumber: string | null;
 };
 
 /** Backs the Approvals tab — one invoice-cancellation request still awaiting a decision. */
@@ -1472,4 +1476,15 @@ export type CreateRequisitionInput = {
   storefrontId: string | null;
   notes: string | null;
   items: Array<{ productId: string | null; itemName: string; quantity: number; notes: string | null }>;
+};
+
+/** SERVER's mobile-credit-notes-service.ts: a return on a receipt or invoice that isn't rejected. */
+export type MobileCreditNoteListItem = {
+  id: string;
+  status: string;
+  creditNoteNumber: string | null;
+  amountCents: number;
+  refundCents: number | null;
+  lines: string[];
+  requestedAt: string;
 };

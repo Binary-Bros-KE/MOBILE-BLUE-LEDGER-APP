@@ -118,6 +118,7 @@ function RecentDecisionRow({ entry, onOpen }: { entry: RecentApprovalDecision; o
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-bold text-navy">
           {KIND_LABEL[entry.kind]} · {entry.documentNumber ?? "—"}
+          {entry.creditNoteNumber ? ` · ${entry.creditNoteNumber}` : ""}
         </p>
         <p className="truncate text-[11px] text-navy/50">{entry.reason}</p>
         <p className="truncate text-[11px] text-navy/40">

@@ -54,7 +54,7 @@ export function SaleAdjustmentApprovals({ onDecided }: { onDecided?: () => void 
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-sm font-bold text-navy">
                   {item.kind === "void" ? <Ban className="size-4 text-red" aria-hidden="true" /> : <Undo2 className="size-4 text-blue" aria-hidden="true" />}
-                  {item.kind === "void" ? "Void" : "Return"} · {item.documentNumber ?? "Sale"}
+                  {item.kind === "void" ? "Void" : item.isInvoice ? "Credit Note" : "Return"} · {item.documentNumber ?? "Sale"}
                 </p>
                 <p className="text-[11px] text-navy/50">
                   {item.requestedByName} · {item.locationName} · {new Date(item.requestedAt).toLocaleString()}
