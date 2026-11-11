@@ -14,6 +14,7 @@ import { canPrintReceipts, getPrinterSettings, printDocument, printerErrorMessag
 import { DeliveryNoteModal } from "./DeliveryNoteModal";
 import { PrinterSetupSheet } from "./PrinterSetupSheet";
 import { ShareSheet } from "./ShareSheet";
+import { CreditNotesSection } from "./CreditNotesSection";
 import { RequestReturnModal } from "./RequestReturnModal";
 import { CheckoutCustomerPickerModal } from "./tabs/CheckoutCustomerPickerModal";
 
@@ -123,6 +124,8 @@ export function DocumentDetailModal({
   const [requestCancelSent, setRequestCancelSent] = useState(false);
   const [requestReturnOpen, setRequestReturnOpen] = useState(false);
   const [requestReturnSent, setRequestReturnSent] = useState(false);
+  const [creditNotesKey, setCreditNotesKey] = useState(0);
+  const [creditNoteCount, setCreditNoteCount] = useState(0);
   /** null = closed; otherwise the reason being typed for a void. */
   const [voidReason, setVoidReason] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
@@ -593,6 +596,7 @@ export function DocumentDetailModal({
                 {doc.discountAmountCents > 0 && <Row label="Discount" value={`-${money(doc.discountAmountCents)}`} />}
                 {doc.includeTaxBreakdown && doc.addedTaxCents > 0 && <Row label="Total Tax" value={money(doc.addedTaxCents)} />}
                 <Row label="Total" value={money(doc.grandTotalCents)} strong />
+                {doc.creditedCents ? <Row label="Credit Notes" value={`-${money(doc.creditedCents)}`} /> : null}
                 {doc.balanceDueCents !== null && doc.balanceDueCents > 0 && (
                   <Row label="Balance Due" value={money(doc.balanceDueCents)} strong className="text-red" />
                 )}
@@ -765,8 +769,18 @@ export function DocumentDetailModal({
               </button>
             )}
 
+            {kind === "sale" && <CreditNotesSection saleId={saleId} currency={doc.currency} refreshKey={creditNotesKey} onLoaded={setCreditNoteCount} />}
+
             {doc.documentKind === "invoice" && doc.paymentStatus !== "cancelled" && (
               <div className="mt-3 space-y-2 border-t border-dashed border-navy/15 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setRequestReturnOpen(true)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red/30 bg-white py-2.5 text-xs font-bold text-red"
+                >
+                  <Undo2 className="size-3.5" aria-hidden="true" />
+                  {canApprove ? "Issue Credit Note" : "Request Credit Note"}
+                </button>
                 {doc.balanceDueCents !== null && doc.balanceDueCents > 0 && (
                   <button
                     type="button"
@@ -781,7 +795,7 @@ export function DocumentDetailModal({
                     Record Payment
                   </button>
                 )}
-                {onEdit && doc.payments.length === 0 && (
+                {onEdit && doc.payments.length === 0 && creditNoteCount === 0 && (
                   <button
                     type="button"
                     onClick={onEdit}
@@ -1170,10 +1184,16 @@ export function DocumentDetailModal({
           saleId={saleId}
           currency={doc.currency}
           approveNow={canApprove}
+          creditNote={doc.documentKind === "invoice"}
           onClose={() => setRequestReturnOpen(false)}
           onRequested={() => {
             setRequestReturnOpen(false);
-            if (canApprove) {
+            setCreditNotesKey((key) => key + 1);
+            if (doc.documentKind === "invoice") {
+              setNotice(canApprove ? "Credit note issued — stock is back and the invoice is updated." : "Credit note sent for approval.");
+              reload();
+              onChanged?.();
+            } else if (canApprove) {
               setNotice("Returned — the items are back in stock.");
               reload();
               onChanged?.();

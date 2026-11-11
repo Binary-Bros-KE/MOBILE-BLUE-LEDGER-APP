@@ -18,11 +18,15 @@ export function RequestReturnModal({
   saleId,
   currency,
   approveNow = false,
+  creditNote = false,
   onClose,
   onRequested,
 }: {
   saleId: string;
   currency: string;
+  /** On an invoice: a credit note. Same lines and rules; on approval what's owed comes down first and
+   * only the rest is refunded (SERVER lib/invoice-credit.ts). */
+  creditNote?: boolean;
   /** The viewer can approve returns — return straight away (stock back now) instead of requesting. */
   approveNow?: boolean;
   onClose: () => void;
@@ -87,12 +91,16 @@ export function RequestReturnModal({
           <div>
             <p className="flex items-center gap-1.5 font-display text-lg text-navy">
               <Undo2 className="size-4 text-blue" aria-hidden="true" />
-              {approveNow ? "Return Items" : "Request Return"}
+              {creditNote ? (approveNow ? "Issue Credit Note" : "Request Credit Note") : approveNow ? "Return Items" : "Request Return"}
             </p>
             <p className="text-xs text-navy/50">
-              {approveNow
-                ? "Select the items and quantities being returned. They go straight back into stock."
-                : "Select the items and quantities being returned. A manager must approve before stock is restocked."}
+              {creditNote
+                ? approveNow
+                  ? "Choose what comes off this invoice. Stock goes back now; what's still owed comes down first and only the rest is refunded."
+                  : "Choose what comes off this invoice. A manager approves it; then stock goes back and what's owed comes down first."
+                : approveNow
+                  ? "Select the items and quantities being returned. They go straight back into stock."
+                  : "Select the items and quantities being returned. A manager must approve before stock is restocked."}
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="grid size-8 flex-none place-items-center rounded-full text-navy/40 hover:bg-cream-dark hover:text-navy">
@@ -161,7 +169,7 @@ export function RequestReturnModal({
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue py-3 text-sm font-bold text-white disabled:opacity-50"
               >
                 {submitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-                {submitting ? "Submitting…" : "Submit Return Request"}
+                {submitting ? "Submitting…" : creditNote ? (approveNow ? "Issue Credit Note" : "Send for Approval") : "Submit Return Request"}
               </button>
             </form>
           )}
