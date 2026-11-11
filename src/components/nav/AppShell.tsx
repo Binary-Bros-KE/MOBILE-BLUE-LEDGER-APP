@@ -229,7 +229,8 @@ export function AppShell() {
               currency={session?.currency ?? "KES"}
               canCreate={can("purchases", "create") || can("local_credit_purchases", "create")}
               canEdit={can("purchases", "edit")}
-              canReceive={can("purchases", "edit") || can("local_credit_purchases", "edit")}
+              // Whoever records purchases receives them too, at their own storefront (SERVER checks).
+              canReceive={can("purchases", "edit") || can("purchases", "create") || can("local_credit_purchases", "create") || can("local_credit_purchases", "edit")}
               canViewPurchases={can("purchases", "view") || can("local_credit_purchases", "view")}
               localOnly={!can("purchases", "view") && can("local_credit_purchases", "view")}
               seesInternational={can("international_suppliers", "view")}

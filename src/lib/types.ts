@@ -1281,6 +1281,8 @@ export type CreatePurchaseInput = {
   notes: string | null;
   items: CreatePurchaseLine[];
   intent: "draft" | "ordered";
+  /** Create & Receive: SERVER orders it and receives every line in the same step. */
+  receiveNow?: boolean;
 };
 
 export type PurchasePaymentInput = {

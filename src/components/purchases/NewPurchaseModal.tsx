@@ -66,6 +66,7 @@ export function NewPurchaseModal({
   fromRequisition = null,
   localOnly = false,
   canChooseSupplierType = true,
+  canReceiveNow = false,
   onClose,
   onCreated,
 }: {
@@ -78,6 +79,8 @@ export function NewPurchaseModal({
   /** Goods on credit from a local supplier: buying price only, no drafts or shipping expense (SERVER enforces). */
   localOnly?: boolean;
   canChooseSupplierType?: boolean;
+  /** Offers "Create & Receive" on a new purchase: ordered and every line received in one go. */
+  canReceiveNow?: boolean;
   onClose: () => void;
   onCreated: (purchaseId: string) => void;
 }) {
@@ -117,7 +120,7 @@ export function NewPurchaseModal({
   const [notes, setNotes] = useState(editing?.notes ?? (fromRequisition ? `From requisition ${fromRequisition.requisitionNumber}` : ""));
   const [showMore, setShowMore] = useState(false);
   const [creatingSupplier, setCreatingSupplier] = useState(false);
-  const [saving, setSaving] = useState<"draft" | "ordered" | null>(null);
+  const [saving, setSaving] = useState<"draft" | "ordered" | "received" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const purchaseId = useRef(`purchase_${crypto.randomUUID()}`);
 
@@ -192,7 +195,7 @@ export function NewPurchaseModal({
     setLines((prev) => prev.map((l) => (l.productId === productId ? { ...l, ...patch } : l)));
   }
 
-  async function submit(intent: "draft" | "ordered"): Promise<void> {
+  async function submit(intent: "draft" | "ordered" | "received"): Promise<void> {
     if (!supplierId) return setError("Choose a supplier.");
     if (!locationId) return setError("Choose where the goods will be received.");
     if (lines.length === 0) return setError("Add at least one product.");
@@ -225,14 +228,14 @@ export function NewPurchaseModal({
         shippingExpenseCents: priceTextToCents(shippingCost) ?? 0,
         notes: notes.trim() || null,
         items,
-        intent,
+        intent: intent === "draft" ? ("draft" as const) : ("ordered" as const),
       };
       if (fromRequisition) {
         const result = await api.approveRequisition(fromRequisition.requisitionId, { ...body, id: purchaseId.current });
         onCreated(result.purchaseId);
         return;
       }
-      const result = editing ? await api.updateDraftPurchase(editing.id, body) : await api.createPurchase({ ...body, id: purchaseId.current });
+      const result = editing ? await api.updateDraftPurchase(editing.id, body) : await api.createPurchase({ ...body, id: purchaseId.current, receiveNow: intent === "received" });
       onCreated(result.id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save purchase.");
@@ -456,6 +459,17 @@ export function NewPurchaseModal({
                 Place Order
               </button>
             </div>
+            {canReceiveNow && !editing && !fromRequisition && (
+              <button
+                type="button"
+                disabled={saving !== null}
+                onClick={() => void submit("received")}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-green py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {saving === "received" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                Create &amp; Receive
+              </button>
+            )}
           </div>
         )}
       </BottomSheet>

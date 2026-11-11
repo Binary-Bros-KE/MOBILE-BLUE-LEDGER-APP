@@ -19,7 +19,7 @@ export const PERMISSION_MODULES = [
   { key: "expenses", label: "Expenses", actions: ["view", "create", "edit", "delete", "export"] },
   { key: "expense_categories", label: "Expense Categories", actions: ["view", "create", "edit", "delete"] },
   { key: "local_purchases", label: "Local Purchases", actions: ["view", "create", "edit", "delete", "export"] },
-  { key: "local_credit_purchases", label: "Local Credit Purchases (Edit = receive goods)", actions: ["view", "create", "edit"] },
+  { key: "local_credit_purchases", label: "Local Credit Purchases", actions: ["view", "create", "edit"] },
   { key: "borrows", label: "Borrow & Lend", actions: ["view", "create", "edit", "export"] },
   { key: "employees", label: "Employees", actions: ["view", "create", "edit", "delete", "export"] },
   { key: "salaries", label: "Salaries", actions: ["view", "create", "edit", "delete", "export"] },

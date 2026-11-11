@@ -305,6 +305,7 @@ export function PurchasesTab({
           editing={editingDraft}
           localOnly={localOnly}
           canChooseSupplierType={seesInternational}
+          canReceiveNow={canReceive}
           onClose={() => {
             setCreating(false);
             setEditingDraft(null);
