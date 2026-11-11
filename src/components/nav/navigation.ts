@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   Store,
   Truck,
+  Tv,
   UserRound,
   Users,
   Wallet,
@@ -39,6 +40,7 @@ export type TabKey =
   | "roles"
   | "customers"
   | "riders"
+  | "subscriptions"
   | "approvals"
   | "workingHours"
   | "settings"
@@ -90,6 +92,7 @@ export const navGroups: NavGroup[] = [
       // tabs (see CheckoutTab's CustomerPickerModal/DeliveryModal).
       { key: "customers", label: "Customers", icon: UserRound, ready: true, permission: { module: "customers", action: "view" } },
       { key: "riders", label: "Riders", icon: Bike, ready: true, permission: { module: "riders", action: "view" } },
+      { key: "subscriptions", label: "Subscriptions", icon: Tv, ready: true, permission: { module: "subscriptions", action: "view" } },
       // Same permission DESKTOP's own Approvals inbox requires — approving a manager-level decision
       // needs the same grant here as it does there, not a mobile-specific one.
       { key: "approvals", label: "Approvals", icon: CheckCircle2, ready: true, permission: { module: "approvals", action: "approve" } },

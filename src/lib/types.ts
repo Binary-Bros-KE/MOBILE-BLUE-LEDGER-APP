@@ -1473,3 +1473,49 @@ export type CreateRequisitionInput = {
   notes: string | null;
   items: Array<{ productId: string | null; itemName: string; quantity: number; notes: string | null }>;
 };
+
+// --- Subscriptions (DStv, GOtv...): SERVER's mobile-subscriptions-service.ts shapes.
+export type MobileSubscriptionNotice = {
+  id: string;
+  stage: "week" | "three_days" | "due" | "expired";
+  channel: string;
+  recipient: string | null;
+  sentAt: string;
+  sentByName: string | null;
+};
+
+export type MobileSubscription = {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  locationId: string | null;
+  locationName: string | null;
+  serviceName: string;
+  accountNumber: string | null;
+  startDate: string;
+  periodDays: number;
+  endDate: string;
+  amountCents: number | null;
+  status: string;
+  renewedFromId: string | null;
+  notes: string | null;
+  daysLeft: number;
+  stage: "active" | "week" | "three_days" | "due" | "expired";
+  pendingNotice: "week" | "three_days" | "due" | "expired" | null;
+  notices: MobileSubscriptionNotice[];
+};
+
+export type MobileSubscriptionServiceSuggestion = { serviceName: string; periodDays: number; amountCents: number | null };
+
+export type CreateSubscriptionInput = {
+  id: string;
+  customerId: string;
+  serviceName: string;
+  accountNumber: string | null;
+  startDate: string;
+  periodDays: number;
+  amountCents: number | null;
+  notes: string | null;
+};

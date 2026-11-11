@@ -23,6 +23,7 @@ import { PurchasesTab } from "../tabs/PurchasesTab";
 import { QuotationsTab } from "../tabs/QuotationsTab";
 import { ReportsTab } from "../tabs/ReportsTab";
 import { RidersTab } from "../tabs/RidersTab";
+import { SubscriptionsTab } from "../tabs/SubscriptionsTab";
 import { SalesTab } from "../tabs/SalesTab";
 import { SettingsTab } from "../tabs/SettingsTab";
 import { StockLedgerTab } from "../tabs/StockLedgerTab";
@@ -184,6 +185,14 @@ export function AppShell() {
           {activeTab === "transactions" && <TransactionsTab />}
           {activeTab === "customers" && <CustomersTab currency={session?.currency ?? "KES"} canCollect={can("sales", "edit")} canEdit={can("customers", "edit")} />}
           {activeTab === "riders" && <RidersTab />}
+          {activeTab === "subscriptions" && (
+            <SubscriptionsTab
+              currency={session?.currency ?? "KES"}
+              businessName={session?.branchName ?? "our shop"}
+              canCreate={can("subscriptions", "create")}
+              canEdit={can("subscriptions", "edit")}
+            />
+          )}
           {activeTab === "products" && (
             <ProductsTab
               currency={session?.currency ?? "KES"}

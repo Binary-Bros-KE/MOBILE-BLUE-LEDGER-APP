@@ -45,6 +45,9 @@ import type {
   MobileQuotationEditData,
   MobileReturnableItem,
   MobileRider,
+  MobileSubscription,
+  MobileSubscriptionServiceSuggestion,
+  CreateSubscriptionInput,
   MobileRole,
   MobileRoleDetail,
   RoleInput,
@@ -307,6 +310,18 @@ export const api = {
   getStatement: (customerId: string) => request<SharedStatement>(`/mobile/customers/${customerId}/statement`),
   listRiders: () => request<MobileRider[]>("/mobile/riders"),
   createRider: (body: CreateRiderInput) => request<MobileRider>("/mobile/riders", { method: "POST", body: JSON.stringify(body) }),
+  listSubscriptions: () => request<MobileSubscription[]>("/mobile/subscriptions"),
+  listSubscriptionSuggestions: () => request<MobileSubscriptionServiceSuggestion[]>("/mobile/subscriptions/suggestions"),
+  createSubscription: (body: CreateSubscriptionInput) =>
+    request<MobileSubscription>("/mobile/subscriptions", { method: "POST", body: JSON.stringify(body) }),
+  getSubscriptionRenewalDefaults: (id: string) =>
+    request<{ startDate: string; periodDays: number; amountCents: number | null }>(`/mobile/subscriptions/${id}/renewal-defaults`),
+  renewSubscription: (id: string, body: { id: string; startDate: string; periodDays: number; amountCents: number | null }) =>
+    request<MobileSubscription>(`/mobile/subscriptions/${id}/renew`, { method: "POST", body: JSON.stringify(body) }),
+  setSubscriptionStatus: (id: string, status: "active" | "cancelled") =>
+    request<MobileSubscription>(`/mobile/subscriptions/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
+  recordSubscriptionNotice: (id: string, body: { id: string; stage: string; channel: string; recipient: string | null }) =>
+    request<MobileSubscription>(`/mobile/subscriptions/${id}/notices`, { method: "POST", body: JSON.stringify(body) }),
   listSuppliers: () => request<MobileSupplier[]>("/mobile/suppliers"),
   listSupplierBalances: () => request<MobileSupplierWithBalance[]>("/mobile/suppliers/balances"),
   listSupplierBalanceEntries: (supplierId: string) => request<MobileSupplierBalanceEntry[]>(`/mobile/suppliers/${supplierId}/balance-entries`),
