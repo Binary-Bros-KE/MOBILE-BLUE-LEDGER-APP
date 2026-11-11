@@ -359,6 +359,8 @@ export type SharedDocument = Partial<SaleStatusFlags> & {
   notesSections: SharedNotesSection[];
   dueDate: string | null;
   balanceDueCents: number | null;
+  /** Approved credit notes on an invoice. */
+  creditedCents?: number | null;
   paymentStatus: string | null;
   validUntil: string | null;
   quotationStatus: string | null;

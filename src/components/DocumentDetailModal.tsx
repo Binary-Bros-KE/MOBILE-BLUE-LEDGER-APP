@@ -596,6 +596,7 @@ export function DocumentDetailModal({
                 {doc.discountAmountCents > 0 && <Row label="Discount" value={`-${money(doc.discountAmountCents)}`} />}
                 {doc.includeTaxBreakdown && doc.addedTaxCents > 0 && <Row label="Total Tax" value={money(doc.addedTaxCents)} />}
                 <Row label="Total" value={money(doc.grandTotalCents)} strong />
+                {doc.creditedCents ? <Row label="Credit Notes" value={`-${money(doc.creditedCents)}`} /> : null}
                 {doc.balanceDueCents !== null && doc.balanceDueCents > 0 && (
                   <Row label="Balance Due" value={money(doc.balanceDueCents)} strong className="text-red" />
                 )}
