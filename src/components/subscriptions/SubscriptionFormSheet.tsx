@@ -46,7 +46,7 @@ export function SubscriptionFormSheet({
   const matches = useMemo(() => {
     const term = customerSearch.trim().toLowerCase();
     if (!term || !customers) return [];
-    return customers.filter((customer) => `${customer.name} ${customer.phone} ${customer.customerCode}`.toLowerCase().includes(term)).slice(0, 20);
+    return customers.filter((customer) => `${customer.name} ${customer.companyName ?? ""} ${customer.phone} ${customer.customerCode}`.toLowerCase().includes(term)).slice(0, 20);
   }, [customers, customerSearch]);
 
   const period = Number(periodDays);

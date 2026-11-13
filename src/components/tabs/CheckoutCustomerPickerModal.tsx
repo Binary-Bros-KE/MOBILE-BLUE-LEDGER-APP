@@ -32,7 +32,7 @@ export function CheckoutCustomerPickerModal({
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return customers.slice(0, 30);
-    return customers.filter((c) => `${c.name} ${c.phone} ${c.customerCode}`.toLowerCase().includes(term)).slice(0, 30);
+    return customers.filter((c) => `${c.name} ${c.companyName ?? ""} ${c.phone} ${c.customerCode}`.toLowerCase().includes(term)).slice(0, 30);
   }, [customers, search]);
 
   return (

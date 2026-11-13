@@ -103,7 +103,7 @@ export function InvoicesTab({
     if (!customers) return [];
     const term = customerSearch.trim().toLowerCase();
     if (!term) return customers.slice(0, 30);
-    return customers.filter((c) => `${c.name} ${c.phone}`.toLowerCase().includes(term)).slice(0, 30);
+    return customers.filter((c) => `${c.name} ${c.companyName ?? ""} ${c.phone}`.toLowerCase().includes(term)).slice(0, 30);
   }, [customers, customerSearch]);
 
   const filteredInvoices = useMemo(() => {

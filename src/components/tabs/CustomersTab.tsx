@@ -38,7 +38,7 @@ export function CustomersTab({ currency, canCollect, canEdit }: { currency: stri
     const term = search.trim().toLowerCase();
     return customers.filter((c) => {
       if (owingOnly && c.balanceDueCents <= 0) return false;
-      return !term || `${c.name} ${c.phone} ${c.customerCode}`.toLowerCase().includes(term);
+      return !term || `${c.name} ${c.companyName ?? ""} ${c.phone} ${c.customerCode}`.toLowerCase().includes(term);
     });
   }, [customers, search, owingOnly]);
 
@@ -92,6 +92,7 @@ export function CustomersTab({ currency, canCollect, canEdit }: { currency: stri
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-navy">{customer.name}</p>
+                  {customer.companyName && <p className="truncate text-xs font-semibold text-navy/50">{customer.companyName}</p>}
                   <p className="flex items-center gap-1 truncate text-xs text-navy/50">
                     <Phone className="size-3 flex-none" aria-hidden="true" />
                     {customer.phone}

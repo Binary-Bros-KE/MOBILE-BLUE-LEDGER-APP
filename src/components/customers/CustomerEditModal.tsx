@@ -35,6 +35,7 @@ export function CustomerEditModal({ customerId, onClose, onSaved }: { customerId
           name: d.name,
           phone: d.phone,
           customerType: d.customerType,
+          companyName: d.companyName ?? "",
           email: d.email ?? "",
           kraPin: d.kraPin ?? "",
           physicalAddress: d.physicalAddress ?? "",
@@ -57,6 +58,7 @@ export function CustomerEditModal({ customerId, onClose, onSaved }: { customerId
         name: form.name!.trim(),
         phone: form.phone!.trim(),
         customerType: form.customerType as MobileCustomerDetail["customerType"],
+        companyName: text("companyName"),
         email: text("email"),
         kraPin: text("kraPin"),
         physicalAddress: text("physicalAddress"),
@@ -96,6 +98,9 @@ export function CustomerEditModal({ customerId, onClose, onSaved }: { customerId
               </select>
             </SheetField>
           </div>
+          <SheetField label="Company (optional)">
+            <input value={form.companyName} onChange={(e) => set("companyName", e.target.value)} placeholder="e.g. Eakha Company Ltd" className={sheetInputClass} />
+          </SheetField>
           <div className="grid grid-cols-2 gap-3">
             <SheetField label="Credit limit">
               <input inputMode="decimal" value={form.creditLimit} onChange={(e) => set("creditLimit", e.target.value)} placeholder="No limit" className={sheetInputClass} />

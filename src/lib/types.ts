@@ -456,7 +456,8 @@ export type InvoiceListItem = {
   currency: string;
 };
 
-export type MobileCustomer = { id: string; name: string; phone: string; customerCode: string };
+/** companyName: optional company the customer belongs to (absent from an older SERVER). */
+export type MobileCustomer = { id: string; name: string; phone: string; customerCode: string; companyName?: string | null };
 
 export type MobileCustomerDetail = {
   id: string;
@@ -464,6 +465,7 @@ export type MobileCustomerDetail = {
   customerType: "retail" | "wholesale" | "corporate" | "walk_in" | "personal";
   name: string;
   phone: string;
+  companyName?: string | null;
   email: string | null;
   kraPin: string | null;
   physicalAddress: string | null;
