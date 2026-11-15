@@ -118,6 +118,8 @@ export function RequisitionDetailModal({
           branchScope: viewerIsSuperAdmin ? null : viewerBranchId,
           workingLocationId: viewerBranchId,
           vatRatePercent,
+          // Creates a product for a requisition line; its prices come from the order.
+          strictMarkPoint: null,
         });
       }, "Could not open the product form.");
       if (!ok) return;

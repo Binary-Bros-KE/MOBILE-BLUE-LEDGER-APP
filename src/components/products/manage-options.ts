@@ -13,6 +13,8 @@ export type ProductManageOptions = {
    * asking. Unlike branchScope it grants/limits nothing on SERVER. */
   workingLocationId: string | null;
   vatRatePercent: number;
+  /** Strict Mark Point: typing one price fills the other (lib/mark-point-form.ts). Null when off. */
+  strictMarkPoint: number | null;
 };
 
 export const MAIN_STORE_TYPE = "distribution_center";

@@ -6,6 +6,7 @@ import { allowsDecimals, amountToBase, baseToAmount, type ProductUnitConfig, uni
 import { ChevronDown, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { centsToPriceText, formatCents, priceTextToCents, priceTextToExactCents } from "@/lib/money";
+import { sellingFromBuying } from "@/lib/mark-point";
 import type { MobileLocation, MobileSupplier, ProductListItem, PurchaseDetail } from "@/lib/types";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
 import { QuickCreateSupplierModal } from "../QuickCreateSupplierModal";
@@ -22,6 +23,8 @@ type Line = {
   quantity: string;
   unitCost: string;
   sellingPrice: string;
+  /** Someone typed this line's selling price: strict Mark Point stops filling it from the cost. */
+  sellingTyped?: boolean;
 };
 
 /** Text fields of a purchase line re-expressed in another unit: 25000 g at 0.14 -> 25 kg at 140. */
@@ -67,6 +70,7 @@ export function NewPurchaseModal({
   localOnly = false,
   canChooseSupplierType = true,
   canReceiveNow = false,
+  strictMarkPoint = null,
   onClose,
   onCreated,
 }: {
@@ -81,6 +85,8 @@ export function NewPurchaseModal({
   canChooseSupplierType?: boolean;
   /** Offers "Create & Receive" on a new purchase: ordered and every line received in one go. */
   canReceiveNow?: boolean;
+  /** Strict Mark Point (Business Profile): a new cost fills the line's selling price. */
+  strictMarkPoint?: number | null;
   onClose: () => void;
   onCreated: (purchaseId: string) => void;
 }) {
@@ -189,6 +195,14 @@ export function NewPurchaseModal({
     const baseCost = priceTextToExactCents(line.unitCost);
     const baseSell = priceTextToExactCents(line.sellingPrice);
     updateLine(line.productId, lineInUnit(line, baseQuantity, baseCost === null ? null : baseCost / current, baseSell === null ? null : baseSell / current, next));
+  }
+
+  /** Strict Mark Point: a new cost fills the selling price until someone types one (SERVER does the
+   * same for a line saved without one — mobile-purchases-service.ts). Both are per the line's unit. */
+  function costChange(line: Line, unitCost: string): Partial<Line> {
+    const costCents = priceTextToCents(unitCost) ?? 0;
+    if (strictMarkPoint === null || line.sellingTyped || costCents <= 0) return { unitCost };
+    return { unitCost, sellingPrice: centsToPriceText(sellingFromBuying(costCents, strictMarkPoint)) };
   }
 
   function updateLine(productId: string, patch: Partial<Line>): void {
@@ -372,7 +386,7 @@ export function NewPurchaseModal({
                     <input
                       inputMode="decimal"
                       value={line.unitCost}
-                      onChange={(e) => updateLine(line.productId, { unitCost: e.target.value })}
+                      onChange={(e) => updateLine(line.productId, costChange(line, e.target.value))}
                       className={sheetInputClass}
                     />
                   </SheetField>
@@ -384,6 +398,7 @@ export function NewPurchaseModal({
                         onChange={(e) =>
                           updateLine(line.productId, {
                             sellingPrice: e.target.value,
+                            sellingTyped: true,
                           })
                         }
                         placeholder="Keep"

@@ -19,6 +19,7 @@ import { RolesTab } from "../tabs/RolesTab";
 import { ExpensesTab } from "../tabs/ExpensesTab";
 import { InvoicesTab } from "../tabs/InvoicesTab";
 import { ProductsTab } from "../tabs/ProductsTab";
+import { strictMarkPoint } from "@/lib/mark-point";
 import { PurchasesTab } from "../tabs/PurchasesTab";
 import { QuotationsTab } from "../tabs/QuotationsTab";
 import { ReportsTab } from "../tabs/ReportsTab";
@@ -203,6 +204,7 @@ export function AppShell() {
               viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               viewerBranchId={session?.branchId ?? null}
               vatRatePercent={session?.vatRatePercent ?? 0}
+              strictMarkPoint={strictMarkPoint(session)}
             />
           )}
           {activeTab === "reports" && <ReportsTab viewerIsSuperAdmin={session?.isSuperAdmin ?? false} />}
@@ -240,6 +242,7 @@ export function AppShell() {
               canCreateProduct={can("products", "create")}
               viewerEmployeeId={session?.employeeId ?? null}
               vatRatePercent={session?.vatRatePercent ?? 16}
+              strictMarkPoint={strictMarkPoint(session)}
               viewerIsSuperAdmin={session?.isSuperAdmin ?? false}
               viewerBranchId={session?.branchId ?? null}
             />

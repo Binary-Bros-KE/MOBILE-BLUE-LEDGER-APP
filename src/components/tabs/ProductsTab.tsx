@@ -33,6 +33,7 @@ export function ProductsTab({
   viewerIsSuperAdmin,
   viewerBranchId,
   vatRatePercent,
+  strictMarkPoint = null,
 }: {
   currency: string;
   /** products.create / products.edit / inventory.edit — same grants DESKTOP checks. */
@@ -44,6 +45,8 @@ export function ProductsTab({
   viewerIsSuperAdmin: boolean;
   viewerBranchId: string | null;
   vatRatePercent: number;
+  /** Strict Mark Point: typing one price fills the other in the product form. */
+  strictMarkPoint?: number | null;
 }) {
   const [products, setProducts] = useState<ProductListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,12 +86,13 @@ export function ProductsTab({
           branchScope: viewerIsSuperAdmin ? null : viewerBranchId,
           workingLocationId: viewerBranchId,
           vatRatePercent,
+          strictMarkPoint,
         }),
       )
       .catch(() => {
         // The catalog still shows without these; the management buttons just stay hidden.
       });
-  }, [canManage, viewerIsSuperAdmin, viewerBranchId, vatRatePercent]);
+  }, [canManage, viewerIsSuperAdmin, viewerBranchId, vatRatePercent, strictMarkPoint]);
 
   async function handleToggleArchive(product: ProductListItem): Promise<void> {
     setNotice(null);

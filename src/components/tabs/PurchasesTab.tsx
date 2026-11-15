@@ -68,6 +68,7 @@ export function PurchasesTab({
   canCreateProduct,
   viewerEmployeeId,
   vatRatePercent,
+  strictMarkPoint = null,
   viewerIsSuperAdmin,
   viewerBranchId,
 }: {
@@ -87,6 +88,8 @@ export function PurchasesTab({
   canCreateProduct: boolean;
   viewerEmployeeId: string | null;
   vatRatePercent: number;
+  /** Strict Mark Point: a new cost fills a purchase line's selling price. */
+  strictMarkPoint?: number | null;
   viewerIsSuperAdmin: boolean;
   viewerBranchId: string | null;
 }) {
@@ -306,6 +309,7 @@ export function PurchasesTab({
           localOnly={localOnly}
           canChooseSupplierType={seesInternational}
           canReceiveNow={canReceive}
+          strictMarkPoint={strictMarkPoint}
           onClose={() => {
             setCreating(false);
             setEditingDraft(null);

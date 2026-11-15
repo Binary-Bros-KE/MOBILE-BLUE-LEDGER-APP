@@ -6,6 +6,7 @@ import { MEASURE_FAMILIES, priceConversionRatio, type ProductUnitConfig, unitFac
 import { ChevronDown, Loader2, Plus, ScanLine } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { centsToPriceText, priceTextToCents, priceTextToExactCents } from "@/lib/money";
+import { initialPriceFollowing, markPointPriceChange, type PriceFollowing } from "@/lib/mark-point-form";
 import type { MobileCategory, ProductInput, ProductTaxTypeValue } from "@/lib/types";
 import { BarcodeScannerSheet, cameraScanSupported } from "../BarcodeScannerSheet";
 import { BottomSheet, SheetError, SheetField, sheetInputClass } from "../BottomSheet";
@@ -111,6 +112,8 @@ export function ProductFormModal({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Strict Mark Point: typing one price fills the other (lib/mark-point-form.ts).
+  const [priceFollowing, setPriceFollowing] = useState<PriceFollowing>(null);
   const singleStorefront = hasSingleStorefront(options);
 
   useEffect(() => {
@@ -131,6 +134,9 @@ export function ProductFormModal({
         } else if (loadedConfig?.kind === "measure") {
           setUnitsKind(MEASURE_FAMILIES.find((f) => f.base === p.unitOfMeasure)?.key ?? "");
         }
+        setPriceFollowing(
+          initialPriceFollowing(centsToPriceText(inPriceUnit(p.buyingPriceCents)), centsToPriceText(inPriceUnit(p.sellingPriceCents)), options.strictMarkPoint),
+        );
         setForm({
           name: p.name,
           sku: p.sku,
@@ -158,6 +164,12 @@ export function ProductFormModal({
       .catch((err) => setError(err instanceof ApiError ? err.message : "Could not load this product."))
       .finally(() => setLoading(false));
   }, [productId, singleStorefront]);
+
+  function setPrice(edited: "buying" | "selling", value: string): void {
+    const next = markPointPriceChange({ buying: form.buyingPrice, selling: form.sellingPrice, following: priceFollowing }, edited, value, options.strictMarkPoint);
+    setPriceFollowing(next.following);
+    setForm((prev) => ({ ...prev, buyingPrice: next.buying, sellingPrice: next.selling }));
+  }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -343,12 +355,17 @@ export function ProductFormModal({
 
           <div className="grid grid-cols-2 gap-3">
             <SheetField label={`Selling price${priceUnitLabel}`}>
-              <input inputMode="decimal" value={form.sellingPrice} onChange={(e) => set("sellingPrice", e.target.value)} required className={sheetInputClass} />
+              <input inputMode="decimal" value={form.sellingPrice} onChange={(e) => setPrice("selling", e.target.value)} required className={sheetInputClass} />
             </SheetField>
             <SheetField label={`Buying price${priceUnitLabel}`}>
-              <input inputMode="decimal" value={form.buyingPrice} onChange={(e) => set("buyingPrice", e.target.value)} placeholder="0" className={sheetInputClass} />
+              <input inputMode="decimal" value={form.buyingPrice} onChange={(e) => setPrice("buying", e.target.value)} placeholder="0" className={sheetInputClass} />
             </SheetField>
           </div>
+          {options.strictMarkPoint !== null && (
+            <p className="-mt-1 text-[11px] font-semibold text-navy/50">
+              Mark point {options.strictMarkPoint}: typing one price fills in the other. You can still change either.
+            </p>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <SheetField label={isEdit ? "SKU" : "SKU (optional)"}>

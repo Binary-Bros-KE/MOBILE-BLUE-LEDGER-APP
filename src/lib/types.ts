@@ -122,6 +122,10 @@ export type MobileSessionInfo = {
   /** Admin "Invoice stock from Main Store" toggle — shows the Stock From picker on invoices and on
    * Convert to Invoice; SERVER refuses a Main Store invoice regardless when it's off. */
   invoiceStockFromMainStore: boolean;
+  /** Mark Point (lib/mark-point.ts) — absent from an older SERVER, which reads as off. */
+  markPointEnabled: boolean;
+  markPoint: number | null;
+  markPointStrict: boolean;
   /** Server-authoritative — see SERVER's Role.isSuperAdmin doc comment. Gates the Working Hours tab
    * (view AND edit are Super-Admin-exclusive, not a delegable module/action permission). */
   isSuperAdmin: boolean;
