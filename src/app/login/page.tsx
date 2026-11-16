@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Lock } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { AlertTriangle, Loader2, Lock } from "lucide-react";
 import { ApiError, LICENSE_KEY_STORAGE_KEY } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { billing, owedPeriods, type PaymentSchedule, type Wallet } from "@/lib/billing";
+import { computeBalanceReminder } from "@/lib/billing-warnings";
+import { formatCents } from "@/lib/money";
+import { PayFlowSheet } from "@/components/billing/PayFlowSheet";
 
 export default function LoginPage() {
   const { status, login } = useAuth();
@@ -19,6 +24,23 @@ export default function LoginPage() {
   // should never have to type it a second time. "showLicenseField" only reopens if they
   // deliberately ask to switch businesses.
   const [showLicenseField, setShowLicenseField] = useState(false);
+  // The business's Blue Ledger subscription, by license key (no session needed): the same overdue /
+  // short-balance warnings DESKTOP shows at login, and a way to pay when sign-in is refused because
+  // the license was locked for non-payment.
+  const [schedule, setSchedule] = useState<PaymentSchedule | null>(null);
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [lockedForPayment, setLockedForPayment] = useState(false);
+  const [payFlow, setPayFlow] = useState<"pay" | "topup" | null>(null);
+  const [paidNotice, setPaidNotice] = useState(false);
+
+  function loadBilling(): void {
+    Promise.all([billing.schedule(), billing.wallet()])
+      .then(([s, w]) => {
+        setSchedule(s);
+        setWallet(w);
+      })
+      .catch(() => undefined);
+  }
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -32,6 +54,7 @@ export default function LoginPage() {
     if (stored) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLicenseKey(stored);
+      loadBilling();
     } else {
       setShowLicenseField(true);
     }
@@ -46,6 +69,11 @@ export default function LoginPage() {
       router.replace("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not reach the API. Check your connection.");
+      if (err instanceof ApiError && err.status === 403 && err.message.includes("PAYMENT_OVERDUE")) {
+        setLockedForPayment(true);
+        setPaidNotice(false);
+        loadBilling();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -61,6 +89,47 @@ export default function LoginPage() {
           <h1 className="mt-2 font-display text-xl text-navy">BLUE LEDGER</h1>
           <p className="text-xs font-semibold tracking-wide text-navy/50 uppercase">Owner App</p>
         </div>
+
+        {(() => {
+          const owed = owedPeriods(schedule);
+          const reminder = wallet
+            ? computeBalanceReminder({
+                licenseStatus: "active",
+                subscriptionType: null,
+                nextDueDate: wallet.nextDueDate,
+                walletBalanceCents: wallet.balanceCents,
+                pricePerPeriodCents: wallet.pricePerPeriodCents,
+              })
+            : null;
+          if (paidNotice) {
+            return <p className="mt-6 rounded border border-green/30 bg-green/10 px-4 py-2.5 text-sm font-semibold text-green">Payment received — sign in again.</p>;
+          }
+          if (!lockedForPayment && owed.length === 0 && !reminder) return null;
+          return (
+            <div className={`mt-6 rounded border px-4 py-3 text-xs font-semibold ${owed.length > 0 || lockedForPayment ? "border-red/30 bg-red/10 text-red" : "border-gold/40 bg-gold/10 text-navy"}`}>
+              <p className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 size-4 flex-none" aria-hidden="true" />
+                <span>
+                  {owed.length > 0
+                    ? `You have ${owed.length} overdue payment${owed.length === 1 ? "" : "s"} (${owed.map((e) => e.label).join(", ")}). Please settle ${owed.length === 1 ? "it" : "them"} to avoid any inconvenience.`
+                    : lockedForPayment
+                      ? "This business is locked until its Blue Ledger payment is made."
+                      : `Your balance won't cover the payment due in ${reminder!.daysUntilDue} day${reminder!.daysUntilDue === 1 ? "" : "s"} — top up at least ${formatCents(reminder!.shortByCents, wallet!.currency)}.`}
+                </span>
+              </p>
+              {schedule && schedule.pricePerPeriodCents !== null && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setPayFlow("pay")} className="rounded bg-blue py-2 text-xs font-bold text-white">
+                    Pay Now
+                  </button>
+                  <button type="button" onClick={() => setPayFlow("topup")} className="rounded border border-navy/20 bg-white py-2 text-xs font-bold text-navy">
+                    Top Up
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           {error && (
@@ -136,6 +205,22 @@ export default function LoginPage() {
             Same employee code and PIN you use on the till. This app is read-only.
           </p>
         </form>
+
+        <AnimatePresence>
+          {payFlow && schedule && (
+            <PayFlowSheet
+              mode={payFlow}
+              schedule={schedule}
+              onClose={() => setPayFlow(null)}
+              onPaid={() => {
+                setError(null);
+                setLockedForPayment(false);
+                setPaidNotice(true);
+                loadBilling();
+              }}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   FileText,
   LayoutDashboard,
   Package,
+  Receipt,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -44,6 +45,7 @@ export type TabKey =
   | "approvals"
   | "workingHours"
   | "settings"
+  | "payments"
   | "reports";
 
 export type NavItem = {
@@ -150,6 +152,8 @@ export const navGroups: NavGroup[] = [
           { module: "payment_methods", action: "edit" },
         ],
       },
+      // This business's own Blue Ledger subscription: balance, Pay Now, Top Up (Super Admin only).
+      { key: "payments", label: "Payments", icon: Receipt, ready: true, superAdminOnly: true },
     ],
   },
 ];

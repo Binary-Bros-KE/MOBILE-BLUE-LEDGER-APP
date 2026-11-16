@@ -129,6 +129,15 @@ export type MobileSessionInfo = {
   /** Server-authoritative — see SERVER's Role.isSuperAdmin doc comment. Gates the Working Hours tab
    * (view AND edit are Super-Admin-exclusive, not a delegable module/action permission). */
   isSuperAdmin: boolean;
+  /** Blue Ledger subscription status for the overdue / short-balance warnings (lib/billing-warnings.ts).
+   * Absent from an older SERVER. */
+  billing?: {
+    licenseStatus: string;
+    subscriptionType: string | null;
+    nextDueDate: string | null;
+    walletBalanceCents: number | null;
+    pricePerPeriodCents: number | null;
+  };
 };
 
 export type Employee = {

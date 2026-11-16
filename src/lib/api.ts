@@ -102,7 +102,7 @@ import { timezoneOffsetMinutes } from "./period";
 
 // The only place this app knows the API's address — change NEXT_PUBLIC_API_URL in .env.local
 // (or the real deployment env) and nothing else needs to change.
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+export const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const TOKEN_STORAGE_KEY = "bl_owner_token";
 // Deliberately a SEPARATE key from the session token, and never cleared on logout — the whole

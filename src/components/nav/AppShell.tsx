@@ -21,6 +21,8 @@ import { InvoicesTab } from "../tabs/InvoicesTab";
 import { ProductsTab } from "../tabs/ProductsTab";
 import { strictMarkPoint } from "@/lib/mark-point";
 import { PurchasesTab } from "../tabs/PurchasesTab";
+import { PaymentsTab } from "../tabs/PaymentsTab";
+import { BillingNotice } from "../billing/BillingNotice";
 import { QuotationsTab } from "../tabs/QuotationsTab";
 import { ReportsTab } from "../tabs/ReportsTab";
 import { RidersTab } from "../tabs/RidersTab";
@@ -113,6 +115,11 @@ export function AppShell() {
         <span className="font-display text-sm">{TAB_LABELS[activeTab]}</span>
       </header>
       <OfflineStatusBar currency={session?.currency ?? "KES"} />
+      <BillingNotice
+        billing={session?.billing}
+        currency={session?.currency ?? "KES"}
+        onOpenPayments={session?.isSuperAdmin ? () => setActiveTab("payments") : undefined}
+      />
 
       <Sidebar
         open={drawerOpen}
@@ -261,6 +268,7 @@ export function AppShell() {
           {activeTab === "stockLedger" && <StockLedgerTab />}
           {activeTab === "approvals" && <ApprovalsTab />}
           {activeTab === "workingHours" && <WorkingHoursTab />}
+          {activeTab === "payments" && <PaymentsTab licenseStatus={session?.billing?.licenseStatus ?? null} />}
         </motion.main>
       </AnimatePresence>
 
