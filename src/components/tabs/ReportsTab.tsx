@@ -156,6 +156,10 @@ export function ReportsTab({ viewerIsSuperAdmin }: { viewerIsSuperAdmin: boolean
                     <span className="font-bold text-navy">{l.locationName}</span>
                     <span className="font-bold text-navy">{formatCents(l.costValueCents, stock.currency)}</span>
                   </div>
+                  <div className="flex justify-between gap-2 text-[11px] text-navy/50">
+                    <span>{l.isMainStore ? "Main Store · " : ""}at selling price</span>
+                    <span className="font-semibold">{formatCents(l.retailValueCents, stock.currency)}</span>
+                  </div>
                   <p className="text-[11px] text-navy/50">
                     {l.totalUnits.toLocaleString()} units · {l.productCount} products
                     {l.lowStockCount > 0 ? ` · ${l.lowStockCount} low` : ""}
