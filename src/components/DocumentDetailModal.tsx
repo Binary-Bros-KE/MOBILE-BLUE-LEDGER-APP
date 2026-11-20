@@ -1,5 +1,6 @@
 "use client";
 
+import { overdueLabel } from "@/lib/overdue";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Ban, Copy, Download, Loader2, Package, Printer, Settings2, Share2, Trash2, Undo2, X } from "lucide-react";
@@ -467,7 +468,7 @@ export function DocumentDetailModal({
               <p className="font-display text-lg text-navy">{documentLabel}</p>
               {statusValue && statusTone && (
                 <span className={`rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${statusTone}`}>
-                  {formatStatus(statusValue)}
+                  {statusValue === "overdue" && doc?.dueDate ? overdueLabel(doc.dueDate) : formatStatus(statusValue)}
                 </span>
               )}
             </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { overdueLabel } from "@/lib/overdue";
 import { FileText, Store, User } from "lucide-react";
 import { formatCents } from "@/lib/money";
 import type { InvoiceListItem } from "@/lib/types";
@@ -48,7 +49,7 @@ export function InvoiceCard({ invoice, onSelect }: { invoice: InvoiceListItem; o
       </div>
       <div className="flex flex-wrap items-center gap-1.5 pl-14">
         <span className={`rounded-full border border-dashed px-2 py-0.5 text-[10px] font-extrabold tracking-wide uppercase ${statusTone}`}>
-          {formatStatus(invoice.paymentStatus)}
+          {invoice.paymentStatus === "overdue" && invoice.dueDate ? overdueLabel(invoice.dueDate) : formatStatus(invoice.paymentStatus)}
         </span>
         {invoice.balanceDueCents > 0 && (
           <span className="text-[10px] font-bold text-red">{formatCents(invoice.balanceDueCents, invoice.currency)} due</span>
